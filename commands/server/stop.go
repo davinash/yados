@@ -1,14 +1,14 @@
-package node
+package server
 
 import (
 	"github.com/davinash/yados/commands/utils"
 	"github.com/spf13/cobra"
 )
 
-func AddNodeStartCmd(parentCmd *cobra.Command) {
+func AddNodeStopCmd(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Start a node",
+		Use:   "stop",
+		Short: "Stop a server",
 		Args:  utils.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return nil

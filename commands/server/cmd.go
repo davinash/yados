@@ -1,4 +1,4 @@
-package node
+package server
 
 import (
 	"github.com/davinash/yados/commands/utils"
@@ -7,7 +7,7 @@ import (
 
 func AddCommands(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
-		Use:   "node",
+		Use:   "server",
 		Short: "Manage & Monitor Nodes in YADOS Cluster",
 		Args:  utils.ExactArgs(0),
 		RunE:  utils.ShowHelp(),
