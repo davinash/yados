@@ -1,4 +1,4 @@
-package message
+package server
 
 type Operation struct {
 	Id        string      `json:"id"`
