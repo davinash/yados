@@ -7,11 +7,35 @@ import (
 	"net/http"
 )
 
-func handleMessage(op Operation, server *Server) (interface{}, error) {
-	return nil, nil
+type Response struct {
+	response interface{}
+	err      error
+}
+
+var (
+	operationHandler map[string]func(interface{}) Response
+)
+
+func handleMessage(op Operation, server *Server) Response {
+	if fn, ok := operationHandler[op.Name]; ok {
+		return fn(op.Arguments)
+	} else {
+
+	}
+	return Response{}
+}
+
+func initialize() error {
+	operationHandler["Put"] = Put
+	operationHandler["Get"] = Get
+	operationHandler["Delete"] = Delete
+	operationHandler["CreateStore"] = CreateStore
+	operationHandler["DeleteStore"] = DeleteStore
+	return nil
 }
 
 func setupRouter(server *Server) *gin.Engine {
+	initialize()
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.POST("/message", func(context *gin.Context) {
@@ -20,12 +44,12 @@ func setupRouter(server *Server) *gin.Engine {
 			context.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
-		result, err := handleMessage(op, server)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, err.Error())
+		resp := handleMessage(op, server)
+		if resp.err != nil {
+			context.JSON(http.StatusInternalServerError, resp.err.Error())
 			return
 		}
-		resultMarshalled, err := json.Marshal(result)
+		resultMarshalled, err := json.Marshal(resp.response)
 		if err != nil {
 			context.JSON(http.StatusInternalServerError, err.Error())
 			return
