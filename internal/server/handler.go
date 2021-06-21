@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"log"
 	"net/http"
 )
 
@@ -26,6 +27,8 @@ func handleMessage(op Operation, server *Server) Response {
 }
 
 func initialize() error {
+	operationHandler = make(map[string]func(interface{}) Response)
+
 	operationHandler["Put"] = Put
 	operationHandler["Get"] = Get
 	operationHandler["Delete"] = Delete
@@ -38,9 +41,17 @@ func setupRouter(server *Server) *gin.Engine {
 	initialize()
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
+
+	router.POST("/ping", func(context *gin.Context) {
+		context.JSON(http.StatusOK, gin.H{
+			"response": "pong",
+		})
+	})
+
 	router.POST("/message", func(context *gin.Context) {
 		var op Operation
 		if err := context.ShouldBindWith(&op, binding.JSON); err != nil {
+			log.Println(err.Error())
 			context.JSON(http.StatusBadRequest, err.Error())
 			return
 		}

@@ -7,15 +7,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 )
 
 type Server struct {
-	name       string
-	port       int
-	listener   net.Listener
-	OSSignalCh chan os.Signal
+	name        string
+	port        int
+	listener    net.Listener
+	OSSignalCh  chan os.Signal
+	address     string
+	clusterName string
 }
 
 func GetExistingServer() (*Server, error) {
@@ -23,15 +24,13 @@ func GetExistingServer() (*Server, error) {
 	return &server, nil
 }
 
-func CreateNewServer(name string, port string) (*Server, error) {
+func CreateNewServer(name string, address string, port int, clusterName string) (*Server, error) {
 	server := Server{
-		name: name,
+		name:        name,
+		address:     address,
+		port:        port,
+		clusterName: clusterName,
 	}
-	p, err := strconv.Atoi(port)
-	if err != nil {
-		return nil, err
-	}
-	server.port = p
 	server.OSSignalCh = make(chan os.Signal, 1)
 	return &server, nil
 }
@@ -39,7 +38,7 @@ func CreateNewServer(name string, port string) (*Server, error) {
 func (server *Server) Start() error {
 	signal.Notify(server.OSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", server.port))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.address, server.port))
 	if err != nil {
 		return fmt.Errorf("failed to start server: %v", err)
 	}
@@ -48,6 +47,8 @@ func (server *Server) Start() error {
 	go func() {
 		http.Serve(server.listener, setupRouter(server))
 	}()
+
+	//SendMessage(member1, operations)
 
 	for {
 		select {

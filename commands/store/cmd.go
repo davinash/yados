@@ -15,5 +15,6 @@ func AddCommands(rootCmd *cobra.Command) {
 	AddCreateStoreCommand(cmd)
 	AddDeleteStoreCommand(cmd)
 	AddGetStoreCommand(cmd)
+	AddListStoreCommand(cmd)
 	rootCmd.AddCommand(cmd)
 }

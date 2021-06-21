@@ -15,5 +15,6 @@ func AddCommands(rootCmd *cobra.Command) {
 	AddDeleteObjectCommand(cmd)
 	AddGetObjectCommand(cmd)
 	AddPutObjectCommand(cmd)
+	AddListObjectCommand(cmd)
 	rootCmd.AddCommand(cmd)
 }

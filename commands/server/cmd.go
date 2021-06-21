@@ -15,5 +15,7 @@ func AddCommands(rootCmd *cobra.Command) {
 	AddNodeStartCmd(cmd)
 	AddNodeStopCmd(cmd)
 	AddNodeStatusCmd(cmd)
+	AddServerAddCmd(cmd)
+	AddServerRemoveCmd(cmd)
 	rootCmd.AddCommand(cmd)
 }
