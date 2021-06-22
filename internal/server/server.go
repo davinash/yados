@@ -48,7 +48,7 @@ func (server *Server) Start() error {
 
 	if member, ok := server.members[server.name]; ok {
 		if member.clusterName == server.clusterName {
-			return fmt.Errorf("Server with name %s already exists in cluster %s", server.name, server.clusterName)
+			return fmt.Errorf("server with name %s already exists in cluster %s", server.name, server.clusterName)
 		}
 	}
 
