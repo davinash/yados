@@ -1,8 +1,7 @@
 package tests
 
+import "log"
+
 func (suite *YadosTestSuite) TestServerStart() {
-}
-func (suite *YadosTestSuite) TestServerStart1() {
-}
-func (suite *YadosTestSuite) TestServerStart2() {
+	log.Println("Running Test TestServerStart")
 }

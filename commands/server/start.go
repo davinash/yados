@@ -16,11 +16,11 @@ func AddNodeStartCmd(parentCmd *cobra.Command) {
 		Short: "Start a server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println(args)
-			server, err := server.CreateNewServer(serverName, address, port, clusterName)
+			srv, err := server.CreateNewServer(serverName, address, port, clusterName)
 			if err != nil {
 				return err
 			}
-			return server.Start()
+			return srv.StartAndWait()
 		},
 	}
 	cmd.Flags().StringVar(&serverName, "name", "", "Name of the server")

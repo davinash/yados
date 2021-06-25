@@ -43,8 +43,20 @@ func CreateNewServer(name string, address string, port int, clusterName string) 
 	return &server, nil
 }
 
+func (server *Server) HandleSignal() {
+	for {
+		select {
+		case _ = <-server.OSSignalCh:
+			log.Println("Exiting ... ")
+			server.Stop()
+			os.Exit(0)
+		}
+	}
+}
+
 func (server *Server) Start() error {
 	signal.Notify(server.OSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go server.HandleSignal()
 
 	if member, ok := server.members[server.name]; ok {
 		if member.clusterName == server.clusterName {
@@ -54,34 +66,36 @@ func (server *Server) Start() error {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.address, server.port))
 	if err != nil {
-		return fmt.Errorf("failed to start server: %v", err)
+		return fmt.Errorf("failed to start server: Error = %v", err)
 	}
 	server.listener = listener
-
 	go func() {
-		err := http.Serve(server.listener, setupRouter(server))
-		if err != nil {
-			log.Fatalf("Failed to start a server, Error = %v", err)
-		}
+		http.Serve(server.listener, setupRouter(server))
 	}()
-	// Make your own entry into members map
+
 	server.members[server.name] = &MemberServer{
 		port:        server.port,
 		address:     server.address,
 		clusterName: server.clusterName,
 	}
+	return nil
+}
 
-	for {
-		select {
-		case _ = <-server.OSSignalCh:
-			log.Println("Exiting ... ")
-			os.Exit(0)
-		}
+func (server *Server) StartAndWait() error {
+	err := server.Start()
+	if err != nil {
+		return err
 	}
+	<-server.OSSignalCh
 	return nil
 }
 
 func (server *Server) Stop() error {
+	err := server.listener.Close()
+	if err != nil {
+		log.Printf("failed to stop the http server, Error = %v\n", err)
+		return err
+	}
 	return nil
 }
 
