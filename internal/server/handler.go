@@ -8,16 +8,16 @@ import (
 	"net/http"
 )
 
-type Response struct {
-	response interface{}
-	err      error
-}
+//type Response struct {
+//	response interface{}
+//	err      error
+//}
 
 var (
 	operationHandler map[string]func(interface{}) Response
 )
 
-func handleMessage(op Operation, server *Server) Response {
+func handleMessage(op Request, server *Server) Response {
 	if fn, ok := operationHandler[op.Name]; ok {
 		return fn(op.Arguments)
 	} else {
@@ -49,7 +49,7 @@ func setupRouter(server *Server) *gin.Engine {
 	})
 
 	router.POST("/message", func(context *gin.Context) {
-		var op Operation
+		var op Request
 		if err := context.ShouldBindWith(&op, binding.JSON); err != nil {
 			log.Println(err.Error())
 			context.JSON(http.StatusBadRequest, err.Error())
@@ -60,7 +60,7 @@ func setupRouter(server *Server) *gin.Engine {
 			context.JSON(http.StatusInternalServerError, resp.err.Error())
 			return
 		}
-		resultMarshalled, err := json.Marshal(resp.response)
+		resultMarshalled, err := json.Marshal(resp.Response)
 		if err != nil {
 			context.JSON(http.StatusInternalServerError, err.Error())
 			return

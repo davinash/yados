@@ -20,10 +20,7 @@ build:
 	GO111MODULE=on go build -ldflags "-X main.Version=$(VERSION)" -o out/yados$(EXE)  cmd/main.go
 
 test:
-	GOFLAGS="-count=1" GO111MODULE=on $(GO_TEST) -timeout 50m github.com/davinash/yados/tests -v
-
-test-single:
-	GOFLAGS="-count=1" GO111MODULE=on go test -v github.com/davinash/yados/tests -testify.m $(TEST_NAME)
+	go test github.com/davinash/yados/... -v
 
 clean:
 	rm -rf out/*

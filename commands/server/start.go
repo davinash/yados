@@ -13,7 +13,7 @@ func AddNodeStartCmd(parentCmd *cobra.Command) {
 	var clusterName string
 	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "Start a server",
+		Short: "startHttpServer a server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println(args)
 			srv, err := server.CreateNewServer(serverName, address, port, clusterName)
