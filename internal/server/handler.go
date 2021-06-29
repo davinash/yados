@@ -1,24 +1,18 @@
 package server
 
 import (
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"log"
 	"net/http"
 )
 
-//type Response struct {
-//	response interface{}
-//	err      error
-//}
-
 var (
-	operationHandler map[string]func(interface{}) Response
+	operationHandler map[OperationId]func(interface{}) Response
 )
 
 func handleMessage(op Request, server *Server) Response {
-	if fn, ok := operationHandler[op.Name]; ok {
+	if fn, ok := operationHandler[op.Id]; ok {
 		return fn(op.Arguments)
 	} else {
 
@@ -27,17 +21,18 @@ func handleMessage(op Request, server *Server) Response {
 }
 
 func initialize() error {
-	operationHandler = make(map[string]func(interface{}) Response)
+	operationHandler = make(map[OperationId]func(interface{}) Response)
 
-	operationHandler["Put"] = Put
-	operationHandler["Get"] = Get
-	operationHandler["Delete"] = Delete
-	operationHandler["CreateStore"] = CreateStore
-	operationHandler["DeleteStore"] = DeleteStore
+	operationHandler[PutObject] = Put
+	operationHandler[GetObject] = Get
+	operationHandler[DeleteObject] = Delete
+	operationHandler[CreateStoreInCluster] = CreateStore
+	operationHandler[DeleteStoreFromCluster] = DeleteStore
+	operationHandler[AddNewMember] = Join
 	return nil
 }
 
-func setupRouter(server *Server) *gin.Engine {
+func SetupRouter(server *Server) *gin.Engine {
 	initialize()
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
@@ -56,16 +51,11 @@ func setupRouter(server *Server) *gin.Engine {
 			return
 		}
 		resp := handleMessage(op, server)
-		if resp.err != nil {
-			context.JSON(http.StatusInternalServerError, resp.err.Error())
+		if resp.Err != nil {
+			context.JSON(http.StatusInternalServerError, resp.Err.Error())
 			return
 		}
-		resultMarshalled, err := json.Marshal(resp.Response)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, err.Error())
-			return
-		}
-		context.JSON(http.StatusOK, resultMarshalled)
+		context.JSON(http.StatusOK, resp)
 	})
 	return router
 }

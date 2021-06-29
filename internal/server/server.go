@@ -27,6 +27,7 @@ type Server struct {
 	address     string
 	clusterName string
 	members     map[string]*MemberServer
+	isTestMode  bool
 }
 
 func GetExistingServer() (*Server, error) {
@@ -41,6 +42,7 @@ func CreateNewServer(name string, address string, port int, clusterName string) 
 		port:        port,
 		clusterName: clusterName,
 		members:     map[string]*MemberServer{},
+		isTestMode:  false,
 	}
 	server.OSSignalCh = make(chan os.Signal, 1)
 	return &server, nil
@@ -57,6 +59,10 @@ func (server *Server) HandleSignal() {
 	}
 }
 
+func (server *Server) EnableTestMode() {
+	server.isTestMode = true
+}
+
 func (server *Server) startHttpServer() error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.address, server.port))
 	if err != nil {
@@ -64,18 +70,21 @@ func (server *Server) startHttpServer() error {
 	}
 	server.listener = listener
 	go func() {
-		http.Serve(server.listener, setupRouter(server))
+		http.Serve(server.listener, SetupRouter(server))
 	}()
 	return nil
 }
 
 func (server *Server) SendMessage(srv *MemberServer, request *Request) (*Response, error) {
-	url := fmt.Sprintf("%s:%d/message", srv.address, srv.port)
+	url := fmt.Sprintf("http://%s:%d/message", srv.address, srv.port)
 	requestBytes, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
 	}
 	r, err := http.NewRequest("POST", url, bytes.NewReader(requestBytes))
+	if err != nil {
+		return nil, err
+	}
 	r.Header.Set("Content-Type", "application/json; charset=UTF-8")
 
 	client := &http.Client{}
@@ -88,6 +97,9 @@ func (server *Server) SendMessage(srv *MemberServer, request *Request) (*Respons
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return nil, fmt.Errorf("StatusCode is not OK: %v. Body: %v ", resp.StatusCode, string(body))
 	}
+	if err != nil {
+		return nil, err
+	}
 	var result Response
 	err = json.Unmarshal(body, &result)
 	if err != nil {
@@ -98,6 +110,18 @@ func (server *Server) SendMessage(srv *MemberServer, request *Request) (*Respons
 
 func (server *Server) BroadcastMessage(request *Request) ([]*Response, error) {
 	allResponses := make([]*Response, 0)
+	// First add yourself
+	resp, err := server.SendMessage(&MemberServer{
+		port:        server.port,
+		address:     server.address,
+		clusterName: server.clusterName,
+	}, request)
+	if err != nil {
+		return nil, err
+	}
+	allResponses = append(allResponses, resp)
+
+	// Send message to all the members
 	for _, srv := range server.members {
 		resp, err := server.SendMessage(srv, request)
 		if err != nil {
@@ -110,16 +134,19 @@ func (server *Server) BroadcastMessage(request *Request) ([]*Response, error) {
 
 func (server *Server) PostInit() error {
 	log.Println("Performing Post Initialization ...")
-	if member, ok := server.members[server.name]; ok {
-		if member.clusterName == server.clusterName {
-			return fmt.Errorf("server with name %s already exists in cluster %s", server.name, server.clusterName)
-		}
+	responses, err := server.BroadcastMessage(&Request{
+		Id: AddNewMember,
+		Arguments: JoinMember{
+			Port:        0,
+			Address:     server.address,
+			ClusterName: server.clusterName,
+			Name:        server.name,
+		},
+	})
+	if err != nil {
+		return err
 	}
-	server.members[server.name] = &MemberServer{
-		port:        server.port,
-		address:     server.address,
-		clusterName: server.clusterName,
-	}
+	log.Printf("-----> %+v\n", responses)
 	return nil
 }
 
@@ -141,10 +168,12 @@ func (server *Server) StartAndWait() error {
 }
 
 func (server *Server) Stop() error {
-	err := server.listener.Close()
-	if err != nil {
-		log.Printf("failed to stop the http server, Error = %v\n", err)
-		return err
+	log.Println("Stopping the server ...")
+	if !server.isTestMode {
+		if err := server.listener.Close(); err != nil {
+			log.Printf("failed to stop the http server, Error = %v\n", err)
+			return err
+		}
 	}
 	return nil
 }
