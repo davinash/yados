@@ -8,20 +8,20 @@ import (
 )
 
 var (
-	operationHandler map[OperationId]func(interface{}, *Server) Response
+	operationHandler map[OperationId]func(interface{}, *Server) (*Response, error)
 )
 
-func handleMessage(op Request, server *Server) Response {
+func handleMessage(op Request, server *Server) (*Response, error) {
 	if fn, ok := operationHandler[op.Id]; ok {
 		return fn(op.Arguments, server)
 	} else {
 
 	}
-	return Response{}
+	return &Response{}, nil
 }
 
 func initialize() error {
-	operationHandler = make(map[OperationId]func(interface{}, *Server) Response)
+	operationHandler = make(map[OperationId]func(interface{}, *Server) (*Response, error))
 
 	operationHandler[PutObject] = Put
 	operationHandler[GetObject] = Get
@@ -52,9 +52,9 @@ func SetupRouter(server *Server) *gin.Engine {
 			context.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
-		resp := handleMessage(op, server)
-		if resp.Err != nil {
-			context.JSON(http.StatusInternalServerError, resp.Err.Error())
+		resp, err := handleMessage(op, server)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, err)
 			return
 		}
 		context.JSON(http.StatusOK, resp)

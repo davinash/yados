@@ -19,7 +19,6 @@ type Request struct {
 type Response struct {
 	Id   string      `json:"id"`
 	Resp interface{} `json:"response"`
-	Err  error       `json:"err"`
 }
 
 type JoinMember struct {

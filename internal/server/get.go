@@ -1,5 +1,5 @@
 package server
 
-func Get(args interface{}, server *Server) Response {
-	return Response{}
+func Get(args interface{}, server *Server) (*Response, error) {
+	return &Response{}, nil
 }
