@@ -1,13 +1,13 @@
 package server
 
-func CreateStore(args interface{}) Response {
+func CreateStore(args interface{}, server *Server) Response {
 	return Response{}
 }
 
-func DeleteStore(args interface{}) Response {
+func DeleteStore(args interface{}, server *Server) Response {
 	return Response{}
 }
 
-func GetStore(args interface{}) Response {
+func GetStore(args interface{}, server *Server) Response {
 	return Response{}
 }

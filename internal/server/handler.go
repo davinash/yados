@@ -8,12 +8,12 @@ import (
 )
 
 var (
-	operationHandler map[OperationId]func(interface{}) Response
+	operationHandler map[OperationId]func(interface{}, *Server) Response
 )
 
 func handleMessage(op Request, server *Server) Response {
 	if fn, ok := operationHandler[op.Id]; ok {
-		return fn(op.Arguments)
+		return fn(op.Arguments, server)
 	} else {
 
 	}
@@ -21,7 +21,7 @@ func handleMessage(op Request, server *Server) Response {
 }
 
 func initialize() error {
-	operationHandler = make(map[OperationId]func(interface{}) Response)
+	operationHandler = make(map[OperationId]func(interface{}, *Server) Response)
 
 	operationHandler[PutObject] = Put
 	operationHandler[GetObject] = Get
@@ -34,8 +34,10 @@ func initialize() error {
 
 func SetupRouter(server *Server) *gin.Engine {
 	initialize()
+
 	gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery())
 
 	router.POST("/ping", func(context *gin.Context) {
 		context.JSON(http.StatusOK, gin.H{

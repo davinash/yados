@@ -1,5 +1,5 @@
 package server
 
-func Delete(args interface{}) Response {
+func Delete(args interface{}, server *Server) Response {
 	return Response{}
 }

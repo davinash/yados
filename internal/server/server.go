@@ -134,7 +134,7 @@ func (server *Server) BroadcastMessage(request *Request) ([]*Response, error) {
 
 func (server *Server) PostInit() error {
 	log.Println("Performing Post Initialization ...")
-	responses, err := server.BroadcastMessage(&Request{
+	_, err := server.BroadcastMessage(&Request{
 		Id: AddNewMember,
 		Arguments: JoinMember{
 			Port:        0,
@@ -146,7 +146,6 @@ func (server *Server) PostInit() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("-----> %+v\n", responses)
 	return nil
 }
 

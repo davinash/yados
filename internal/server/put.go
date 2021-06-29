@@ -1,5 +1,5 @@
 package server
 
-func Put(args interface{}) Response {
+func Put(args interface{}, server *Server) Response {
 	return Response{}
 }

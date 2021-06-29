@@ -1,19 +1,11 @@
 package server
 
-import "log"
+import (
+	"log"
+)
 
-func Join(args interface{}) Response {
+func Join(args interface{}, server *Server) Response {
 	log.Println("Adding new member ")
-	return Response{
-		Id: "",
-		Resp: JoinMemberResp{
-			Port:        0,
-			Address:     "",
-			ClusterName: "",
-			Name:        "",
-		},
-		Err: nil,
-	}
 
 	//if member, ok := server.members[server.name]; ok {
 	//	if member.clusterName == server.clusterName {
@@ -25,4 +17,15 @@ func Join(args interface{}) Response {
 	//	address:     server.address,
 	//	clusterName: server.clusterName,
 	//}
+
+	return Response{
+		Id: "",
+		Resp: JoinMemberResp{
+			Port:        0,
+			Address:     "",
+			ClusterName: "",
+			Name:        "",
+		},
+		Err: nil,
+	}
 }
