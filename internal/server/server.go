@@ -17,17 +17,15 @@ type MemberServer struct {
 	port        int
 	address     string
 	clusterName string
+	name        string
 }
 
 type Server struct {
-	name        string
-	port        int
-	listener    net.Listener
-	OSSignalCh  chan os.Signal
-	address     string
-	clusterName string
-	members     map[string]*MemberServer
-	isTestMode  bool
+	self       *MemberServer
+	listener   net.Listener
+	OSSignalCh chan os.Signal
+	members    map[string]*MemberServer
+	isTestMode bool
 }
 
 func GetExistingServer() (*Server, error) {
@@ -37,12 +35,14 @@ func GetExistingServer() (*Server, error) {
 
 func CreateNewServer(name string, address string, port int, clusterName string) (*Server, error) {
 	server := Server{
-		name:        name,
-		address:     address,
-		port:        port,
-		clusterName: clusterName,
-		members:     map[string]*MemberServer{},
-		isTestMode:  false,
+		self: &MemberServer{
+			port:        port,
+			address:     address,
+			clusterName: clusterName,
+			name:        name,
+		},
+		members:    map[string]*MemberServer{},
+		isTestMode: false,
 	}
 	server.OSSignalCh = make(chan os.Signal, 1)
 	return &server, nil
@@ -64,7 +64,7 @@ func (server *Server) EnableTestMode() {
 }
 
 func (server *Server) startHttpServer() error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.address, server.port))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.address, server.self.port))
 	if err != nil {
 		return fmt.Errorf("failed to start server: Error = %v", err)
 	}
@@ -110,17 +110,6 @@ func (server *Server) SendMessage(srv *MemberServer, request *Request) (*Respons
 
 func (server *Server) BroadcastMessage(request *Request) ([]*Response, error) {
 	allResponses := make([]*Response, 0)
-	// First add yourself
-	resp, err := server.SendMessage(&MemberServer{
-		port:        server.port,
-		address:     server.address,
-		clusterName: server.clusterName,
-	}, request)
-	if err != nil {
-		return nil, err
-	}
-	allResponses = append(allResponses, resp)
-
 	// Send message to all the members
 	for _, srv := range server.members {
 		resp, err := server.SendMessage(srv, request)
@@ -136,11 +125,11 @@ func (server *Server) PostInit() error {
 	log.Println("Performing Post Initialization ...")
 	_, err := server.BroadcastMessage(&Request{
 		Id: AddNewMember,
-		Arguments: JoinMember{
-			Port:        0,
-			Address:     server.address,
-			ClusterName: server.clusterName,
-			Name:        server.name,
+		Arguments: MemberServer{
+			port:        server.self.port,
+			address:     server.self.address,
+			clusterName: server.self.clusterName,
+			name:        server.self.name,
 		},
 	})
 	if err != nil {
