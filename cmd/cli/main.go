@@ -1,15 +1,15 @@
 package main
 
 import (
-	"github.com/davinash/yados/commands"
+	"github.com/davinash/yados/commands/cli"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "yados",
-	Short: "YADOS CLI",
+	Use:   "yadosctl",
+	Short: "yadosctl",
 	Long: `
-YADOS cli to interact with YADOS cluster`,
+yadosct cli to interact with YADOS cluster`,
 }
 
 func Execute() {
@@ -24,6 +24,6 @@ func init() {
 }
 
 func main() {
-	commands.AddCommands(rootCmd)
+	cli.AddCommands(rootCmd)
 	Execute()
 }

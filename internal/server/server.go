@@ -24,7 +24,7 @@ type Server struct {
 	self       *MemberServer
 	listener   net.Listener
 	OSSignalCh chan os.Signal
-	members    map[string]*MemberServer
+	peers      map[string]*MemberServer
 	isTestMode bool
 }
 
@@ -33,7 +33,8 @@ func GetExistingServer() (*Server, error) {
 	return &server, nil
 }
 
-func CreateNewServer(name string, address string, port int, clusterName string) (*Server, error) {
+func CreateNewServer(name string, address string, port int, clusterName string,
+	withPeer bool, peerAddress string, peerPort int) (*Server, error) {
 	server := Server{
 		self: &MemberServer{
 			port:        port,
@@ -41,7 +42,7 @@ func CreateNewServer(name string, address string, port int, clusterName string) 
 			clusterName: clusterName,
 			name:        name,
 		},
-		members:    map[string]*MemberServer{},
+		peers:      map[string]*MemberServer{},
 		isTestMode: false,
 	}
 	server.OSSignalCh = make(chan os.Signal, 1)
@@ -111,7 +112,7 @@ func (server *Server) SendMessage(srv *MemberServer, request *Request) (*Respons
 func (server *Server) BroadcastMessage(request *Request) ([]*Response, error) {
 	allResponses := make([]*Response, 0)
 	// Send message to all the members
-	for _, srv := range server.members {
+	for _, srv := range server.peers {
 		resp, err := server.SendMessage(srv, request)
 		if err != nil {
 			return nil, err

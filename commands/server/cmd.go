@@ -8,14 +8,10 @@ import (
 func AddCommands(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "server",
-		Short: "Manage & Monitor Nodes in YADOS Cluster",
+		Short: "Start and join new server in a cluster",
 		Args:  utils.ExactArgs(0),
 		RunE:  utils.ShowHelp(),
 	}
 	AddNodeStartCmd(cmd)
-	AddNodeStopCmd(cmd)
-	AddNodeStatusCmd(cmd)
-	AddServerAddCmd(cmd)
-	AddServerRemoveCmd(cmd)
 	rootCmd.AddCommand(cmd)
 }

@@ -11,12 +11,16 @@ func AddNodeStartCmd(parentCmd *cobra.Command) {
 	var address string
 	var port int
 	var clusterName string
+	var withPeer bool
+	var peerAddress string
+	var peerPort int
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "startHttpServer a server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println(args)
-			srv, err := server.CreateNewServer(serverName, address, port, clusterName)
+			srv, err := server.CreateNewServer(serverName, address, port, clusterName,
+				withPeer, peerAddress, peerPort)
 			if err != nil {
 				return err
 			}
@@ -34,6 +38,11 @@ func AddNodeStartCmd(parentCmd *cobra.Command) {
 	cmd.Flags().StringVar(&clusterName, "cluster-name", "", "Name of the cluster\n"+
 		"Same cluster name need to use for other servers \nin order to participate in the cluster")
 	_ = cmd.MarkFlagRequired("clusterName")
+
+	//--with-peer --peer-address --peer-port
+	cmd.Flags().BoolVar(&withPeer, "with-peer", false, "Use this flag if server need to part of cluster")
+	cmd.Flags().StringVar(&peerAddress, "peer-address", "", "IP address or host name of the peer")
+	cmd.Flags().IntVar(&peerPort, "peer-port", -1, "Port to use for communication with peer")
 
 	parentCmd.AddCommand(cmd)
 }
