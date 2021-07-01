@@ -13,7 +13,7 @@ func Join(args interface{}, server *Server) (*Response, error) {
 	// 1. Check if the peer already exists
 	// 2. If yes see if the cluster Name is the same
 	if peer, ok := server.peers[newPeer.Name]; ok {
-		return nil, fmt.Errorf("server with Name %s already exists in cluster %s", peer.Name)
+		return nil, fmt.Errorf("server with Name %s already exists in cluster", peer.Name)
 	}
 
 	server.peers[newPeer.Name] = &MemberServer{
