@@ -5,6 +5,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	Verbose bool
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "yadosctl",
 	Short: "yadosctl",
@@ -21,6 +25,7 @@ func initConfig() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+	rootCmd.PersistentFlags().BoolVar(&Verbose, "verbose", false, "verbose output")
 }
 
 func main() {

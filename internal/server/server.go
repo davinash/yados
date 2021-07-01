@@ -1,10 +1,7 @@
 package server
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -14,8 +11,8 @@ import (
 )
 
 type MemberServer struct {
-	port        int
-	address     string
+	Port        int
+	Address     string
 	clusterName string
 	name        string
 }
@@ -28,17 +25,12 @@ type Server struct {
 	isTestMode bool
 }
 
-func GetExistingServer() (*Server, error) {
-	server := Server{}
-	return &server, nil
-}
-
 func CreateNewServer(name string, address string, port int, clusterName string,
 	withPeer bool, peerAddress string, peerPort int) (*Server, error) {
 	server := Server{
 		self: &MemberServer{
-			port:        port,
-			address:     address,
+			Port:        port,
+			Address:     address,
 			clusterName: clusterName,
 			name:        name,
 		},
@@ -65,7 +57,7 @@ func (server *Server) EnableTestMode() {
 }
 
 func (server *Server) startHttpServer() error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.address, server.self.port))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.Address, server.self.Port))
 	if err != nil {
 		return fmt.Errorf("failed to start server: Error = %v", err)
 	}
@@ -76,44 +68,11 @@ func (server *Server) startHttpServer() error {
 	return nil
 }
 
-func (server *Server) SendMessage(srv *MemberServer, request *Request) (*Response, error) {
-	url := fmt.Sprintf("http://%s:%d/message", srv.address, srv.port)
-	requestBytes, err := json.Marshal(request)
-	if err != nil {
-		return nil, err
-	}
-	r, err := http.NewRequest("POST", url, bytes.NewReader(requestBytes))
-	if err != nil {
-		return nil, err
-	}
-	r.Header.Set("Content-Type", "application/json; charset=UTF-8")
-
-	client := &http.Client{}
-	resp, err := client.Do(r)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("StatusCode is not OK: %v. Body: %v ", resp.StatusCode, string(body))
-	}
-	if err != nil {
-		return nil, err
-	}
-	var result Response
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
 func (server *Server) BroadcastMessage(request *Request) ([]*Response, error) {
 	allResponses := make([]*Response, 0)
 	// Send message to all the members
 	for _, srv := range server.peers {
-		resp, err := server.SendMessage(srv, request)
+		resp, err := SendMessage(srv, request)
 		if err != nil {
 			return nil, err
 		}
@@ -127,8 +86,8 @@ func (server *Server) PostInit() error {
 	_, err := server.BroadcastMessage(&Request{
 		Id: AddNewMember,
 		Arguments: MemberServer{
-			port:        server.self.port,
-			address:     server.self.address,
+			Port:        server.self.Port,
+			Address:     server.self.Address,
 			clusterName: server.self.clusterName,
 			name:        server.self.name,
 		},
@@ -163,6 +122,7 @@ func (server *Server) Stop() error {
 			log.Printf("failed to stop the http server, Error = %v\n", err)
 			return err
 		}
+		os.Exit(0)
 	}
 	return nil
 }

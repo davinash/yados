@@ -7,5 +7,4 @@ import (
 
 func AddCommands(rootCmd *cobra.Command) {
 	server.AddCommands(rootCmd)
-
 }

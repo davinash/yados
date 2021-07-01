@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +17,6 @@ func AddNodeStartCmd(parentCmd *cobra.Command) {
 		Use:   "start",
 		Short: "startHttpServer a server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println(args)
 			srv, err := server.CreateNewServer(serverName, address, port, clusterName,
 				withPeer, peerAddress, peerPort)
 			if err != nil {

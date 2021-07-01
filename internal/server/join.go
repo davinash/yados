@@ -24,8 +24,8 @@ func Join(args interface{}, server *Server) (*Response, error) {
 	}
 
 	server.peers[newPeer.name] = &MemberServer{
-		port:        newPeer.port,
-		address:     newPeer.address,
+		Port:        newPeer.Port,
+		Address:     newPeer.Address,
 		clusterName: newPeer.clusterName,
 	}
 	return nil, nil

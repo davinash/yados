@@ -3,7 +3,6 @@ package server
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"log"
 	"net/http"
 )
 
@@ -29,6 +28,7 @@ func initialize() error {
 	operationHandler[CreateStoreInCluster] = CreateStore
 	operationHandler[DeleteStoreFromCluster] = DeleteStore
 	operationHandler[AddNewMember] = Join
+	operationHandler[StopServer] = Stop
 	return nil
 }
 
@@ -48,7 +48,6 @@ func SetupRouter(server *Server) *gin.Engine {
 	router.POST("/message", func(context *gin.Context) {
 		var op Request
 		if err := context.ShouldBindWith(&op, binding.JSON); err != nil {
-			log.Println(err.Error())
 			context.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
