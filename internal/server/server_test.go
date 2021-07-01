@@ -8,7 +8,7 @@ import (
 )
 
 func StartServerForTests(name string, address string, port int, clusterName string) (*Server, *httptest.Server, error) {
-	server, err := CreateNewServer(name, address, port, clusterName, false, "", 0)
+	server, err := CreateNewServer(name, address, port)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -22,7 +22,7 @@ func StartServerForTests(name string, address string, port int, clusterName stri
 	ts.Listener = testListener
 	ts.Start()
 
-	err = server.PostInit()
+	err = server.PostInit(false, "", 0)
 	if err != nil {
 		return nil, nil, err
 	}

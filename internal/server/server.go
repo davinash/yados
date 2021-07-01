@@ -2,6 +2,8 @@ package server
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
+	easy "github.com/t-tomalak/logrus-easy-formatter"
 	"log"
 	"net"
 	"net/http"
@@ -11,10 +13,9 @@ import (
 )
 
 type MemberServer struct {
-	Port        int
-	Address     string
-	clusterName string
-	name        string
+	Port    int
+	Address string
+	Name    string
 }
 
 type Server struct {
@@ -23,20 +24,31 @@ type Server struct {
 	OSSignalCh chan os.Signal
 	peers      map[string]*MemberServer
 	isTestMode bool
+	logger     *logrus.Entry
 }
 
-func CreateNewServer(name string, address string, port int, clusterName string,
-	withPeer bool, peerAddress string, peerPort int) (*Server, error) {
+func CreateNewServer(name string, address string, port int) (*Server, error) {
 	server := Server{
 		self: &MemberServer{
-			Port:        port,
-			Address:     address,
-			clusterName: clusterName,
-			name:        name,
+			Port:    port,
+			Address: address,
+			Name:    name,
 		},
 		peers:      map[string]*MemberServer{},
 		isTestMode: false,
 	}
+
+	logger := &logrus.Logger{
+		Out:   os.Stderr,
+		Level: logrus.DebugLevel,
+		Formatter: &easy.Formatter{
+			LogFormat:       "[%lvl%]:[%Server%] %time% - %msg% \n",
+			TimestampFormat: "2006-01-02 15:04:05",
+		},
+	}
+	server.logger = logger.WithFields(logrus.Fields{
+		"Server": server.self.Name,
+	})
 	server.OSSignalCh = make(chan os.Signal, 1)
 	return &server, nil
 }
@@ -81,24 +93,30 @@ func (server *Server) BroadcastMessage(request *Request) ([]*Response, error) {
 	return allResponses, nil
 }
 
-func (server *Server) PostInit() error {
-	log.Println("Performing Post Initialization ...")
-	_, err := server.BroadcastMessage(&Request{
-		Id: AddNewMember,
-		Arguments: MemberServer{
-			Port:        server.self.Port,
-			Address:     server.self.Address,
-			clusterName: server.self.clusterName,
-			name:        server.self.name,
-		},
-	})
-	if err != nil {
-		return err
+func (server *Server) PostInit(withPeer bool, peerAddress string, peerPort int) error {
+	server.logger.Info("Performing Post Initialization ...")
+
+	if withPeer {
+		_, err := SendMessage(&MemberServer{
+			Port:    peerPort,
+			Address: peerAddress,
+		}, &Request{
+			Id: AddNewMember,
+			Arguments: MemberServer{
+				Port:    server.self.Port,
+				Address: server.self.Address,
+				Name:    server.self.Name,
+			},
+		})
+		if err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
-func (server *Server) StartAndWait() error {
+func (server *Server) StartAndWait(withPeer bool, peerAddress string, peerPort int) error {
 	signal.Notify(server.OSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go server.HandleSignal()
 
@@ -106,7 +124,7 @@ func (server *Server) StartAndWait() error {
 	if err != nil {
 		return err
 	}
-	err = server.PostInit()
+	err = server.PostInit(withPeer, peerAddress, peerPort)
 	if err != nil {
 		server.Stop()
 		return err
