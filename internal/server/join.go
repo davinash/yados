@@ -1,53 +1,44 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
 func Join(args interface{}, server *Server) (*Response, error) {
 	server.logger.Info("Adding new member ")
-	return &Response{
-		Id:    "",
-		Resp:  nil,
-		Error: "dummy Error",
-	}, nil
 
-	//marshal, err := json.Marshal(args)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//var newPeer MemberServer
-	//err = json.Unmarshal(marshal, &newPeer)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if peer, ok := server.peers[newPeer.Name]; ok {
-	//	return nil, fmt.Errorf("server with Name %s already exists in cluster", peer.Name)
-	//}
-	//return &Response{
-	//	Id:   "",
-	//	Resp: nil,
-	//	//Err:  fmt.Errorf("server with Name ---- already exists in cluster"),
-	//}, nil
+	marshal, err := json.Marshal(args)
+	if err != nil {
+		return nil, err
+	}
+	var newPeer MemberServer
+	err = json.Unmarshal(marshal, &newPeer)
+	if err != nil {
+		return nil, err
+	}
+	if peer, ok := server.peers[newPeer.Name]; ok {
+		return nil, fmt.Errorf("server with Name %s already exists in cluster", peer.Name)
+	}
 
-	//responses, err := BroadcastMessage(server, &Request{
-	//	Id:        AddNewMemberEx,
-	//	Arguments: newPeer,
-	//}, server.logger)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//for _, r := range responses {
-	//	if r.Err != nil {
-	//		return nil, err
-	//	}
-	//}
-	//server.peers[newPeer.Name] = &MemberServer{
-	//	Port:    newPeer.Port,
-	//	Address: newPeer.Address,
-	//	Name:    newPeer.Name,
-	//}
-	//return nil, nil
+	responses, err := BroadcastMessage(server, &Request{
+		Id:        AddNewMemberEx,
+		Arguments: newPeer,
+	}, server.logger)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range responses {
+		if r.Error != "" {
+			return nil, err
+		}
+	}
+	server.peers[newPeer.Name] = &MemberServer{
+		Port:    newPeer.Port,
+		Address: newPeer.Address,
+		Name:    newPeer.Name,
+	}
+	return nil, nil
 }
 
 func JoinEx(args interface{}, server *Server) (*Response, error) {

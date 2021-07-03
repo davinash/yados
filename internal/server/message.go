@@ -80,11 +80,6 @@ func SendMessage(srv *MemberServer, request *Request, logger *logrus.Entry) (*Re
 	var result Response
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		_, ok := err.(*json.UnsupportedTypeError)
-		if ok {
-			logger.Errorf("Error is json.UnsupportedTypeError")
-		}
-
 		logger.Errorf("Unmarshling error -> %v", err)
 		return nil, err
 	}

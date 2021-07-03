@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"net/http"
@@ -12,11 +13,19 @@ var (
 
 func handleMessage(op Request, server *Server) (*Response, error) {
 	if fn, ok := operationHandler[op.Id]; ok {
-		return fn(op.Arguments, server)
+		response, err := fn(op.Arguments, server)
+		if err != nil {
+			response.Error = err.Error()
+			return response, err
+		}
 	} else {
-
+		return &Response{
+			Id:    "",
+			Resp:  nil,
+			Error: fmt.Errorf("unexpected Operation %v", op.Id).Error(),
+		}, fmt.Errorf("unexpected Operation %v", op.Id)
 	}
-	return &Response{}, nil
+	return nil, nil
 }
 
 func initialize() error {
