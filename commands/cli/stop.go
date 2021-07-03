@@ -21,7 +21,7 @@ func AddServerStopCmd(parentCmd *cobra.Command) {
 			}, &server.Request{
 				Id:        server.StopServer,
 				Arguments: server.StopMember{},
-			})
+			}, nil)
 			if err != nil {
 				return err
 			}

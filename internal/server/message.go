@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 )
@@ -18,6 +19,7 @@ const (
 	CreateStoreInCluster
 	DeleteStoreFromCluster
 	StopServer
+	AddNewMemberEx
 )
 
 type Request struct {
@@ -26,8 +28,9 @@ type Request struct {
 }
 
 type Response struct {
-	Id   string      `json:"id"`
-	Resp interface{} `json:"response"`
+	Id    string      `json:"id"`
+	Resp  interface{} `json:"response"`
+	Error string      `json:"error"`
 }
 
 type JoinMember struct {
@@ -50,8 +53,9 @@ type StopMember struct {
 type StopMemberResp struct {
 }
 
-func SendMessage(srv *MemberServer, request *Request) (*Response, error) {
+func SendMessage(srv *MemberServer, request *Request, logger *logrus.Entry) (*Response, error) {
 	url := fmt.Sprintf("http://%s:%d/message", srv.Address, srv.Port)
+
 	requestBytes, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -68,17 +72,39 @@ func SendMessage(srv *MemberServer, request *Request) (*Response, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	body, err := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("StatusCode is not OK: %v. Body: %v ", resp.StatusCode, string(body))
-	}
 	if err != nil {
 		return nil, err
 	}
 	var result Response
 	err = json.Unmarshal(body, &result)
 	if err != nil {
+		_, ok := err.(*json.UnsupportedTypeError)
+		if ok {
+			logger.Errorf("Error is json.UnsupportedTypeError")
+		}
+
+		logger.Errorf("Unmarshling error -> %v", err)
 		return nil, err
 	}
+	if result.Error != "" {
+		return nil, fmt.Errorf(result.Error)
+	}
+	logger.Infof("Returning Result error -> %+v", result)
 	return &result, nil
+}
+
+func BroadcastMessage(server *Server, request *Request, logger *logrus.Entry) ([]*Response, error) {
+	logger.Debug("Sending Broadcast message")
+	allResponses := make([]*Response, 0)
+	// Send message to all the members
+	for _, srv := range server.peers {
+		resp, err := SendMessage(srv, request, nil)
+		if err != nil {
+			return nil, err
+		}
+		allResponses = append(allResponses, resp)
+	}
+	return allResponses, nil
 }

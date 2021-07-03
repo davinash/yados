@@ -29,6 +29,7 @@ func initialize() error {
 	operationHandler[DeleteStoreFromCluster] = DeleteStore
 	operationHandler[AddNewMember] = Join
 	operationHandler[StopServer] = Stop
+	operationHandler[AddNewMemberEx] = JoinEx
 	return nil
 }
 

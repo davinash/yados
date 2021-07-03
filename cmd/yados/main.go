@@ -23,6 +23,10 @@ func init() {
 	cobra.OnInitialize(initConfig)
 }
 
+type Dummy struct {
+	Err error `json:"err"`
+}
+
 func main() {
 	commands.AddCommands(rootCmd)
 	Execute()

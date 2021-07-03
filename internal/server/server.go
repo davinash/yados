@@ -13,9 +13,9 @@ import (
 )
 
 type MemberServer struct {
-	Port    int
-	Address string
-	Name    string
+	Port    int    `json:"port"`
+	Address string `json:"address"`
+	Name    string `json:"name"`
 }
 
 type Server struct {
@@ -80,19 +80,6 @@ func (server *Server) startHttpServer() error {
 	return nil
 }
 
-func (server *Server) BroadcastMessage(request *Request) ([]*Response, error) {
-	allResponses := make([]*Response, 0)
-	// Send message to all the members
-	for _, srv := range server.peers {
-		resp, err := SendMessage(srv, request)
-		if err != nil {
-			return nil, err
-		}
-		allResponses = append(allResponses, resp)
-	}
-	return allResponses, nil
-}
-
 func (server *Server) PostInit(withPeer bool, peerAddress string, peerPort int) error {
 	server.logger.Info("Performing Post Initialization ...")
 
@@ -107,10 +94,15 @@ func (server *Server) PostInit(withPeer bool, peerAddress string, peerPort int) 
 				Address: server.self.Address,
 				Name:    server.self.Name,
 			},
-		})
+		}, server.logger)
+
 		if err != nil {
+			server.logger.Error(err)
 			return err
 		}
+		//if resp.Err != nil {
+		//	server.logger.Error(resp.Err)
+		//}
 	}
 
 	return nil
