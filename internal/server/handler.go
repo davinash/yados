@@ -67,7 +67,6 @@ func SetupRouter(server *Server) *gin.Engine {
 			context.JSON(http.StatusInternalServerError, err)
 			return
 		}
-		server.logger.Printf("-----> %v", resp)
 		context.JSON(http.StatusOK, resp)
 	})
 	return router

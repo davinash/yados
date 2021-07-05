@@ -21,6 +21,5 @@ func ListAllMembers(args interface{}, server *Server) (*Response, error) {
 		Resp:  members,
 		Error: "",
 	}
-	server.logger.Info("-----> %+v", resp)
 	return &resp, nil
 }

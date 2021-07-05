@@ -25,22 +25,11 @@ func AddServerListCmd(parentCmd *cobra.Command) {
 			if err != nil {
 				return err
 			}
-
 			marshal, err := json.MarshalIndent(resp.Resp, "", "   ")
 			if err != nil {
 				return err
 			}
 			fmt.Println(string(marshal))
-			//var members []server.MemberServer
-			//err = json.Unmarshal(marshal, &members)
-			//if err != nil {
-			//	return err
-			//}
-			//fmt.Println("NAME\tADDRESS\tPORT")
-			//fmt.Println()
-			//for _, m := range members {
-			//	fmt.Printf("%s\t%s\t%d\n", m.Name, m.Address, m.Port)
-			//}
 			return nil
 		},
 	}
