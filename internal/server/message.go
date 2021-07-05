@@ -86,7 +86,6 @@ func SendMessage(srv *MemberServer, request *Request, logger *logrus.Entry) (*Re
 	if result.Error != "" {
 		return nil, fmt.Errorf(result.Error)
 	}
-	logger.Infof("Returning Result error -> %+v", result)
 	return &result, nil
 }
 
@@ -95,7 +94,8 @@ func BroadcastMessage(server *Server, request *Request, logger *logrus.Entry) ([
 	allResponses := make([]*Response, 0)
 	// Send message to all the members
 	for _, srv := range server.peers {
-		resp, err := SendMessage(srv, request, nil)
+		logger.Debugf("Sending to %s:%d", srv.Address, srv.Port)
+		resp, err := SendMessage(srv, request, logger)
 		if err != nil {
 			return nil, err
 		}

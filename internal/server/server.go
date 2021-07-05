@@ -100,11 +100,7 @@ func (server *Server) PostInit(withPeer bool, peerAddress string, peerPort int) 
 			server.logger.Error(err)
 			return err
 		}
-		//if resp.Err != nil {
-		//	server.logger.Error(resp.Err)
-		//}
 	}
-
 	return nil
 }
 
