@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddPutObjectCommand Cobra comamnd to put new object in store
 func AddPutObjectCommand(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "put",

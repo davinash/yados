@@ -3,10 +3,12 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
 )
 
+// AddServerListCmd Command for listing the members in the cluster
 func AddServerListCmd(parentCmd *cobra.Command) {
 	var serverAddress string
 	var port int
@@ -19,7 +21,7 @@ func AddServerListCmd(parentCmd *cobra.Command) {
 				Port:    port,
 				Address: serverAddress,
 			}, &server.Request{
-				Id:        server.ListMembers,
+				ID:        server.ListMembers,
 				Arguments: nil,
 			}, nil)
 			if err != nil {

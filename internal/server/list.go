@@ -1,8 +1,10 @@
 package server
 
+//ListAllMembers list all the members in the cluster
 func ListAllMembers(args interface{}, server *Server) (*Response, error) {
 	server.logger.Info("Performing ListAllMembers")
 	members := make([]MemberServer, 0)
+	// Add all the neighbor
 	for _, srv := range server.peers {
 		members = append(members, MemberServer{
 			Port:    srv.Port,
@@ -10,6 +12,7 @@ func ListAllMembers(args interface{}, server *Server) (*Response, error) {
 			Name:    srv.Name,
 		})
 	}
+	// Add self
 	members = append(members, MemberServer{
 		Port:    server.self.Port,
 		Address: server.self.Address,
@@ -17,7 +20,7 @@ func ListAllMembers(args interface{}, server *Server) (*Response, error) {
 	})
 
 	resp := Response{
-		Id:    "",
+		ID:    "",
 		Resp:  members,
 		Error: "",
 	}

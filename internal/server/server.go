@@ -2,31 +2,39 @@ package server
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
-	easy "github.com/t-tomalak/logrus-easy-formatter"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/sirupsen/logrus"
+	easy "github.com/t-tomalak/logrus-easy-formatter"
 )
 
+//MemberServer represents the individual node in the cluster
 type MemberServer struct {
-	Port    int    `json:"port"`
+	//Port on which server is running
+	Port int `json:"port"`
+	//Address ip address
 	Address string `json:"address"`
-	Name    string `json:"name"`
+	//Name unique name in the cluster
+	Name string `json:"name"`
 }
 
+//Server represents the Server object in the cluster
 type Server struct {
-	self       *MemberServer
-	listener   net.Listener
+	self     *MemberServer
+	listener net.Listener
+	//OSSignalCh channel listening for the OS events
 	OSSignalCh chan os.Signal
 	peers      map[string]*MemberServer
 	isTestMode bool
 	logger     *logrus.Entry
 }
 
+// CreateNewServer Creates a new object of the Server
 func CreateNewServer(name string, address string, port int) (*Server, error) {
 	server := Server{
 		self: &MemberServer{
@@ -53,22 +61,22 @@ func CreateNewServer(name string, address string, port int) (*Server, error) {
 	return &server, nil
 }
 
+// HandleSignal Handles the CTRL-C signals
 func (server *Server) HandleSignal() {
 	for {
-		select {
-		case _ = <-server.OSSignalCh:
-			log.Println("Exiting ... ")
-			server.Stop()
-			os.Exit(0)
-		}
+		<-server.OSSignalCh
+		log.Println("Exiting ... ")
+		server.Stop()
+		os.Exit(0)
 	}
 }
 
+// EnableTestMode To be ued from the test
 func (server *Server) EnableTestMode() {
 	server.isTestMode = true
 }
 
-func (server *Server) startHttpServer() error {
+func (server *Server) startHTTPServer() error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.Address, server.self.Port))
 	if err != nil {
 		return fmt.Errorf("failed to start server: Error = %v", err)
@@ -80,6 +88,7 @@ func (server *Server) startHttpServer() error {
 	return nil
 }
 
+// PostInit performs the post initialization
 func (server *Server) PostInit(withPeer bool, peerAddress string, peerPort int) error {
 	server.logger.Info("Performing Post Initialization ...")
 
@@ -88,7 +97,7 @@ func (server *Server) PostInit(withPeer bool, peerAddress string, peerPort int) 
 			Port:    peerPort,
 			Address: peerAddress,
 		}, &Request{
-			Id: AddNewMember,
+			ID: AddNewMember,
 			Arguments: MemberServer{
 				Port:    server.self.Port,
 				Address: server.self.Address,
@@ -104,11 +113,12 @@ func (server *Server) PostInit(withPeer bool, peerAddress string, peerPort int) 
 	return nil
 }
 
+//StartAndWait start the server and wait for the OS signal
 func (server *Server) StartAndWait(withPeer bool, peerAddress string, peerPort int) error {
 	signal.Notify(server.OSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go server.HandleSignal()
 
-	err := server.startHttpServer()
+	err := server.startHTTPServer()
 	if err != nil {
 		return err
 	}
@@ -121,8 +131,9 @@ func (server *Server) StartAndWait(withPeer bool, peerAddress string, peerPort i
 	return nil
 }
 
+//Stop Stops the server
 func (server *Server) Stop() error {
-	log.Println("Stopping the server ...")
+	server.logger.Info("Stopping the server ...")
 	if !server.isTestMode {
 		if err := server.listener.Close(); err != nil {
 			log.Printf("failed to stop the http server, Error = %v\n", err)
@@ -133,6 +144,7 @@ func (server *Server) Stop() error {
 	return nil
 }
 
+// Status returns the status of the server
 func (server *Server) Status() error {
 	return nil
 }

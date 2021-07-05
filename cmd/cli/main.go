@@ -6,6 +6,7 @@ import (
 )
 
 var (
+	// Verbose flag for verbose output
 	Verbose bool
 )
 
@@ -16,6 +17,7 @@ var rootCmd = &cobra.Command{
 yadosct cli to interact with YADOS cluster`,
 }
 
+//Execute main driver function form Cobra commands
 func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
 }

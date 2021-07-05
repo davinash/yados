@@ -12,6 +12,7 @@ var rootCmd = &cobra.Command{
 YADOS cli to interact with st cluster`,
 }
 
+//Execute main driver function form Cobra commands
 func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
 }
@@ -21,10 +22,6 @@ func initConfig() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-}
-
-type Dummy struct {
-	Err error `json:"err"`
 }
 
 func main() {

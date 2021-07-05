@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddGetStoreCommand Cobra command to get the store
 func AddGetStoreCommand(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "get",

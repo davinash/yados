@@ -2,11 +2,13 @@ package server
 
 import (
 	"fmt"
+
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
+// AddNodeStartCmd Cobra command implementation for Starting a node for the cluster
 func AddNodeStartCmd(parentCmd *cobra.Command) {
 	var serverName string
 	var address string
@@ -31,7 +33,7 @@ func AddNodeStartCmd(parentCmd *cobra.Command) {
 						isPeerAddressPassed = true
 					}
 				})
-				if isPeerAddressPassed == false {
+				if !isPeerAddressPassed {
 					return fmt.Errorf("peer-address is missing, check help")
 				}
 			}
@@ -43,7 +45,7 @@ func AddNodeStartCmd(parentCmd *cobra.Command) {
 						isPeerPort = true
 					}
 				})
-				if isPeerPort == false {
+				if !isPeerPort {
 					return fmt.Errorf("peer-port is missing, check help")
 				}
 			}

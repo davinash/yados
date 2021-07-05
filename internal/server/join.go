@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+//Join implements message for joining a new member in the cluster
 func Join(args interface{}, server *Server) (*Response, error) {
 	server.logger.Info("Adding new member ")
 
@@ -22,7 +23,7 @@ func Join(args interface{}, server *Server) (*Response, error) {
 	}
 
 	_, err = BroadcastMessage(server, &Request{
-		Id:        AddNewMemberEx,
+		ID:        AddNewMemberEx,
 		Arguments: newPeer,
 	}, server.logger)
 	if err != nil {
@@ -36,12 +37,9 @@ func Join(args interface{}, server *Server) (*Response, error) {
 	return nil, nil
 }
 
+//JoinEx Adds a new member in the local dictionary
 func JoinEx(args interface{}, server *Server) (*Response, error) {
 	server.logger.Info("Adding New Member from existing member")
-	//newPeer, ok := args.(MemberServer)
-	//if !ok {
-	//	return nil, fmt.Errorf("internal error, invalid type received by join operation")
-	//}
 
 	marshal, err := json.Marshal(args)
 	if err != nil {

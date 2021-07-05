@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddListStoreCommand Cobra command to list the stores
 func AddListStoreCommand(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "list",

@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddServerStopCmd command line options for stopping a server
 func AddServerStopCmd(parentCmd *cobra.Command) {
 	var serverAddress string
 	var port int
@@ -19,7 +20,7 @@ func AddServerStopCmd(parentCmd *cobra.Command) {
 				Port:    port,
 				Address: serverAddress,
 			}, &server.Request{
-				Id:        server.StopServer,
+				ID:        server.StopServer,
 				Arguments: server.StopMember{},
 			}, nil)
 			if err != nil {

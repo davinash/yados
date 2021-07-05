@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddServerCliCmd Commands for server option
 func AddServerCliCmd(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "server",

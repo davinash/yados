@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddListObjectCommand Cobra command to list objects in a store
 func AddListObjectCommand(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "list",

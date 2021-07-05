@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddDeleteObjectCommand Delete objects from the store
 func AddDeleteObjectCommand(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "delete",

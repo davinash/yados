@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddServerCmd Parent command server operation
 func AddServerCmd(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "server",

@@ -2,34 +2,35 @@ package server
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"net/http"
 )
 
 var (
-	operationHandler map[OperationId]func(interface{}, *Server) (*Response, error)
+	operationHandler map[OperationID]func(interface{}, *Server) (*Response, error)
 )
 
 func handleMessage(op Request, server *Server) (*Response, error) {
-	if fn, ok := operationHandler[op.Id]; ok {
+	if fn, ok := operationHandler[op.ID]; ok {
 		response, err := fn(op.Arguments, server)
 		if err != nil {
 			response.Error = err.Error()
 			return response, err
 		}
 		return response, nil
-	} else {
-		return &Response{
-			Id:    "",
-			Resp:  nil,
-			Error: fmt.Errorf("unexpected Operation %v", op.Id).Error(),
-		}, fmt.Errorf("unexpected Operation %v", op.Id)
 	}
+	return &Response{
+		ID:    "",
+		Resp:  nil,
+		Error: fmt.Errorf("unexpected Operation %v", op.ID).Error(),
+	}, fmt.Errorf("unexpected Operation %v", op.ID)
+
 }
 
 func initialize() error {
-	operationHandler = make(map[OperationId]func(interface{}, *Server) (*Response, error))
+	operationHandler = make(map[OperationID]func(interface{}, *Server) (*Response, error))
 
 	operationHandler[PutObject] = Put
 	operationHandler[GetObject] = Get
@@ -43,6 +44,7 @@ func initialize() error {
 	return nil
 }
 
+//SetupRouter Router setup function
 func SetupRouter(server *Server) *gin.Engine {
 	initialize()
 

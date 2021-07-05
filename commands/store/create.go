@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddCreateStoreCommand Cobra command for creating a store
 func AddCreateStoreCommand(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "create",

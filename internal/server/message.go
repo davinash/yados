@@ -4,36 +4,50 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/sirupsen/logrus"
 )
 
-type OperationId int
+//OperationID represents the operation id or request
+type OperationID int
 
 const (
-	AddNewMember OperationId = iota
+	//AddNewMember request type to add new member
+	AddNewMember OperationID = iota
+	//PutObject request type to put new object in a store
 	PutObject
+	//GetObject request type to get object from store
 	GetObject
+	//DeleteObject request type to delete object
 	DeleteObject
+	//CreateStoreInCluster request type to create cluster
 	CreateStoreInCluster
+	//DeleteStoreFromCluster request type to delete store
 	DeleteStoreFromCluster
+	//StopServer request type to stop a server
 	StopServer
+	//AddNewMemberEx request type to add new member
 	AddNewMemberEx
+	//ListMembers request type to list all the members
 	ListMembers
 )
 
+//Request represents the HTTP request
 type Request struct {
-	Id        OperationId `json:"id"`
+	ID        OperationID `json:"id"`
 	Arguments interface{} `json:"arguments"`
 }
 
+//Response represents response for the HTTP Request
 type Response struct {
-	Id    string      `json:"id"`
+	ID    string      `json:"id"`
 	Resp  interface{} `json:"response"`
 	Error string      `json:"error"`
 }
 
+//JoinMember represent the request for adding a new member in the cluster
 type JoinMember struct {
 	Port        int    `json:"Port"`
 	Address     string `json:"Address"`
@@ -41,6 +55,7 @@ type JoinMember struct {
 	Name        string `json:"Name"`
 }
 
+//JoinMemberResp response for the adding new member
 type JoinMemberResp struct {
 	Port        int    `json:"Port"`
 	Address     string `json:"Address"`
@@ -48,12 +63,15 @@ type JoinMemberResp struct {
 	Name        string `json:"Name"`
 }
 
+//StopMember Request for stopping a member
 type StopMember struct {
 }
 
+//StopMemberResp response from the stopping a member request
 type StopMemberResp struct {
 }
 
+//SendMessage Sends message to particular member in the cluster
 func SendMessage(srv *MemberServer, request *Request, logger *logrus.Entry) (*Response, error) {
 	url := fmt.Sprintf("http://%s:%d/message", srv.Address, srv.Port)
 
@@ -90,6 +108,7 @@ func SendMessage(srv *MemberServer, request *Request, logger *logrus.Entry) (*Re
 	return &result, nil
 }
 
+// BroadcastMessage Sends the message to all the members in the cluster
 func BroadcastMessage(server *Server, request *Request, logger *logrus.Entry) ([]*Response, error) {
 	logger.Debug("Sending Broadcast message")
 	allResponses := make([]*Response, 0)
