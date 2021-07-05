@@ -1,4 +1,4 @@
-package cli
+package server
 
 import (
 	"github.com/davinash/yados/commands/utils"

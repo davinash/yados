@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/davinash/yados/commands"
+	"github.com/davinash/yados/commands/yados"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +28,6 @@ type Dummy struct {
 }
 
 func main() {
-	commands.AddCommands(rootCmd)
+	yados.AddCommands(rootCmd)
 	Execute()
 }

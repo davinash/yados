@@ -1,4 +1,4 @@
-package commands
+package yados
 
 import (
 	"github.com/davinash/yados/commands/server"
@@ -6,5 +6,6 @@ import (
 )
 
 func AddCommands(rootCmd *cobra.Command) {
-	server.AddCommands(rootCmd)
+	//server.AddNodeStartCmd(rootCmd)
+	server.AddServerCmd(rootCmd)
 }

@@ -1,18 +1,21 @@
-package cli
+package server
 
 import (
 	"github.com/davinash/yados/commands/utils"
 	"github.com/spf13/cobra"
 )
 
-func AddServerStatusCmd(parentCmd *cobra.Command) {
+func AddServerCmd(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Status of a server",
-		Args:  utils.ExactArgs(0),
+		Use:   "server",
+		Short: "server commands",
+		Args:  utils.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
 	}
+
+	AddNodeStartCmd(cmd)
+
 	parentCmd.AddCommand(cmd)
 }
