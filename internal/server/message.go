@@ -20,6 +20,7 @@ const (
 	DeleteStoreFromCluster
 	StopServer
 	AddNewMemberEx
+	ListMembers
 )
 
 type Request struct {

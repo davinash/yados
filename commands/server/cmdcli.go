@@ -15,5 +15,6 @@ func AddCliCommands(rootCmd *cobra.Command) {
 	AddServerRemoveCmd(cmd)
 	AddServerStatusCmd(cmd)
 	AddServerStopCmd(cmd)
+	AddServerListCmd(cmd)
 	rootCmd.AddCommand(cmd)
 }

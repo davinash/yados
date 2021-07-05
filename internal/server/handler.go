@@ -18,6 +18,7 @@ func handleMessage(op Request, server *Server) (*Response, error) {
 			response.Error = err.Error()
 			return response, err
 		}
+		return response, nil
 	} else {
 		return &Response{
 			Id:    "",
@@ -25,7 +26,6 @@ func handleMessage(op Request, server *Server) (*Response, error) {
 			Error: fmt.Errorf("unexpected Operation %v", op.Id).Error(),
 		}, fmt.Errorf("unexpected Operation %v", op.Id)
 	}
-	return nil, nil
 }
 
 func initialize() error {
@@ -39,6 +39,7 @@ func initialize() error {
 	operationHandler[AddNewMember] = Join
 	operationHandler[StopServer] = Stop
 	operationHandler[AddNewMemberEx] = JoinEx
+	operationHandler[ListMembers] = ListAllMembers
 	return nil
 }
 
@@ -66,6 +67,7 @@ func SetupRouter(server *Server) *gin.Engine {
 			context.JSON(http.StatusInternalServerError, err)
 			return
 		}
+		server.logger.Printf("-----> %v", resp)
 		context.JSON(http.StatusOK, resp)
 	})
 	return router
