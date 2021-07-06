@@ -29,7 +29,7 @@ func startServerForTests(name string, address string, port int) (*Server, *httpt
 	return server, ts, nil
 }
 
-// CreateClusterForTest Creates a cluter for test purpose
+// CreateClusterForTest Creates a cluster for test purpose
 func CreateClusterForTest(numOfMembers int) ([]Cluster, error) {
 	portStart := 9191
 	cluster := make([]Cluster, 0)
@@ -64,7 +64,7 @@ func CreateClusterForTest(numOfMembers int) ([]Cluster, error) {
 //StopTestCluster stops the test cluster
 func StopTestCluster(cluster []Cluster) error {
 	for _, member := range cluster {
-		err := member.Member.Stop()
+		err := member.Member.StopServerFn()
 		if err != nil {
 			return err
 		}

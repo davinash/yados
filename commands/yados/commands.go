@@ -7,6 +7,5 @@ import (
 
 // AddCommands Cobra command for yados cli
 func AddCommands(rootCmd *cobra.Command) {
-	//server.AddNodeStartCmd(rootCmd)
 	server.AddServerCmd(rootCmd)
 }

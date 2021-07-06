@@ -5,8 +5,8 @@ import (
 	"fmt"
 )
 
-//Join implements message for joining a new member in the cluster
-func Join(args interface{}, server *Server) (*Response, error) {
+//AddNewMemberFn implements message for joining a new member in the cluster
+func AddNewMemberFn(args interface{}, server *Server) (*Response, error) {
 	server.logger.Info("Adding new member ")
 
 	marshal, err := json.Marshal(args)
@@ -37,8 +37,8 @@ func Join(args interface{}, server *Server) (*Response, error) {
 	return nil, nil
 }
 
-//JoinEx Adds a new member in the local dictionary
-func JoinEx(args interface{}, server *Server) (*Response, error) {
+//AddNewMemberExFn Adds a new member in the local dictionary
+func AddNewMemberExFn(args interface{}, server *Server) (*Response, error) {
 	server.logger.Info("Adding New Member from existing member")
 
 	marshal, err := json.Marshal(args)

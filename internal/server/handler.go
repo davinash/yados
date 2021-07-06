@@ -32,15 +32,15 @@ func handleMessage(op Request, server *Server) (*Response, error) {
 func initialize() error {
 	operationHandler = make(map[OperationID]func(interface{}, *Server) (*Response, error))
 
-	operationHandler[PutObject] = Put
-	operationHandler[GetObject] = Get
-	operationHandler[DeleteObject] = Delete
-	operationHandler[CreateStoreInCluster] = CreateStore
-	operationHandler[DeleteStoreFromCluster] = DeleteStore
-	operationHandler[AddNewMember] = Join
-	operationHandler[StopServer] = Stop
-	operationHandler[AddNewMemberEx] = JoinEx
-	operationHandler[ListMembers] = ListAllMembers
+	operationHandler[PutObject] = PutObjectFn
+	operationHandler[GetObject] = GetObjectFn
+	operationHandler[DeleteObject] = DeleteObjectFn
+	operationHandler[CreateStoreInCluster] = CreateStoreInClusterFn
+	operationHandler[DeleteStoreFromCluster] = DeleteStoreFromClusterFn
+	operationHandler[AddNewMember] = AddNewMemberFn
+	operationHandler[StopServer] = StopServerFn
+	operationHandler[AddNewMemberEx] = AddNewMemberExFn
+	operationHandler[ListMembers] = ListMemberFn
 	return nil
 }
 

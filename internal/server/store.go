@@ -1,16 +1,16 @@
 package server
 
-// CreateStore Creates a new Store
-func CreateStore(args interface{}, server *Server) (*Response, error) {
+// CreateStoreInClusterFn Creates a new Store
+func CreateStoreInClusterFn(args interface{}, server *Server) (*Response, error) {
 	return nil, nil
 }
 
-//DeleteStore Delete the store
-func DeleteStore(args interface{}, server *Server) (*Response, error) {
+//DeleteStoreFromClusterFn DeleteObjectFn the store
+func DeleteStoreFromClusterFn(args interface{}, server *Server) (*Response, error) {
 	return nil, nil
 }
 
-// GetStore Get a new store
+// GetStore GetObjectFn a new store
 func GetStore(args interface{}, server *Server) (*Response, error) {
 	return nil, nil
 }

@@ -1,8 +1,8 @@
 package server
 
-//ListAllMembers list all the members in the cluster
-func ListAllMembers(args interface{}, server *Server) (*Response, error) {
-	server.logger.Info("Performing ListAllMembers")
+//ListMemberFn list all the members in the cluster
+func ListMemberFn(args interface{}, server *Server) (*Response, error) {
+	server.logger.Info("Performing ListMemberFn")
 	members := make([]MemberServer, 0)
 	// Add all the neighbor
 	for _, srv := range server.peers {

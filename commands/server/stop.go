@@ -12,7 +12,7 @@ func AddServerStopCmd(parentCmd *cobra.Command) {
 	var port int
 	cmd := &cobra.Command{
 		Use:   "stop",
-		Short: "Stop a server",
+		Short: "StopServerFn a server",
 		Args:  utils.ExactArgs(0),
 
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -66,7 +66,7 @@ func (server *Server) HandleSignal() {
 	for {
 		<-server.OSSignalCh
 		log.Println("Exiting ... ")
-		server.Stop()
+		server.StopServerFn()
 		os.Exit(0)
 	}
 }
@@ -124,15 +124,15 @@ func (server *Server) StartAndWait(withPeer bool, peerAddress string, peerPort i
 	}
 	err = server.PostInit(withPeer, peerAddress, peerPort)
 	if err != nil {
-		server.Stop()
+		server.StopServerFn()
 		return err
 	}
 	<-server.OSSignalCh
 	return nil
 }
 
-//Stop Stops the server
-func (server *Server) Stop() error {
+//StopServerFn Stops the server
+func (server *Server) StopServerFn() error {
 	server.logger.Info("Stopping the server ...")
 	if !server.isTestMode {
 		if err := server.listener.Close(); err != nil {
