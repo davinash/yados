@@ -97,7 +97,7 @@ func (server *Server) PostInit(withPeer bool, peerAddress string, peerPort int) 
 			Port:    peerPort,
 			Address: peerAddress,
 		}, &Request{
-			ID: AddNewMember,
+			ID: AddNewMemberInCluster,
 			Arguments: MemberServer{
 				Port:    server.self.Port,
 				Address: server.self.Address,

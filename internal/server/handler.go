@@ -37,7 +37,7 @@ func initialize() error {
 	operationHandler[DeleteObject] = DeleteObjectFn
 	operationHandler[CreateStoreInCluster] = CreateStoreInClusterFn
 	operationHandler[DeleteStoreFromCluster] = DeleteStoreFromClusterFn
-	operationHandler[AddNewMember] = AddNewMemberFn
+	operationHandler[AddNewMemberInCluster] = AddNewMemberInClusterFn
 	operationHandler[StopServer] = StopServerFn
 	operationHandler[AddNewMemberEx] = AddNewMemberExFn
 	operationHandler[ListMembers] = ListMemberFn

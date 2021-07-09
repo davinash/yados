@@ -14,8 +14,8 @@ import (
 type OperationID int
 
 const (
-	//AddNewMember request type to add new member
-	AddNewMember OperationID = iota
+	//AddNewMemberInCluster request type to add new member
+	AddNewMemberInCluster OperationID = iota
 	//PutObject request type to put new object in a store
 	PutObject
 	//GetObject request type to get object from store
