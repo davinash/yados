@@ -1,0 +1,15 @@
+syntax = "proto3";
+option go_package = "/gen";
+
+message Member {
+  string name = 1;
+  string address = 2;
+  int32 port = 3;
+}
+message NewMemberRequest {
+  Member member = 1;
+}
+
+message NewMemberReply {
+  string name = 1;
+}

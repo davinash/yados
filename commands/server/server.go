@@ -10,13 +10,11 @@ func AddServerCmd(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "server commands",
-		Args:  utils.ExactArgs(2),
+		Args:  utils.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
 	}
-
-	AddNodeStartCmd(cmd)
-
+	AddServerStartCmd(cmd)
 	parentCmd.AddCommand(cmd)
 }

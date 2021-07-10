@@ -1,9 +1,7 @@
 package server
 
-import "syscall"
-
-//StopServerFn stops the members in the cluster
-func StopServerFn(args interface{}, server *Server) (*Response, error) {
-	server.OSSignalCh <- syscall.SIGINT
-	return nil, nil
-}
+////StopServerFn stops the members in the cluster
+//func StopServerFn(args interface{}, server *YadosServer) (*Response, error) {
+//	server.OSSignalCh <- syscall.SIGINT
+//	return nil, nil
+//}

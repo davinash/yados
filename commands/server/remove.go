@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// AddServerRemoveCmd Command to remove the member from the cluster
+// AddServerRemoveCmd Command to remove the member.proto from the cluster
 func AddServerRemoveCmd(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "remove",

@@ -8,17 +8,20 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// AddNodeStartCmd Cobra command implementation for Starting a node for the cluster
-func AddNodeStartCmd(parentCmd *cobra.Command) {
+// AddServerStartCmd Cobra command implementation for Starting a node for the cluster
+func AddServerStartCmd(parentCmd *cobra.Command) {
 	var serverName string
 	var address string
-	var port int
+	var port int32
 	var withPeer bool
 	var peerAddress string
-	var peerPort int
+	var peerPort int32
 	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "startHttpServer a server",
+		Short: "Start YADOS YadosServer",
+		Long: "" +
+			"Example : yados server start --name server1\n" +
+			"          yados server start --name server1 --port 9191 --listen-address 127.0.0.1",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			isWithPeer := false
 			cmd.Flags().Visit(func(f *pflag.Flag) {
@@ -66,11 +69,11 @@ func AddNodeStartCmd(parentCmd *cobra.Command) {
 	cmd.Flags().StringVar(&address, "listen-address", "127.0.0.1", "Listen Address on which server will listen\n"+
 		"Can usually be left blank. Otherwise, use IP address or host name \nthat other server nodes use to connect to the new server")
 
-	cmd.Flags().IntVar(&port, "port", 9191, "Port to use for communication")
+	cmd.Flags().Int32Var(&port, "port", 9191, "Port to use for communication")
 
 	cmd.Flags().BoolVar(&withPeer, "with-peer", false, "Use this flag if server need to part of cluster")
 	cmd.Flags().StringVar(&peerAddress, "peer-address", "", "IP address or host name of the peer")
-	cmd.Flags().IntVar(&peerPort, "peer-port", -1, "Port to use for communication with peer")
+	cmd.Flags().Int32Var(&peerPort, "peer-port", -1, "Port to use for communication with peer")
 
 	parentCmd.AddCommand(cmd)
 }

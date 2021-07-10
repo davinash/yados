@@ -22,8 +22,8 @@ func TestListAllMembers(t *testing.T) {
 	//	}
 	//}(members)
 	//
-	//for _, member := range members {
-	//	m, err := ListMemberFn(nil, member.Member)
+	//for _, member.proto := range members {
+	//	m, err := ListMemberFn(nil, member.proto.Member)
 	//	if err != nil {
 	//		t.Log(err)
 	//		t.FailNow()
