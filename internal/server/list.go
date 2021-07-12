@@ -11,11 +11,11 @@ func (server *YadosServer) GetListOfPeers(ctx context.Context, request *pb.ListO
 	reply := &pb.ListOfPeersReply{
 		Member: make([]*pb.Member, 0),
 	}
-	for _, p := range server.peers {
+	for _, peer := range server.peers {
 		reply.Member = append(reply.Member, &pb.Member{
-			Name:    p.Name,
-			Address: p.Address,
-			Port:    p.Port,
+			Name:    peer.Name,
+			Address: peer.Address,
+			Port:    peer.Port,
 		})
 	}
 	// Add Self

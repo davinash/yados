@@ -21,3 +21,9 @@ message ListOfPeersRequest {
 message ListOfPeersReply {
   repeated Member member = 1;
 }
+
+message StopServerRequest {
+}
+
+message StopServerReply {
+}

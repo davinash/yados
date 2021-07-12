@@ -15,8 +15,14 @@ func AddServerStartCmd(parentCmd *cobra.Command) {
 		Use:   "start",
 		Short: "Start YADOS YadosServer",
 		Long: "" +
-			"Example : yados server start --name server1\n" +
-			"          yados server start --name server1 --port 9191 --listen-address 127.0.0.1",
+			"Example : \n\n" +
+			"Start server with default options\n" +
+			"    yados server start --name server1\n" +
+			"Start server with specific IP address and port\n" +
+			"    yados server start --name server1 --port 9191 --listen-address 127.0.0.1\n" +
+			"Start server with more than one peer to form a cluster\n" +
+			"    yados server start --port 9193 --peer 127.0.0.1:9191 --name Server3 --peer 127.0.0.1:9192\n\n",
+
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -28,7 +34,7 @@ func AddServerStartCmd(parentCmd *cobra.Command) {
 			return srv.StartAndWait(peers)
 		},
 	}
-	cmd.Flags().StringVar(&serverName, "name", "", "Name of the server")
+	cmd.Flags().StringVar(&serverName, "name", "", "Name of the server, name must be unique in a cluster")
 	_ = cmd.MarkFlagRequired("name")
 
 	cmd.Flags().StringVar(&address, "listen-address", "127.0.0.1", "Listen Address on which server will listen\n"+

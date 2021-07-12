@@ -5,7 +5,7 @@ package server
 //type OperationID int
 //
 //const (
-//	//AddNewMemberInCluster request type to add new member.proto
+//	//AddNewMemberInCluster request type to add new messages.proto
 //	AddNewMemberInCluster OperationID = iota
 //	//PutObject request type to put new object in a store
 //	PutObject
@@ -19,7 +19,7 @@ package server
 //	DeleteStoreFromCluster
 //	//StopServer request type to stop a server
 //	StopServer
-//	//AddNewMemberEx request type to add new member.proto
+//	//AddNewMemberEx request type to add new messages.proto
 //	AddNewMemberEx
 //	//ListMembers request type to list all the members
 //	ListMembers
@@ -38,7 +38,7 @@ package server
 //	Error string      `json:"error"`
 //}
 //
-////JoinMember represent the request for adding a new member.proto in the cluster
+////JoinMember represent the request for adding a new messages.proto in the cluster
 //type JoinMember struct {
 //	Port        int    `json:"Port"`
 //	Address     string `json:"Address"`
@@ -46,7 +46,7 @@ package server
 //	Name        string `json:"Name"`
 //}
 //
-////JoinMemberResp response for the adding new member.proto
+////JoinMemberResp response for the adding new messages.proto
 //type JoinMemberResp struct {
 //	Port        int    `json:"Port"`
 //	Address     string `json:"Address"`
@@ -54,15 +54,15 @@ package server
 //	Name        string `json:"Name"`
 //}
 //
-////StopMember Request for stopping a member.proto
+////StopMember Request for stopping a messages.proto
 //type StopMember struct {
 //}
 //
-////StopMemberResp response from the stopping a member.proto request
+////StopMemberResp response from the stopping a messages.proto request
 //type StopMemberResp struct {
 //}
 //
-////SendMessage Sends message to particular member.proto in the cluster
+////SendMessage Sends message to particular messages.proto in the cluster
 //func SendMessage(srv *MemberServer, request *Request, logger *logrus.Entry) (*Response, error) {
 //	url := fmt.Sprintf("http://%s:%d/message", srv.Address, srv.Port)
 //

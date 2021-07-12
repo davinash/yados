@@ -99,7 +99,6 @@ func (server *YadosServer) StartAndWait(peers []string) error {
 func (server *YadosServer) HandleSignal() {
 	for {
 		<-server.OSSignalCh
-		log.Println("Exiting ... ")
 		server.StopServerFn()
 		os.Exit(0)
 	}
