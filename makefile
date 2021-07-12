@@ -38,7 +38,10 @@ lint:
 	@GO111MODULE=on ${GOPATH}/bin/golangci-lint run --build-tags kqueue --timeout=10m --skip-dirs internal/proto/gen --config ./.golangci.yml
 
 test:
-	go test github.com/davinash/yados/... -v -count=1
+	go test github.com/davinash/yados/... -v -count=1 -failfast
+
+test-with-cover:
+	go test github.com/davinash/yados/... -v -count=1 -failfast -coverprofile=coverage.out
 
 clean:
 	rm -rf out/*

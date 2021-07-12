@@ -2,9 +2,10 @@ package server
 
 import (
 	"context"
+	"testing"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/grpc"
-	"testing"
 )
 
 func TestRemoveServer(t *testing.T) {
@@ -111,6 +112,33 @@ func TestRemoveServerNotExists(t *testing.T) {
 		},
 	})
 	if err == nil {
+		t.FailNow()
+	}
+}
+
+func TestRemoveServerFromCluster(t *testing.T) {
+	numberOfServers := 3
+	cluster, err := CreateClusterForTest(numberOfServers)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	defer func(cluster []*YadosServer) {
+		err := StopTestCluster(cluster)
+		if err != nil {
+			t.Log(err)
+			t.FailNow()
+		}
+	}(cluster)
+
+	err = cluster[0].RemoveServerFromCluster("127.0.0.1", 9192)
+	if err != nil {
+		t.Logf("Error %v", err)
+		t.FailNow()
+	}
+	listOfPeersEx := cluster[1].GetListOfPeersEx()
+	if len(listOfPeersEx) != numberOfServers-1 {
+		t.Logf("Number of servers did not match. Expected %d Actual %d", numberOfServers-1, len(listOfPeersEx))
 		t.FailNow()
 	}
 }

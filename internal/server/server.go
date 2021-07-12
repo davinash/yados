@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -63,7 +62,7 @@ func CreateNewServer(name string, address string, port int32) (*YadosServer, err
 func (server *YadosServer) StartGrpcServer() error {
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.Address, server.self.Port))
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		return fmt.Errorf("failed to listen: %v", err)
 	}
 
 	pb.RegisterYadosServiceServer(server.grpcServer, server)

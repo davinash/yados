@@ -48,3 +48,27 @@ func TestCreateNewServerDuplicateName(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+func TestStartGrpcServer(t *testing.T) {
+	srv, err := startServerForTests("TestServer-0", "127.0.0.1", 9191)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	err = srv.PostInit(nil)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	defer func(srv *YadosServer) {
+		err := srv.StopServerFn()
+		if err != nil {
+			t.Logf("Failed to stop the server, error = %v", err)
+		}
+	}(srv)
+
+	err = srv.StartGrpcServer()
+	if err == nil {
+		t.FailNow()
+	}
+}
