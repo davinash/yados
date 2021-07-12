@@ -17,7 +17,7 @@ else
 	EXE=
 endif
 
-build: getdeps
+build: getdeps lint
 	GO111MODULE=on go build -ldflags "-X main.Version=$(VERSION)" -o out/yados$(EXE)     cmd/yados/main.go
 	GO111MODULE=on go build -ldflags "-X main.Version=$(VERSION)" -o out/yadosctl$(EXE)  cmd/cli/main.go
 

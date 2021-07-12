@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
+// GetListOfPeers Get the list of peers in the cluster
 func (server *YadosServer) GetListOfPeers(ctx context.Context, request *pb.ListOfPeersRequest) (*pb.ListOfPeersReply, error) {
 	reply := &pb.ListOfPeersReply{
 		Member: make([]*pb.Member, 0),

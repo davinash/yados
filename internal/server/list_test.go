@@ -2,9 +2,10 @@ package server
 
 import (
 	"context"
+	"testing"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/grpc"
-	"testing"
 )
 
 // TestListAllMembers

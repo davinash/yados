@@ -3,8 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	pb "github.com/davinash/yados/internal/proto/gen"
-	"google.golang.org/grpc"
 	"log"
 	"net"
 	"os"
@@ -12,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	pb "github.com/davinash/yados/internal/proto/gen"
+	"google.golang.org/grpc"
 
 	"github.com/sirupsen/logrus"
 	easy "github.com/t-tomalak/logrus-easy-formatter"
@@ -58,6 +59,7 @@ func CreateNewServer(name string, address string, port int32) (*YadosServer, err
 	return &server, nil
 }
 
+// StartGrpcServer Starts the GRPC server
 func (server *YadosServer) StartGrpcServer() error {
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.Address, server.self.Port))
 	if err != nil {
@@ -108,6 +110,7 @@ func (server *YadosServer) EnableTestMode() {
 	server.isTestMode = true
 }
 
+// JoinWith admits the new members in the existing cluster
 func (server *YadosServer) JoinWith(address string, port int32) error {
 	conn, peer, err := GetPeerConn(address, port)
 	if err != nil {

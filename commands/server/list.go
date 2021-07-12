@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
