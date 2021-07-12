@@ -21,6 +21,7 @@ type YadosServiceClient interface {
 	AddNewMemberInCluster(ctx context.Context, in *NewMemberRequest, opts ...grpc.CallOption) (*NewMemberReply, error)
 	GetListOfPeers(ctx context.Context, in *ListOfPeersRequest, opts ...grpc.CallOption) (*ListOfPeersReply, error)
 	StopServer(ctx context.Context, in *StopServerRequest, opts ...grpc.CallOption) (*StopServerReply, error)
+	RemoveServer(ctx context.Context, in *RemoveServerRequest, opts ...grpc.CallOption) (*RemoveServerReply, error)
 }
 
 type yadosServiceClient struct {
@@ -58,6 +59,15 @@ func (c *yadosServiceClient) StopServer(ctx context.Context, in *StopServerReque
 	return out, nil
 }
 
+func (c *yadosServiceClient) RemoveServer(ctx context.Context, in *RemoveServerRequest, opts ...grpc.CallOption) (*RemoveServerReply, error) {
+	out := new(RemoveServerReply)
+	err := c.cc.Invoke(ctx, "/YadosService/RemoveServer", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
@@ -65,6 +75,7 @@ type YadosServiceServer interface {
 	AddNewMemberInCluster(context.Context, *NewMemberRequest) (*NewMemberReply, error)
 	GetListOfPeers(context.Context, *ListOfPeersRequest) (*ListOfPeersReply, error)
 	StopServer(context.Context, *StopServerRequest) (*StopServerReply, error)
+	RemoveServer(context.Context, *RemoveServerRequest) (*RemoveServerReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -80,6 +91,9 @@ func (UnimplementedYadosServiceServer) GetListOfPeers(context.Context, *ListOfPe
 }
 func (UnimplementedYadosServiceServer) StopServer(context.Context, *StopServerRequest) (*StopServerReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopServer not implemented")
+}
+func (UnimplementedYadosServiceServer) RemoveServer(context.Context, *RemoveServerRequest) (*RemoveServerReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveServer not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -148,6 +162,24 @@ func _YadosService_StopServer_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_RemoveServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).RemoveServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/RemoveServer",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).RemoveServer(ctx, req.(*RemoveServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -166,6 +198,10 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StopServer",
 			Handler:    _YadosService_StopServer_Handler,
+		},
+		{
+			MethodName: "RemoveServer",
+			Handler:    _YadosService_RemoveServer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

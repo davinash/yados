@@ -7,4 +7,5 @@ service YadosService {
   rpc AddNewMemberInCluster(NewMemberRequest) returns (NewMemberReply) {}
   rpc GetListOfPeers(ListOfPeersRequest) returns (ListOfPeersReply) {}
   rpc StopServer(StopServerRequest) returns (StopServerReply) {}
+  rpc RemoveServer(RemoveServerRequest) returns (RemoveServerReply) {}
 }

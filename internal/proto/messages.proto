@@ -6,24 +6,23 @@ message Member {
   string address = 2;
   int32 port = 3;
 }
-
 message NewMemberRequest {
   Member member = 1;
 }
-
 message NewMemberReply {
   Member member = 1;
 }
-
 message ListOfPeersRequest {
 }
-
 message ListOfPeersReply {
   repeated Member member = 1;
 }
-
 message StopServerRequest {
 }
-
 message StopServerReply {
+}
+message RemoveServerRequest {
+  Member member = 1;
+}
+message RemoveServerReply {
 }
