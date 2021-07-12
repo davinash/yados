@@ -9,30 +9,22 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/sirupsen/logrus"
 	easy "github.com/t-tomalak/logrus-easy-formatter"
 )
 
-//MemberServer represents the individual node in the cluster
-type MemberServer struct {
-	//Port on which server is running
-	Port int32 `json:"port"`
-	//Address ip address
-	Address string `json:"address"`
-	//Name unique name in the cluster
-	Name string `json:"name"`
-}
-
 //YadosServer represents the YadosServer object in the cluster
 type YadosServer struct {
 	pb.UnimplementedYadosServiceServer
 
-	self *MemberServer
+	self *pb.Member
 	//OSSignalCh channel listening for the OS events
 	OSSignalCh chan os.Signal
-	peers      map[string]*MemberServer
+	peers      map[string]*pb.Member
 	isTestMode bool
 	logger     *logrus.Entry
 	grpcServer *grpc.Server
@@ -41,12 +33,12 @@ type YadosServer struct {
 // CreateNewServer Creates a new object of the YadosServer
 func CreateNewServer(name string, address string, port int32) (*YadosServer, error) {
 	server := YadosServer{
-		self: &MemberServer{
+		self: &pb.Member{
 			Port:    port,
 			Address: address,
 			Name:    name,
 		},
-		peers:      map[string]*MemberServer{},
+		peers:      map[string]*pb.Member{},
 		isTestMode: false,
 		grpcServer: grpc.NewServer(),
 	}
@@ -81,7 +73,7 @@ func (server *YadosServer) startGrpcServer() error {
 }
 
 //StartAndWait start the server and wait for the OS signal
-func (server *YadosServer) StartAndWait(withPeer bool, peerAddress string, peerPort int32) error {
+func (server *YadosServer) StartAndWait(peers []string) error {
 	signal.Notify(server.OSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go server.HandleSignal()
 
@@ -90,7 +82,7 @@ func (server *YadosServer) StartAndWait(withPeer bool, peerAddress string, peerP
 		return err
 	}
 
-	err = server.PostInit(withPeer, peerAddress, peerPort)
+	err = server.PostInit(peers)
 	if err != nil {
 		server.logger.Error(err)
 		_ = server.StopServerFn()
@@ -116,56 +108,53 @@ func (server *YadosServer) EnableTestMode() {
 	server.isTestMode = true
 }
 
+func (server *YadosServer) JoinWith(address string, port int32) error {
+	conn, peer, err := GetPeerConn(address, port)
+	if err != nil {
+		return err
+	}
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			server.logger.Warnf("Failed to close connection, Error = %v", err)
+		}
+	}(conn)
+
+	self := &pb.Member{
+		Name:    server.self.Name,
+		Address: server.self.Address,
+		Port:    server.self.Port,
+	}
+
+	_, err = peer.AddNewMemberInCluster(context.Background(), &pb.NewMemberRequest{Member: self})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // PostInit performs the post initialization
-func (server *YadosServer) PostInit(withPeer bool, peerAddress string, peerPort int32) error {
+func (server *YadosServer) PostInit(peers []string) error {
 	server.logger.Info("Performing Post Initialization ...")
 
-	if withPeer {
-		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", peerAddress, peerPort), grpc.WithInsecure())
+	if len(peers) == 0 {
+		return nil
+	}
+
+	for _, p := range peers {
+		split := strings.Split(p, ":")
+		if len(split) != 2 {
+			return fmt.Errorf("invalid format for peers, use <ip-address>:port")
+		}
+		port, err := strconv.Atoi(split[1])
+		if err != nil {
+			return fmt.Errorf("invalid format for peers, use <ip-address>:port")
+		}
+		err = server.JoinWith(split[0], int32(port))
 		if err != nil {
 			return err
 		}
-		defer conn.Close()
-		peer := pb.NewYadosServiceClient(conn)
-		_, err = peer.AddNewMemberInCluster(context.Background(), &pb.NewMemberRequest{
-			Member: &pb.Member{
-				Name:    server.self.Name,
-				Address: server.self.Address,
-				Port:    server.self.Port,
-			},
-		},
-		)
-		if err != nil {
-			return err
-		}
-
-		//_, err := server.AddNewMemberInCluster(context.Background(), &pb.NewMemberRequest{
-		//	Member: &pb.Member{
-		//		Name:    "",
-		//		Address: peerAddress,
-		//		Port:    peerPort,
-		//	},
-		//})
-		//if err != nil {
-		//	return err
-		//}
-
-		//_, err := SendMessage(&MemberServer{
-		//	Port:    peerPort,
-		//	Address: peerAddress,
-		//}, &Request{
-		//	ID: AddNewMemberInCluster,
-		//	Arguments: MemberServer{
-		//		Port:    server.self.Port,
-		//		Address: server.self.Address,
-		//		Name:    server.self.Name,
-		//	},
-		//}, server.logger)
-		//
-		//if err != nil {
-		//	server.logger.Error(err)
-		//	return err
-		//}
 	}
 	return nil
 }

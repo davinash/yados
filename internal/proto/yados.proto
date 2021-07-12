@@ -5,4 +5,5 @@ import "member.proto";
 
 service YadosService {
   rpc AddNewMemberInCluster(NewMemberRequest) returns (NewMemberReply) {}
+  rpc GetListOfPeers(ListOfPeersRequest) returns (ListOfPeersReply) {}
 }

@@ -6,10 +6,17 @@ message Member {
   string address = 2;
   int32 port = 3;
 }
+
 message NewMemberRequest {
   Member member = 1;
 }
 
 message NewMemberReply {
-  string name = 1;
+}
+
+message ListOfPeersRequest {
+}
+
+message ListOfPeersReply {
+  repeated Member member = 1;
 }

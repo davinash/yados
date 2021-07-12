@@ -14,19 +14,19 @@ func AddServerStopCmd(parentCmd *cobra.Command) {
 		Short: "StopServerFn a server",
 		Args:  utils.ExactArgs(0),
 
-		//RunE: func(cmd *cobra.Command, args []string) error {
-		//	_, err := server.SendMessage(&server.MemberServer{
-		//		Port:    port,
-		//		Address: serverAddress,
-		//	}, &server.Request{
-		//		ID:        server.StopServer,
-		//		Arguments: server.StopMember{},
-		//	}, nil)
-		//	if err != nil {
-		//		return err
-		//	}
-		//	return nil
-		//},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			//	_, err := server.SendMessage(&server.MemberServer{
+			//		Port:    port,
+			//		Address: serverAddress,
+			//	}, &server.Request{
+			//		ID:        server.StopServer,
+			//		Arguments: server.StopMember{},
+			//	}, nil)
+			//	if err != nil {
+			//		return err
+			//	}
+			return nil
+		},
 	}
 	cmd.Flags().StringVar(&serverAddress, "server", "127.0.0.1", "IP address or host name")
 	cmd.Flags().IntVar(&port, "port", 9191, "Port to use for communication")
