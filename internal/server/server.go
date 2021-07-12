@@ -32,6 +32,13 @@ type YadosServer struct {
 
 // CreateNewServer Creates a new object of the YadosServer
 func CreateNewServer(name string, address string, port int32) (*YadosServer, error) {
+
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen: %v", err)
+	}
+	lis.Close()
+
 	server := YadosServer{
 		self: &pb.Member{
 			Port:    port,
@@ -166,7 +173,7 @@ func (server *YadosServer) postInit(peers []string) error {
 
 //StopServerFn Stops the server
 func (server *YadosServer) StopServerFn() error {
-	server.logger.Info("Stopping the server ...")
+	server.logger.Infof("Stopping the server [%s:%d] ...", server.self.Address, server.self.Port)
 	server.grpcServer.Stop()
 
 	if !server.isTestMode {

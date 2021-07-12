@@ -13,6 +13,14 @@ func TestStopServer(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
+	defer func(cluster []*YadosServer) {
+		err := StopTestCluster(cluster)
+		if err != nil {
+			t.Log(err)
+			t.FailNow()
+		}
+	}(cluster)
+
 	for _, server := range cluster {
 		_, err := server.StopServer(context.Background(), &pb.StopServerRequest{})
 		if err != nil {
