@@ -38,7 +38,7 @@ lint:
 	@GO111MODULE=on ${GOPATH}/bin/golangci-lint run --build-tags kqueue --timeout=10m --config ./.golangci.yml
 
 test:
-	go test github.com/davinash/yados/... -v
+	go test github.com/davinash/yados/... -v -count=1
 
 clean:
 	rm -rf out/*

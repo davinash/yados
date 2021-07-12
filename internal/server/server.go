@@ -58,7 +58,7 @@ func CreateNewServer(name string, address string, port int32) (*YadosServer, err
 	return &server, nil
 }
 
-func (server *YadosServer) startGrpcServer() error {
+func (server *YadosServer) StartGrpcServer() error {
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.Address, server.self.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -77,7 +77,7 @@ func (server *YadosServer) StartAndWait(peers []string) error {
 	signal.Notify(server.OSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go server.HandleSignal()
 
-	err := server.startGrpcServer()
+	err := server.StartGrpcServer()
 	if err != nil {
 		return err
 	}
@@ -163,8 +163,9 @@ func (server *YadosServer) PostInit(peers []string) error {
 //StopServerFn Stops the server
 func (server *YadosServer) StopServerFn() error {
 	server.logger.Info("Stopping the server ...")
+	server.grpcServer.Stop()
+
 	if !server.isTestMode {
-		server.grpcServer.Stop()
 		os.Exit(0)
 	}
 	return nil
