@@ -12,6 +12,7 @@ message NewMemberRequest {
 }
 
 message NewMemberReply {
+  Member member = 1;
 }
 
 message ListOfPeersRequest {

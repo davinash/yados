@@ -126,11 +126,12 @@ func (server *YadosServer) JoinWith(address string, port int32) error {
 		Port:    server.self.Port,
 	}
 
-	_, err = peer.AddNewMemberInCluster(context.Background(), &pb.NewMemberRequest{Member: self})
+	remotePeer, err := peer.AddNewMemberInCluster(context.Background(), &pb.NewMemberRequest{Member: self})
 	if err != nil {
 		return err
 	}
-
+	// Add the remote to self peer list
+	server.peers[remotePeer.Member.Name] = remotePeer.Member
 	return nil
 }
 

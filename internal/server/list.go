@@ -1,28 +1,22 @@
 package server
 
-//ListMemberFn list all the members in the cluster
-//func ListMemberFn(args interface{}, server *YadosServer) (*Response, error) {
-//	server.logger.Info("Performing ListMemberFn")
-//	members := make([]MemberServer, 0)
-//	// Add all the neighbor
-//	for _, srv := range server.peers {
-//		members = append(members, MemberServer{
-//			Port:    srv.Port,
-//			Address: srv.Address,
-//			Name:    srv.Name,
-//		})
-//	}
-//	// Add self
-//	members = append(members, MemberServer{
-//		Port:    server.self.Port,
-//		Address: server.self.Address,
-//		Name:    server.self.Name,
-//	})
-//
-//	resp := Response{
-//		ID:    "",
-//		Resp:  members,
-//		Error: "",
-//	}
-//	return &resp, nil
-//}
+import (
+	"context"
+	pb "github.com/davinash/yados/internal/proto/gen"
+)
+
+func (server *YadosServer) GetListOfPeers(ctx context.Context, request *pb.ListOfPeersRequest) (*pb.ListOfPeersReply, error) {
+	reply := &pb.ListOfPeersReply{
+		Member: make([]*pb.Member, 0),
+	}
+	for _, p := range server.peers {
+		reply.Member = append(reply.Member, &pb.Member{
+			Name:    p.Name,
+			Address: p.Address,
+			Port:    p.Port,
+		})
+	}
+	// Add Self
+	reply.Member = append(reply.Member, server.self)
+	return reply, nil
+}

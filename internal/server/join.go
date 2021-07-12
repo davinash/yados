@@ -21,5 +21,9 @@ func (server *YadosServer) AddNewMemberInCluster(ctx context.Context, newPeer *p
 		Name:    newPeer.Member.Name,
 	}
 
-	return &pb.NewMemberReply{}, nil
+	return &pb.NewMemberReply{Member: &pb.Member{
+		Name:    server.self.Name,
+		Address: server.self.Address,
+		Port:    server.self.Port,
+	}}, nil
 }
