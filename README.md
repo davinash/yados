@@ -2,6 +2,7 @@
 # yados
 Yet Another Distributed Object Store
 
+
 ## Starting a server
 ### Starting with default options
 In this mode server will start listening on 127.0.0.1 and port 9191
@@ -38,4 +39,17 @@ Starting a server and joining the cluster with multiple peers
    2.1 make
 3. Run the tests using following command
    3.1 make test
+4. Running single Test 
+   4.1 TEST_NAME=<TestName> make test-single
+```
+
+### Fixing some common lint errors
+```shell
+Error      : File is not `gofmt`-ed with `-s
+Resolution : Run the gofmt tool on the file which is reported this error
+
+Error      : File is not `goimports`-ed (goimports)
+Resolution : Run following command for the file
+
+$GOPATH/bin/goimports  -w <file-name> 
 ```

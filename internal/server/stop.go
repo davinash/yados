@@ -40,6 +40,8 @@ func (server *YadosServer) StopServer(ctx context.Context, request *pb.StopServe
 			server.logger.Warningf("Error removing server from cluster, Error = %v", err)
 		}
 	}
-	server.OSSignalCh <- syscall.SIGINT
+	if !server.isTestMode {
+		server.OSSignalCh <- syscall.SIGINT
+	}
 	return &pb.StopServerReply{}, nil
 }
