@@ -2,7 +2,6 @@
 
 set -o errexit
 set -o nounset
-set -o pipefail
 
 # shellcheck disable=SC1068
 GOPATH=$(go env GOPATH)
