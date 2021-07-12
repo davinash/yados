@@ -43,5 +43,8 @@ test:
 test-with-cover:
 	go test github.com/davinash/yados/... -v -count=1 -failfast -coverprofile=coverage.out
 
+test-single:
+	go test github.com/davinash/yados/... -v -count=1 -failfast -test.v -test.paniconexit0 -test.run ^\$(TEST_NAME)\$
+
 clean:
 	rm -rf out/*

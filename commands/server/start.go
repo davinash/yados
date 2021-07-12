@@ -31,7 +31,12 @@ func AddServerStartCmd(parentCmd *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			return srv.StartAndWait(peers)
+			err = srv.Start(peers)
+			if err != nil {
+				return err
+			}
+			<-srv.OSSignalCh
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&serverName, "name", "", "Name of the server, name must be unique in a cluster")

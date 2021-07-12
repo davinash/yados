@@ -22,7 +22,7 @@ func TestAddNewMemberInCluster(t *testing.T) {
 		}
 	}(cluster)
 
-	newServer, err := startServerForTests("TestServer-99", "127.0.0.1", 9199)
+	newServer, err := startServerForTests("TestServer-99", "127.0.0.1", 9199, nil)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()

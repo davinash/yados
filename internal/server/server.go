@@ -73,8 +73,8 @@ func (server *YadosServer) StartGrpcServer() error {
 	return err
 }
 
-//StartAndWait start the server and wait for the OS signal
-func (server *YadosServer) StartAndWait(peers []string) error {
+//Start start the server and wait for the OS signal
+func (server *YadosServer) Start(peers []string) error {
 	signal.Notify(server.OSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go server.HandleSignal()
 
@@ -83,14 +83,12 @@ func (server *YadosServer) StartAndWait(peers []string) error {
 		return err
 	}
 
-	err = server.PostInit(peers)
+	err = server.postInit(peers)
 	if err != nil {
 		server.logger.Error(err)
 		_ = server.StopServerFn()
 		return err
 	}
-
-	<-server.OSSignalCh
 	return nil
 }
 
@@ -98,8 +96,13 @@ func (server *YadosServer) StartAndWait(peers []string) error {
 func (server *YadosServer) HandleSignal() {
 	for {
 		<-server.OSSignalCh
-		server.StopServerFn()
-		os.Exit(0)
+		err := server.StopServerFn()
+		if err != nil {
+			return
+		}
+		if !server.isTestMode {
+			os.Exit(0)
+		}
 	}
 }
 
@@ -136,8 +139,8 @@ func (server *YadosServer) JoinWith(address string, port int32) error {
 	return nil
 }
 
-// PostInit performs the post initialization
-func (server *YadosServer) PostInit(peers []string) error {
+// postInit performs the post initialization
+func (server *YadosServer) postInit(peers []string) error {
 	server.logger.Info("Performing Post Initialization ...")
 
 	if len(peers) == 0 {

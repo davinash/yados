@@ -34,28 +34,21 @@ func TestCreateNewServerDuplicateName(t *testing.T) {
 		}
 	}(cluster)
 
-	srvDuplicate, err := startServerForTests("TestServer-0", "127.0.0.1", 9199)
-	if err != nil {
-		t.FailNow()
-	}
 	peers := make([]string, 0)
 	for _, p := range cluster {
 		peers = append(peers, fmt.Sprintf("%s:%d", p.self.Address, p.self.Port))
 	}
-	err = srvDuplicate.PostInit(peers)
+
+	_, err = startServerForTests("TestServer-0", "127.0.0.1", 9199, peers)
 	if err == nil {
 		t.Log("startServerForTests should fail, duplicate name")
 		t.FailNow()
 	}
+
 }
 
 func TestStartGrpcServer(t *testing.T) {
-	srv, err := startServerForTests("TestServer-0", "127.0.0.1", 9191)
-	if err != nil {
-		t.Log(err)
-		t.FailNow()
-	}
-	err = srv.PostInit(nil)
+	srv, err := startServerForTests("TestServer-0", "127.0.0.1", 9191, nil)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
