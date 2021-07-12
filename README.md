@@ -20,19 +20,18 @@ Starting a server and joining the cluster with multiple peers
 ```shell
 ./yados server start --listen-address 127.0.0.1 --port 9193 --name Server3 --peer 127.0.0.1:9191 --peer 127.0.0.1:9192
 ```
-
-###Listing the members in the cluster
+### Listing the members in the cluster
 ```shell
 ./yadosctl  server list --server 127.0.0.1 --port 9191
 ```
 
-###Stopping individual server in a cluster
+### Stopping individual server in a cluster
 ```shell
 ./yadosctl  server stop --server 127.0.0.1 --port 9191
 ```
 
-##Developer Notes
-###How to build
+## Developer Notes
+### How to build
 ```shell
 1. Checkout the repository
 2. Building using following command
