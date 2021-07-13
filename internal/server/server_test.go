@@ -38,35 +38,49 @@ func TestCreateNewServerDuplicateName(t *testing.T) {
 	for _, p := range cluster {
 		peers = append(peers, fmt.Sprintf("%s:%d", p.self.Address, p.self.Port))
 	}
-	_, err = startServerForTests("TestServer-0", "127.0.0.1", 9199, peers)
+	ports, err := GetFreePorts(1)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	_, err = startServerForTests("TestServer-0", "127.0.0.1", int32(ports[0]), peers)
 	if err == nil {
 		t.Log("startServerForTests should fail, duplicate name")
 		t.FailNow()
 	}
 }
 
-//
-//func __TestStartGrpcServer(t *testing.T) {
-//	srv, err := startServerForTests("TestServer-0", "127.0.0.1", 9191, nil)
-//	if err != nil {
-//		t.Log(err)
-//		t.FailNow()
-//	}
-//	defer func(srv *YadosServer) {
-//		err := srv.StopServerFn()
-//		if err != nil {
-//			t.Logf("Failed to stop the server, error = %v", err)
-//		}
-//	}(srv)
-//
-//	err = srv.StartGrpcServer()
-//	if err == nil {
-//		t.FailNow()
-//	}
-//}
+func TestStartGrpcServer(t *testing.T) {
+	ports, err := GetFreePorts(1)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	srv, err := startServerForTests("TestServer-0", "127.0.0.1", int32(ports[0]), nil)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	defer func(srv *YadosServer) {
+		err := srv.StopServerFn()
+		if err != nil {
+			t.Logf("Failed to stop the server, error = %v", err)
+		}
+	}(srv)
+
+	err = srv.StartGrpcServer()
+	if err == nil {
+		t.FailNow()
+	}
+}
 
 func TestPostInitWrongInput(t *testing.T) {
-	srv, err := startServerForTests("TestServer-0", "127.0.0.1", 9191, nil)
+	ports, err := GetFreePorts(1)
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	srv, err := startServerForTests("TestServer-0", "127.0.0.1", int32(ports[0]), nil)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()

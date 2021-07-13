@@ -22,13 +22,14 @@ func TestRemoveServer(t *testing.T) {
 			t.FailNow()
 		}
 	}(cluster)
-	verifyRemoveServer(t, numberOfServers)
+	verifyRemoveServer(t, numberOfServers, cluster)
 }
 
-func verifyRemoveServer(t *testing.T, numberOfServers int) {
-	conn, p, err := GetPeerConn("127.0.0.1", 9191)
+func verifyRemoveServer(t *testing.T, numberOfServers int, cluster []*YadosServer) {
+	conn, p, err := GetPeerConn("127.0.0.1", cluster[0].self.Port)
 	if err != nil {
-		return
+		t.Log(err)
+		t.FailNow()
 	}
 	defer func(conn *grpc.ClientConn) {
 		err := conn.Close()
@@ -41,10 +42,11 @@ func verifyRemoveServer(t *testing.T, numberOfServers int) {
 		Member: &pb.Member{
 			Name:    "TestServer-1",
 			Address: "127.0.0.1",
-			Port:    9192,
+			Port:    cluster[1].self.Port,
 		},
 	})
 	if err != nil {
+		t.Log(err)
 		t.FailNow()
 	}
 	peers, err := p.GetListOfPeers(context.Background(), &pb.ListOfPeersRequest{})
@@ -61,10 +63,11 @@ func verifyRemoveServer(t *testing.T, numberOfServers int) {
 		Member: &pb.Member{
 			Name:    "TestServer-2",
 			Address: "127.0.0.1",
-			Port:    9193,
+			Port:    cluster[2].self.Port,
 		},
 	})
 	if err != nil {
+		t.Log(err)
 		t.FailNow()
 	}
 	peers, err = p.GetListOfPeers(context.Background(), &pb.ListOfPeersRequest{})
@@ -93,7 +96,7 @@ func TestRemoveServerNotExists(t *testing.T) {
 		}
 	}(cluster)
 
-	conn, p, err := GetPeerConn("127.0.0.1", 9191)
+	conn, p, err := GetPeerConn("127.0.0.1", cluster[0].self.Port)
 	if err != nil {
 		return
 	}
@@ -108,7 +111,7 @@ func TestRemoveServerNotExists(t *testing.T) {
 		Member: &pb.Member{
 			Name:    "TestServer-4",
 			Address: "127.0.0.1",
-			Port:    9192,
+			Port:    cluster[1].self.Port,
 		},
 	})
 	if err == nil {
@@ -131,7 +134,7 @@ func TestRemoveServerFromCluster(t *testing.T) {
 		}
 	}(cluster)
 
-	err = cluster[0].RemoveServerFromCluster("127.0.0.1", 9192)
+	err = cluster[0].RemoveServerFromCluster("127.0.0.1", cluster[1].self.Port)
 	if err != nil {
 		t.Logf("Error %v", err)
 		t.FailNow()

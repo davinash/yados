@@ -35,7 +35,7 @@ func CreateNewServer(name string, address string, port int32) (*YadosServer, err
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen: %v", err)
+		return nil, fmt.Errorf("[CreateNewServer] failed to listen: %v", err)
 	}
 	lis.Close()
 

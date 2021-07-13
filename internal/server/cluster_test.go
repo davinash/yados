@@ -1,9 +1,16 @@
 package server
 
-import "fmt"
+import (
+	"fmt"
+	"net"
+)
 
 func startServerForTests(name string, address string, port int32, peers []string) (*YadosServer, error) {
-	server, err := CreateNewServer(name, address, port)
+	freePorts, err := GetFreePorts(1)
+	if err != nil {
+		return nil, err
+	}
+	server, err := CreateNewServer(name, address, int32(freePorts[0]))
 	if err != nil {
 		return nil, err
 	}
@@ -17,10 +24,13 @@ func startServerForTests(name string, address string, port int32, peers []string
 
 // CreateClusterForTest Creates a cluster for test purpose
 func CreateClusterForTest(numOfServers int) ([]*YadosServer, error) {
-	portStart := 9191
+	freePorts, err := GetFreePorts(numOfServers)
+	if err != nil {
+		return nil, err
+	}
 	cluster := make([]*YadosServer, 0)
 
-	srv, err := startServerForTests("TestServer-0", "127.0.0.1", int32(portStart), nil)
+	srv, err := startServerForTests("TestServer-0", "127.0.0.1", int32(freePorts[0]), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -31,9 +41,7 @@ func CreateClusterForTest(numOfServers int) ([]*YadosServer, error) {
 		for _, p := range cluster {
 			peers = append(peers, fmt.Sprintf("%s:%d", p.self.Address, p.self.Port))
 		}
-
-		portStart = portStart + 1
-		srv, err := startServerForTests(fmt.Sprintf("TestServer-%d", i), "127.0.0.1", int32(portStart), peers)
+		srv, err := startServerForTests(fmt.Sprintf("TestServer-%d", i), "127.0.0.1", int32(freePorts[i]), peers)
 		if err != nil {
 			return nil, err
 		}
@@ -52,4 +60,31 @@ func StopTestCluster(cluster []*YadosServer) error {
 		}
 	}
 	return nil
+}
+
+func GetFreePort() (int, *net.TCPListener, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, nil, err
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, nil, err
+	}
+	return l.Addr().(*net.TCPAddr).Port, l, nil
+}
+
+// GetFreePorts allocates a batch of n TCP ports in one go to avoid collisions.
+func GetFreePorts(n int) ([]int, error) {
+	ports := make([]int, 0)
+	for i := 0; i < n; i++ {
+		port, listener, err := GetFreePort()
+		if err != nil {
+			return nil, err
+		}
+		listener.Close()
+		ports = append(ports, port)
+	}
+	return ports, nil
 }
