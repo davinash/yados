@@ -30,6 +30,7 @@ func pluralize(word string, number int) string {
 	return word + "s"
 }
 
+//ShowHelp shows the help
 func ShowHelp() func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		cmd.HelpFunc()(cmd, args)

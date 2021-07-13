@@ -1,15 +1,16 @@
-package node
+package store
 
 import (
 	"github.com/davinash/yados/commands/utils"
 	"github.com/spf13/cobra"
 )
 
-func AddNodeStatusCmd(parentCmd *cobra.Command) {
+//AddDeleteStoreCommand Cobra command for delete store command
+func AddDeleteStoreCommand(parentCmd *cobra.Command) {
 	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Status of a node",
-		Args:  utils.ExactArgs(0),
+		Use:   "delete",
+		Short: "delete store",
+		Args:  utils.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
