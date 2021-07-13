@@ -12,6 +12,7 @@ func AddServerStartCmd(parentCmd *cobra.Command) {
 	var port int32
 	var peers []string
 	var hcTimeDuration int
+	var loglevel string
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start YADOS YadosServer",
@@ -32,7 +33,9 @@ func AddServerStartCmd(parentCmd *cobra.Command) {
 			if err != nil {
 				return err
 			}
+			srv.SetLogLevel(loglevel)
 			srv.SetHealthCheckDuration(hcTimeDuration)
+
 			err = srv.Start(peers)
 			if err != nil {
 				return err
@@ -53,6 +56,8 @@ func AddServerStartCmd(parentCmd *cobra.Command) {
 		"use multiple of this flag if want to join with multiple peers")
 
 	cmd.Flags().IntVar(&hcTimeDuration, "health-check-duration", 30, "Health check duration in seconds")
+
+	cmd.Flags().StringVar(&loglevel, "log-level", "info", "log level [trace | debug | info | warn | error]")
 
 	parentCmd.AddCommand(cmd)
 }

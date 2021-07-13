@@ -38,3 +38,11 @@ message HealthStatusRequest {
 }
 message HealthStatusReply {
 }
+
+message StoreCreateRequest {
+  string name = 1;
+  int32 replication = 2;
+
+}
+message StoreCreateReply {
+}

@@ -39,7 +39,7 @@ func (server *YadosServer) StartHealthCheck() error {
 			}
 		}
 	}()
-	server.logger.Info("Health Check is started ...")
+	server.logger.Debug("Health Check is started ...")
 	return nil
 }
 
@@ -72,7 +72,6 @@ func (server *YadosServer) SendHealthToPeers() {
 }
 
 func (server *YadosServer) performCheck() {
-	server.logger.Debug("Performing health check")
 	currentTime := time.Now().Unix()
 	server.mutex.Lock()
 	for _, peer := range server.peers {

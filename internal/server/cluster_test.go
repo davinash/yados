@@ -15,6 +15,7 @@ func startServerForTests(name string, address string, port int32, peers []string
 		return nil, err
 	}
 	server.EnableTestMode()
+	server.SetLogLevel("debug")
 	err = server.Start(peers)
 	if err != nil {
 		return nil, err

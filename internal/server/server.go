@@ -34,6 +34,7 @@ type YadosServer struct {
 	wg                sync.WaitGroup
 	hcMaxWaitTime     int64
 	mutex             *sync.RWMutex
+	stores            map[string]*Store
 }
 
 // CreateNewServer Creates a new object of the YadosServer
@@ -58,11 +59,11 @@ func CreateNewServer(name string, address string, port int32) (*YadosServer, err
 		hcTriggerDuration: 30,
 		hcMaxWaitTime:     180,
 		mutex:             &sync.RWMutex{},
+		stores:            make(map[string]*Store),
 	}
 
 	logger := &logrus.Logger{
-		Out:   os.Stderr,
-		Level: logrus.DebugLevel,
+		Out: os.Stderr,
 		Formatter: &easy.Formatter{
 			LogFormat:       "[%lvl%]:[%YadosServer%] %time% - %msg% \n",
 			TimestampFormat: "2006-01-02 15:04:05",
@@ -73,6 +74,24 @@ func CreateNewServer(name string, address string, port int32) (*YadosServer, err
 	})
 	server.OSSignalCh = make(chan os.Signal, 1)
 	return &server, nil
+}
+
+//SetLogLevel set the log level
+func (server *YadosServer) SetLogLevel(level string) {
+	switch level {
+	case "trace":
+		server.logger.Logger.SetLevel(logrus.TraceLevel)
+	case "debug":
+		server.logger.Logger.SetLevel(logrus.DebugLevel)
+	case "info":
+		server.logger.Logger.SetLevel(logrus.InfoLevel)
+	case "warn":
+		server.logger.Logger.SetLevel(logrus.WarnLevel)
+	case "error":
+		server.logger.Logger.SetLevel(logrus.ErrorLevel)
+	default:
+		server.logger.Logger.SetLevel(logrus.InfoLevel)
+	}
 }
 
 // StartGrpcServer Starts the GRPC server
@@ -86,7 +105,7 @@ func (server *YadosServer) StartGrpcServer() error {
 	go func() {
 		server.grpcServer.Serve(lis)
 	}()
-	server.logger.Printf("server listening at %v", lis.Addr())
+	server.logger.Infof("server listening at %v", lis.Addr())
 	return err
 }
 
@@ -99,7 +118,6 @@ func (server *YadosServer) Start(peers []string) error {
 	if err != nil {
 		return err
 	}
-
 	err = server.postInit(peers)
 	if err != nil {
 		server.logger.Error(err)
@@ -168,11 +186,9 @@ func (server *YadosServer) JoinWith(address string, port int32) error {
 // postInit performs the post initialization
 func (server *YadosServer) postInit(peers []string) error {
 	server.logger.Info("Performing Post Initialization ...")
-
 	if len(peers) == 0 {
 		return nil
 	}
-
 	for _, p := range peers {
 		split := strings.Split(p, ":")
 		if len(split) != 2 {
