@@ -34,6 +34,9 @@ func (server *YadosServer) RemoveServerFromCluster(address string, port int32) e
 
 // StopServer Stops the server
 func (server *YadosServer) StopServer(ctx context.Context, request *pb.StopServerRequest) (*pb.StopServerReply, error) {
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+
 	for _, s := range server.peers {
 		err := server.RemoveServerFromCluster(s.Address, s.Port)
 		if err != nil {

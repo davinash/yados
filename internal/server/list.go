@@ -8,6 +8,9 @@ import (
 
 //GetListOfPeersEx helper function to get list of peers from this server
 func (server *YadosServer) GetListOfPeersEx() []*pb.Member {
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+
 	servers := make([]*pb.Member, 0)
 	for _, peer := range server.peers {
 		servers = append(servers, &pb.Member{
