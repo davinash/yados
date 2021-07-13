@@ -5,6 +5,12 @@ message Member {
   string name = 1;
   string address = 2;
   int32 port = 3;
+  enum MemberStatus {
+    Healthy = 0;
+    UnHealthy = 1;
+  }
+  MemberStatus status = 4;
+  int64 ReceivedHCLastAt = 5;
 }
 message NewMemberRequest {
   Member member = 1;
@@ -25,4 +31,10 @@ message RemoveServerRequest {
   Member member = 1;
 }
 message RemoveServerReply {
+}
+
+message HealthStatusRequest {
+  Member member = 1;
+}
+message HealthStatusReply {
 }

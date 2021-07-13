@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
@@ -23,11 +24,16 @@ type YadosServer struct {
 
 	self *pb.Member
 	//OSSignalCh channel listening for the OS events
-	OSSignalCh chan os.Signal
-	peers      map[string]*pb.Member
-	isTestMode bool
-	logger     *logrus.Entry
-	grpcServer *grpc.Server
+	OSSignalCh        chan os.Signal
+	peers             map[string]*pb.Member
+	isTestMode        bool
+	logger            *logrus.Entry
+	grpcServer        *grpc.Server
+	healthCheckChan   chan struct{}
+	hcTriggerDuration int
+	wg                sync.WaitGroup
+	hcMaxWaitTime     int64
+	mutex             *sync.RWMutex
 }
 
 // CreateNewServer Creates a new object of the YadosServer
@@ -45,9 +51,13 @@ func CreateNewServer(name string, address string, port int32) (*YadosServer, err
 			Address: address,
 			Name:    name,
 		},
-		peers:      map[string]*pb.Member{},
-		isTestMode: false,
-		grpcServer: grpc.NewServer(),
+		peers:             map[string]*pb.Member{},
+		isTestMode:        false,
+		grpcServer:        grpc.NewServer(),
+		healthCheckChan:   make(chan struct{}, 1),
+		hcTriggerDuration: 30,
+		hcMaxWaitTime:     180,
+		mutex:             &sync.RWMutex{},
 	}
 
 	logger := &logrus.Logger{
@@ -96,6 +106,12 @@ func (server *YadosServer) Start(peers []string) error {
 		_ = server.StopServerFn()
 		return err
 	}
+	err = server.StartHealthCheck()
+	if err != nil {
+		server.logger.Error(err)
+		_ = server.StopServerFn()
+		return err
+	}
 	return nil
 }
 
@@ -120,6 +136,9 @@ func (server *YadosServer) EnableTestMode() {
 
 // JoinWith admits the new members in the existing cluster
 func (server *YadosServer) JoinWith(address string, port int32) error {
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+
 	conn, peer, err := GetPeerConn(address, port)
 	if err != nil {
 		return err
@@ -171,11 +190,24 @@ func (server *YadosServer) postInit(peers []string) error {
 	return nil
 }
 
+// SetHealthCheckDuration Sets the time duration to run the health check
+func (server *YadosServer) SetHealthCheckDuration(duration int) {
+	server.hcTriggerDuration = duration
+}
+
+//SetHealthCheckMaxWaitTime Set the max time to wait for members response before declaring
+//it is un-healthy
+func (server *YadosServer) SetHealthCheckMaxWaitTime(maxTime int64) {
+	server.hcMaxWaitTime = maxTime
+}
+
 //StopServerFn Stops the server
 func (server *YadosServer) StopServerFn() error {
 	server.logger.Infof("Stopping the server [%s:%d] ...", server.self.Address, server.self.Port)
+	server.StopHealthCheck()
 	server.grpcServer.Stop()
 
+	server.wg.Wait()
 	if !server.isTestMode {
 		os.Exit(0)
 	}

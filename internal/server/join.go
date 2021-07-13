@@ -11,6 +11,9 @@ import (
 func (server *YadosServer) AddNewMemberInCluster(ctx context.Context, newPeer *pb.NewMemberRequest) (*pb.NewMemberReply, error) {
 	server.logger.Info("Adding new member in the cluster")
 
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+
 	if peer, ok := server.peers[newPeer.Member.Name]; ok {
 		return nil, fmt.Errorf("server with Name %s already exists in cluster", peer.Name)
 	}
