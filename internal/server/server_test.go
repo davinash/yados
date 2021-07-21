@@ -68,10 +68,6 @@ func TestStartGrpcServer(t *testing.T) {
 		}
 	}(srv)
 
-	err = srv.Stop()
-	if err == nil {
-		t.FailNow()
-	}
 }
 
 func TestPostInitWrongInput(t *testing.T) {
