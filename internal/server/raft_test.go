@@ -7,7 +7,7 @@ import (
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
-func TestStopServer(t *testing.T) {
+func TestRaft_Start(t *testing.T) {
 	cluster, err := CreateClusterForTest(3)
 	if err != nil {
 		t.Log(err)
@@ -21,10 +21,17 @@ func TestStopServer(t *testing.T) {
 		}
 	}(cluster)
 
-	for _, server := range cluster {
-		_, err := server.StopServer(context.Background(), &pb.StopServerRequest{})
-		if err != nil {
-			t.Log(err)
+	_, err = cluster[0].CreateStore(context.Background(), &pb.StoreCreateRequest{
+		Name:        "Store-1",
+		Replication: 3,
+	})
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+
+	for _, p := range cluster {
+		if len(p.Stores()) != 1 {
 			t.FailNow()
 		}
 	}

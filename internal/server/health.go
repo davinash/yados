@@ -8,7 +8,7 @@ import (
 )
 
 // UpdateHealthStatus updates the locally the health status of other peers
-func (server *YadosServer) UpdateHealthStatus(ctx context.Context, request *pb.HealthStatusRequest) (*pb.HealthStatusReply, error) {
+func (server *server) UpdateHealthStatus(ctx context.Context, request *pb.HealthStatusRequest) (*pb.HealthStatusReply, error) {
 	server.logger.Debug("Received UpdateHealthStatus")
 
 	server.mutex.Lock()
@@ -21,7 +21,7 @@ func (server *YadosServer) UpdateHealthStatus(ctx context.Context, request *pb.H
 }
 
 //StartHealthCheck starts the health check go routine
-func (server *YadosServer) StartHealthCheck() error {
+func (server *server) StartHealthCheck() error {
 	server.wg.Add(1)
 	go func() {
 		defer server.wg.Done()
@@ -44,12 +44,12 @@ func (server *YadosServer) StartHealthCheck() error {
 }
 
 // StopHealthCheck Stops the health check go-routine
-func (server *YadosServer) StopHealthCheck() {
+func (server *server) StopHealthCheck() {
 	close(server.healthCheckChan)
 }
 
 //SendHealthToPeers Send the current status of this server to all the peers
-func (server *YadosServer) SendHealthToPeers() {
+func (server *server) SendHealthToPeers() {
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
 
@@ -71,7 +71,7 @@ func (server *YadosServer) SendHealthToPeers() {
 	}
 }
 
-func (server *YadosServer) performCheck() {
+func (server *server) performCheck() {
 	currentTime := time.Now().Unix()
 	server.mutex.Lock()
 	for _, peer := range server.peers {

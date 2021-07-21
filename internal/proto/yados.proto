@@ -10,4 +10,5 @@ service YadosService {
   rpc RemoveServer(RemoveServerRequest) returns (RemoveServerReply) {}
   rpc UpdateHealthStatus(HealthStatusRequest) returns (HealthStatusReply) {}
   rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
+  rpc CreateStoreSecondary(StoreCreateRequest) returns (StoreCreateReply) {}
 }

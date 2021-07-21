@@ -12,8 +12,8 @@ import (
 // Create 3 node cluster and
 // Verify the membership
 
-func verifyListMembers(server *YadosServer, t *testing.T, numberOfServers int) {
-	conn, p, err := GetPeerConn(server.self.Address, server.self.Port)
+func verifyListMembers(server Server, t *testing.T, numberOfServers int) {
+	conn, p, err := GetPeerConn(server.Self().Address, server.Self().Port)
 	if err != nil {
 		return
 	}
@@ -42,7 +42,7 @@ func TestListAllMembers(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	defer func(cluster []*YadosServer) {
+	defer func(cluster []Server) {
 		err := StopTestCluster(cluster)
 		if err != nil {
 			t.Log(err)
@@ -62,7 +62,7 @@ func TestListAllMembers2(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	defer func(cluster []*YadosServer) {
+	defer func(cluster []Server) {
 		err := StopTestCluster(cluster)
 		if err != nil {
 			t.Log(err)

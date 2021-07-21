@@ -6,11 +6,8 @@ import (
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
-//GetListOfPeersEx helper function to get list of peers from this server
-func (server *YadosServer) GetListOfPeersEx() []*pb.Member {
-	server.mutex.Lock()
-	defer server.mutex.Unlock()
-
+// GetListOfPeers Get the list of peers in the cluster
+func (server *server) GetListOfPeers(ctx context.Context, request *pb.ListOfPeersRequest) (*pb.ListOfPeersReply, error) {
 	servers := make([]*pb.Member, 0)
 	for _, peer := range server.peers {
 		servers = append(servers, &pb.Member{
@@ -19,15 +16,12 @@ func (server *YadosServer) GetListOfPeersEx() []*pb.Member {
 			Port:    peer.Port,
 		})
 	}
-	// Add Self
+	// Add self
 	servers = append(servers, server.self)
-	return servers
-}
 
-// GetListOfPeers Get the list of peers in the cluster
-func (server *YadosServer) GetListOfPeers(ctx context.Context, request *pb.ListOfPeersRequest) (*pb.ListOfPeersReply, error) {
 	reply := &pb.ListOfPeersReply{
-		Member: server.GetListOfPeersEx(),
+		Member: servers,
 	}
+
 	return reply, nil
 }

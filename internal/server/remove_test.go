@@ -15,7 +15,7 @@ func TestRemoveServer(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	defer func(cluster []*YadosServer) {
+	defer func(cluster []Server) {
 		err := StopTestCluster(cluster)
 		if err != nil {
 			t.Log(err)
@@ -25,8 +25,8 @@ func TestRemoveServer(t *testing.T) {
 	verifyRemoveServer(t, numberOfServers, cluster)
 }
 
-func verifyRemoveServer(t *testing.T, numberOfServers int, cluster []*YadosServer) {
-	conn, p, err := GetPeerConn("127.0.0.1", cluster[0].self.Port)
+func verifyRemoveServer(t *testing.T, numberOfServers int, cluster []Server) {
+	conn, p, err := GetPeerConn("127.0.0.1", cluster[0].Self().Port)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -42,7 +42,7 @@ func verifyRemoveServer(t *testing.T, numberOfServers int, cluster []*YadosServe
 		Member: &pb.Member{
 			Name:    "TestServer-1",
 			Address: "127.0.0.1",
-			Port:    cluster[1].self.Port,
+			Port:    cluster[1].Self().Port,
 		},
 	})
 	if err != nil {
@@ -63,7 +63,7 @@ func verifyRemoveServer(t *testing.T, numberOfServers int, cluster []*YadosServe
 		Member: &pb.Member{
 			Name:    "TestServer-2",
 			Address: "127.0.0.1",
-			Port:    cluster[2].self.Port,
+			Port:    cluster[2].Self().Port,
 		},
 	})
 	if err != nil {
@@ -88,7 +88,7 @@ func TestRemoveServerNotExists(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	defer func(cluster []*YadosServer) {
+	defer func(cluster []Server) {
 		err := StopTestCluster(cluster)
 		if err != nil {
 			t.Log(err)
@@ -96,7 +96,7 @@ func TestRemoveServerNotExists(t *testing.T) {
 		}
 	}(cluster)
 
-	conn, p, err := GetPeerConn("127.0.0.1", cluster[0].self.Port)
+	conn, p, err := GetPeerConn("127.0.0.1", cluster[0].Self().Port)
 	if err != nil {
 		return
 	}
@@ -111,7 +111,7 @@ func TestRemoveServerNotExists(t *testing.T) {
 		Member: &pb.Member{
 			Name:    "TestServer-4",
 			Address: "127.0.0.1",
-			Port:    cluster[1].self.Port,
+			Port:    cluster[1].Self().Port,
 		},
 	})
 	if err == nil {
@@ -126,7 +126,7 @@ func TestRemoveServerFromCluster(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	defer func(cluster []*YadosServer) {
+	defer func(cluster []Server) {
 		err := StopTestCluster(cluster)
 		if err != nil {
 			t.Log(err)
@@ -134,14 +134,15 @@ func TestRemoveServerFromCluster(t *testing.T) {
 		}
 	}(cluster)
 
-	err = cluster[0].RemoveServerFromCluster("127.0.0.1", cluster[1].self.Port)
+	err = RemoveServerFromCluster(cluster[0], "127.0.0.1", cluster[1].Self().Port)
 	if err != nil {
 		t.Logf("Error %v", err)
 		t.FailNow()
 	}
-	listOfPeersEx := cluster[1].GetListOfPeersEx()
-	if len(listOfPeersEx) != numberOfServers-1 {
-		t.Logf("Number of servers did not match. Expected %d Actual %d", numberOfServers-1, len(listOfPeersEx))
+	listOfPeersEx, _ := cluster[1].GetListOfPeers(context.Background(), &pb.ListOfPeersRequest{})
+	if len(listOfPeersEx.GetMember()) != numberOfServers-1 {
+		t.Logf("Number of servers did not match. Expected %d Actual %d", numberOfServers-1,
+			len(listOfPeersEx.GetMember()))
 		t.FailNow()
 	}
 }

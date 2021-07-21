@@ -8,7 +8,7 @@ import (
 )
 
 //RemoveServer Remove server from the cluster
-func (server *YadosServer) RemoveServer(ctx context.Context, request *pb.RemoveServerRequest) (*pb.RemoveServerReply, error) {
+func (server *server) RemoveServer(ctx context.Context, request *pb.RemoveServerRequest) (*pb.RemoveServerReply, error) {
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
 

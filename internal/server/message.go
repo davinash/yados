@@ -100,7 +100,7 @@ package server
 //}
 //
 //// BroadcastMessage Sends the message to all the members in the cluster
-//func BroadcastMessage(server *YadosServer, request *Request, logger *logrus.Entry) ([]*Response, error) {
+//func BroadcastMessage(server *server, request *Request, logger *logrus.Entry) ([]*Response, error) {
 //	logger.Debug("Sending Broadcast message")
 //	allResponses := make([]*Response, 0)
 //	// Send message to all the members

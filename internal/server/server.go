@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,13 +19,52 @@ import (
 	easy "github.com/t-tomalak/logrus-easy-formatter"
 )
 
-//YadosServer represents the YadosServer object in the cluster
-type YadosServer struct {
+//Server server interface
+type Server interface {
+	pb.YadosServiceServer
+	//SetOrCreateDataDir TODO Add later
+	SetOrCreateDataDir(dir string) error
+	//SetLogLevel TODO Add later
+	SetLogLevel(level string)
+	//Start TODO Add later
+	Start(peers []string) error
+	//Stop TODO Add later
+	Stop() error
+	//HandleSignal TODO Add later
+	HandleSignal()
+	//JoinWith TODO Add later
+	JoinWith(address string, port int32) error
+	//SetHealthCheckDuration TODO Add later
+	SetHealthCheckDuration(duration int)
+	//SetHealthCheckMaxWaitTime TODO Add later
+	SetHealthCheckMaxWaitTime(maxTime int64)
+	//Status TODO Add later
+	Status() string
+	//DataDirectory TODO Add later
+	DataDirectory() string
+	//Address TODO Add later
+	Address() string
+	//Port TODO Add later
+	Port() int32
+	//OSSignalChan TODO Add later
+	OSSignalChan() chan os.Signal
+	//Self TODO Add later
+	Self() *pb.Member
+	//PostInit TODO Add later
+	PostInit(peers []string) error
+	//Stores TODO Add later
+	Stores() map[string]Store
+	//EnableTestMode TODO Add later
+	EnableTestMode()
+}
+
+//server represents the server object in the cluster
+type server struct {
 	pb.UnimplementedYadosServiceServer
 
 	self *pb.Member
-	//OSSignalCh channel listening for the OS events
-	OSSignalCh        chan os.Signal
+	//osSignalCh channel listening for the OS events
+	osSignalCh        chan os.Signal
 	peers             map[string]*pb.Member
 	isTestMode        bool
 	logger            *logrus.Entry
@@ -34,23 +74,26 @@ type YadosServer struct {
 	wg                sync.WaitGroup
 	hcMaxWaitTime     int64
 	mutex             *sync.RWMutex
-	stores            map[string]*Store
+	storeMutex        *sync.RWMutex
+	stores            map[string]Store
+	dataDirectory     string
 }
 
-// CreateNewServer Creates a new object of the YadosServer
-func CreateNewServer(name string, address string, port int32) (*YadosServer, error) {
+//SrvArgs represents object required to start the server
+type SrvArgs struct {
+	Name    string
+	Address string
+	Port    int32
+	HomeDir string
+}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
-	if err != nil {
-		return nil, fmt.Errorf("[CreateNewServer] failed to listen: %v", err)
-	}
-	lis.Close()
-
-	server := YadosServer{
+// CreateNewServer Creates a new object of the server
+func CreateNewServer(args *SrvArgs) (Server, error) {
+	server := server{
 		self: &pb.Member{
-			Port:    port,
-			Address: address,
-			Name:    name,
+			Port:    args.Port,
+			Address: args.Address,
+			Name:    args.Name,
 		},
 		peers:             map[string]*pb.Member{},
 		isTestMode:        false,
@@ -59,25 +102,75 @@ func CreateNewServer(name string, address string, port int32) (*YadosServer, err
 		hcTriggerDuration: 30,
 		hcMaxWaitTime:     180,
 		mutex:             &sync.RWMutex{},
-		stores:            make(map[string]*Store),
+		storeMutex:        &sync.RWMutex{},
+		stores:            make(map[string]Store),
 	}
 
 	logger := &logrus.Logger{
 		Out: os.Stderr,
 		Formatter: &easy.Formatter{
-			LogFormat:       "[%lvl%]:[%YadosServer%] %time% - %msg% \n",
+			LogFormat:       "[%lvl%]:[%server%] %time% - %msg% \n",
 			TimestampFormat: "2006-01-02 15:04:05",
 		},
 	}
 	server.logger = logger.WithFields(logrus.Fields{
-		"YadosServer": server.self.Name,
+		"server": server.self.Name,
 	})
-	server.OSSignalCh = make(chan os.Signal, 1)
+
+	err := server.SetOrCreateDataDir(args.HomeDir)
+	if err != nil {
+		return nil, err
+	}
+
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", args.Address, args.Port))
+	if err != nil {
+		return nil, fmt.Errorf("[CreateNewServer] failed to listen: %v", err)
+	}
+	lis.Close()
+
+	server.osSignalCh = make(chan os.Signal, 1)
 	return &server, nil
 }
 
+func (server *server) Self() *pb.Member {
+	return server.self
+}
+
+func (server *server) Stores() map[string]Store {
+	return server.stores
+}
+
+func (server *server) DataDirectory() string {
+	return server.dataDirectory
+}
+
+func (server *server) Address() string {
+	return server.self.Address
+}
+
+func (server *server) Port() int32 {
+	return server.self.Port
+}
+
+func (server *server) OSSignalChan() chan os.Signal {
+	return server.osSignalCh
+}
+
+//SetOrCreateDataDir Sets and create data directory
+func (server *server) SetOrCreateDataDir(dir string) error {
+	server.dataDirectory = dir
+	if _, err := os.Stat(filepath.Join(dir, ".yados")); os.IsNotExist(err) {
+		err := os.MkdirAll(filepath.Join(dir, ".yados"), os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
+	server.logger.Infof("Data directory %s", server.DataDirectory())
+	return nil
+}
+
 //SetLogLevel set the log level
-func (server *YadosServer) SetLogLevel(level string) {
+func (server *server) SetLogLevel(level string) {
 	switch level {
 	case "trace":
 		server.logger.Logger.SetLevel(logrus.TraceLevel)
@@ -95,7 +188,7 @@ func (server *YadosServer) SetLogLevel(level string) {
 }
 
 // StartGrpcServer Starts the GRPC server
-func (server *YadosServer) StartGrpcServer() error {
+func (server *server) StartGrpcServer() error {
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.Address, server.self.Port))
 	if err != nil {
 		return fmt.Errorf("failed to listen: %v", err)
@@ -110,34 +203,34 @@ func (server *YadosServer) StartGrpcServer() error {
 }
 
 //Start start the server and wait for the OS signal
-func (server *YadosServer) Start(peers []string) error {
-	signal.Notify(server.OSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+func (server *server) Start(peers []string) error {
+	signal.Notify(server.osSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go server.HandleSignal()
 
 	err := server.StartGrpcServer()
 	if err != nil {
 		return err
 	}
-	err = server.postInit(peers)
+	err = server.PostInit(peers)
 	if err != nil {
 		server.logger.Error(err)
-		_ = server.StopServerFn()
+		_ = server.Stop()
 		return err
 	}
 	err = server.StartHealthCheck()
 	if err != nil {
 		server.logger.Error(err)
-		_ = server.StopServerFn()
+		_ = server.Stop()
 		return err
 	}
 	return nil
 }
 
 // HandleSignal Handles the CTRL-C signals
-func (server *YadosServer) HandleSignal() {
+func (server *server) HandleSignal() {
 	for {
-		<-server.OSSignalCh
-		err := server.StopServerFn()
+		<-server.osSignalCh
+		err := server.Stop()
 		if err != nil {
 			return
 		}
@@ -148,12 +241,12 @@ func (server *YadosServer) HandleSignal() {
 }
 
 // EnableTestMode To be ued from the test
-func (server *YadosServer) EnableTestMode() {
+func (server *server) EnableTestMode() {
 	server.isTestMode = true
 }
 
 // JoinWith admits the new members in the existing cluster
-func (server *YadosServer) JoinWith(address string, port int32) error {
+func (server *server) JoinWith(address string, port int32) error {
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
 
@@ -183,8 +276,8 @@ func (server *YadosServer) JoinWith(address string, port int32) error {
 	return nil
 }
 
-// postInit performs the post initialization
-func (server *YadosServer) postInit(peers []string) error {
+// PostInit performs the post initialization
+func (server *server) PostInit(peers []string) error {
 	server.logger.Info("Performing Post Initialization ...")
 	if len(peers) == 0 {
 		return nil
@@ -207,20 +300,26 @@ func (server *YadosServer) postInit(peers []string) error {
 }
 
 // SetHealthCheckDuration Sets the time duration to run the health check
-func (server *YadosServer) SetHealthCheckDuration(duration int) {
+func (server *server) SetHealthCheckDuration(duration int) {
 	server.hcTriggerDuration = duration
 }
 
 //SetHealthCheckMaxWaitTime Set the max time to wait for members response before declaring
 //it is un-healthy
-func (server *YadosServer) SetHealthCheckMaxWaitTime(maxTime int64) {
+func (server *server) SetHealthCheckMaxWaitTime(maxTime int64) {
 	server.hcMaxWaitTime = maxTime
 }
 
-//StopServerFn Stops the server
-func (server *YadosServer) StopServerFn() error {
+//Stop Stops the server
+func (server *server) Stop() error {
 	server.logger.Infof("Stopping the server [%s:%d] ...", server.self.Address, server.self.Port)
 	server.StopHealthCheck()
+
+	for _, s := range server.stores {
+		s.Close()
+	}
+
+	//server.raftInstance.Stop()
 	server.grpcServer.Stop()
 
 	server.wg.Wait()
@@ -231,6 +330,6 @@ func (server *YadosServer) StopServerFn() error {
 }
 
 // Status returns the status of the server
-func (server *YadosServer) Status() error {
-	return nil
+func (server *server) Status() string {
+	return ""
 }

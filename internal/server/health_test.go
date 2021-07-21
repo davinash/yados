@@ -1,6 +1,8 @@
 package server
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestHealthCheck(t *testing.T) {
 	numberOfServers := 3
@@ -9,7 +11,7 @@ func TestHealthCheck(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	defer func(cluster []*YadosServer) {
+	defer func(cluster []Server) {
 		err := StopTestCluster(cluster)
 		if err != nil {
 			t.Log(err)

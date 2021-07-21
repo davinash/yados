@@ -24,6 +24,7 @@ type YadosServiceClient interface {
 	RemoveServer(ctx context.Context, in *RemoveServerRequest, opts ...grpc.CallOption) (*RemoveServerReply, error)
 	UpdateHealthStatus(ctx context.Context, in *HealthStatusRequest, opts ...grpc.CallOption) (*HealthStatusReply, error)
 	CreateStore(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error)
+	CreateStoreSecondary(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error)
 }
 
 type yadosServiceClient struct {
@@ -88,6 +89,15 @@ func (c *yadosServiceClient) CreateStore(ctx context.Context, in *StoreCreateReq
 	return out, nil
 }
 
+func (c *yadosServiceClient) CreateStoreSecondary(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error) {
+	out := new(StoreCreateReply)
+	err := c.cc.Invoke(ctx, "/YadosService/CreateStoreSecondary", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
@@ -98,6 +108,7 @@ type YadosServiceServer interface {
 	RemoveServer(context.Context, *RemoveServerRequest) (*RemoveServerReply, error)
 	UpdateHealthStatus(context.Context, *HealthStatusRequest) (*HealthStatusReply, error)
 	CreateStore(context.Context, *StoreCreateRequest) (*StoreCreateReply, error)
+	CreateStoreSecondary(context.Context, *StoreCreateRequest) (*StoreCreateReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -122,6 +133,9 @@ func (UnimplementedYadosServiceServer) UpdateHealthStatus(context.Context, *Heal
 }
 func (UnimplementedYadosServiceServer) CreateStore(context.Context, *StoreCreateRequest) (*StoreCreateReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStore not implemented")
+}
+func (UnimplementedYadosServiceServer) CreateStoreSecondary(context.Context, *StoreCreateRequest) (*StoreCreateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateStoreSecondary not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -244,6 +258,24 @@ func _YadosService_CreateStore_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_CreateStoreSecondary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreCreateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).CreateStoreSecondary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/CreateStoreSecondary",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).CreateStoreSecondary(ctx, req.(*StoreCreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -274,6 +306,10 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateStore",
 			Handler:    _YadosService_CreateStore_Handler,
+		},
+		{
+			MethodName: "CreateStoreSecondary",
+			Handler:    _YadosService_CreateStoreSecondary_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

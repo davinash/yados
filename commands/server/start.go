@@ -1,6 +1,8 @@
 package server
 
 import (
+	"os"
+
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -15,7 +17,7 @@ func AddServerStartCmd(parentCmd *cobra.Command) {
 	var loglevel string
 	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "Start YADOS YadosServer",
+		Short: "Start YADOS server",
 		Long: "" +
 			"Example : \n\n" +
 			"Start server with default options\n" +
@@ -29,7 +31,17 @@ func AddServerStartCmd(parentCmd *cobra.Command) {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			srv, err := server.CreateNewServer(serverName, address, port)
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+
+			srv, err := server.CreateNewServer(&server.SrvArgs{
+				Name:    serverName,
+				Address: address,
+				Port:    port,
+				HomeDir: homeDir,
+			})
 			if err != nil {
 				return err
 			}
@@ -40,7 +52,7 @@ func AddServerStartCmd(parentCmd *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			<-srv.OSSignalCh
+			<-srv.OSSignalChan()
 			return nil
 		},
 	}

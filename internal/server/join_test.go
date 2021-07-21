@@ -14,7 +14,7 @@ func TestAddNewMemberInCluster(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	defer func(cluster []*YadosServer) {
+	defer func(cluster []Server) {
 		err := StopTestCluster(cluster)
 		if err != nil {
 			t.Log(err)
@@ -27,21 +27,21 @@ func TestAddNewMemberInCluster(t *testing.T) {
 		t.Log(err)
 		t.FailNow()
 	}
-	newServer, err := startServerForTests("TestServer-99", "127.0.0.1", int32(ports[0]), nil)
+	newServer, err := StartServerForTests("TestServer-99", "127.0.0.1", int32(ports[0]), nil)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
-	defer newServer.StopServerFn()
+	defer StopServer(newServer)
 
-	_, err = cluster[0].AddNewMemberInCluster(context.Background(), &pb.NewMemberRequest{Member: newServer.self})
+	_, err = cluster[0].AddNewMemberInCluster(context.Background(), &pb.NewMemberRequest{Member: newServer.Self()})
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
-	listOfPeers := cluster[0].GetListOfPeersEx()
-	if len(listOfPeers) != numberOfServers+1 {
-		t.Logf("Number of servers did not match. Expected %d Actual %d", numberOfServers+1, len(listOfPeers))
+	listOfPeers, _ := cluster[0].GetListOfPeers(context.Background(), &pb.ListOfPeersRequest{})
+	if len(listOfPeers.GetMember()) != numberOfServers+1 {
+		t.Logf("Number of servers did not match. Expected %d Actual %d", numberOfServers+1, len(listOfPeers.GetMember()))
 		t.FailNow()
 	}
 

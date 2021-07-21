@@ -8,7 +8,7 @@ import (
 )
 
 //AddNewMemberInCluster adds a new member in cluster
-func (server *YadosServer) AddNewMemberInCluster(ctx context.Context, newPeer *pb.NewMemberRequest) (*pb.NewMemberReply, error) {
+func (server *server) AddNewMemberInCluster(ctx context.Context, newPeer *pb.NewMemberRequest) (*pb.NewMemberReply, error) {
 	server.logger.Info("Adding new member in the cluster")
 
 	server.mutex.Lock()
