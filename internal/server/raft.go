@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -46,6 +47,14 @@ type Raft interface {
 	Peers() map[string]*pb.Member
 	SetPeers(peers map[string]*pb.Member)
 	AddPeer(peer *pb.Member)
+	Term() uint64
+
+	QuorumSize() int
+	MemberCount() int
+
+	Leader() string
+
+	ProcessRequestVote(*pb.VoteRequest) (*pb.VoteRequestReply, error)
 }
 
 type raft struct {
@@ -57,20 +66,33 @@ type raft struct {
 	electionTimeout time.Duration
 	name            string
 	peers           map[string]*pb.Member
+	isTestMode      bool
+	leader          string
+	currentTerm     uint64
+	votedFor        string
+	serverName      string
 }
 
 //RftArgs Arguments to create new raft instance
 type RftArgs struct {
-	Logger *logrus.Entry
-	Name   string
+	Logger     *logrus.Entry
+	Name       string
+	ServerName string
+	IsTestMode bool
 }
 
 //NewRaftInstance creates new instance of raft
 func NewRaftInstance(args *RftArgs) (Raft, error) {
-	return &raft{logger: args.Logger,
+	r := &raft{logger: args.Logger,
 		electionTimeout: DefaultElectionTimeout,
 		state:           Stopped,
-	}, nil
+		peers:           make(map[string]*pb.Member),
+		serverName:      args.ServerName,
+	}
+	if args.IsTestMode {
+		r.isTestMode = true
+	}
+	return r, nil
 }
 
 func (r *raft) Logger() *logrus.Entry {
@@ -98,7 +120,17 @@ func (r *raft) SetPeers(peers map[string]*pb.Member) {
 }
 
 func (r *raft) AddPeer(peer *pb.Member) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	r.peers[peer.Name] = peer
+}
+
+func (r *raft) Leader() string {
+	return r.leader
+}
+
+func (r *raft) Term() uint64 {
+	return r.currentTerm
 }
 
 func (r *raft) Running() bool {
@@ -115,8 +147,17 @@ func (r *raft) Initialize() error {
 func (r *raft) SetState(state string) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-
 	r.state = state
+
+	// Increment current term, vote for self.
+	r.currentTerm++
+	r.votedFor = r.name
+
+	// Update state and leader.
+	r.state = state
+	if state == Leader {
+		r.leader = r.Name()
+	}
 }
 
 func (r *raft) State() string {
@@ -135,6 +176,16 @@ func (r *raft) SetElectionTimeout(duration time.Duration) {
 	r.electionTimeout = duration
 }
 
+func (r *raft) MemberCount() int {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return len(r.peers) + 1
+}
+
+func (r *raft) QuorumSize() int {
+	return (r.MemberCount() / 2) + 1
+}
+
 func (r *raft) Start() error {
 	if r.Running() {
 		return fmt.Errorf("raft instance already running[%v]", r.state)
@@ -147,7 +198,6 @@ func (r *raft) Start() error {
 	r.stopped = make(chan bool)
 	r.SetState(Follower)
 
-	r.logger.Debugf("Starting the Raft Loop")
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
@@ -158,6 +208,7 @@ func (r *raft) Start() error {
 }
 
 func (r *raft) startRaftLoop() {
+	//r.logger.Debugf("Starting Loop for Raft")
 	state := r.State()
 
 	for state != Stopped {
@@ -174,33 +225,107 @@ func (r *raft) startRaftLoop() {
 }
 
 func (r *raft) executeFollowerLoop() {
+	//since := time.Now()
+	//electionTimeout := r.ElectionTimeout()
+	timeoutChan := getRandomTimeout(r.ElectionTimeout(), r.ElectionTimeout()*2)
+
 	for r.State() == Follower {
+		update := false
 		select {
 		case <-r.stopped:
 			r.SetState(Stopped)
 			return
+		case <-timeoutChan:
+			if r.promotable() {
+				r.SetState(Candidate)
+			} else {
+				update = true
+			}
+		}
+		if update {
+			//since = time.Now()
+			timeoutChan = getRandomTimeout(r.ElectionTimeout(), r.ElectionTimeout()*2)
 		}
 	}
 }
 
 func (r *raft) executeCandidateLoop() {
+	r.leader = ""
+	doVote := true
+	votesGranted := 0
+	var timeoutChan <-chan time.Time
+	var respChan chan *pb.VoteRequestReply
+
 	for r.State() == Candidate {
+		if doVote {
+			// Increment current term, vote for self.
+			r.currentTerm++
+			r.votedFor = r.name
+
+			// Request for a vote to peers
+			respChan = make(chan *pb.VoteRequestReply, len(r.peers))
+			for _, peer := range r.peers {
+				go func(peer *pb.Member) {
+					conn, p, err := GetPeerConn(peer.Address, peer.Port)
+					if err != nil {
+						return
+					}
+					voteRequestReply, err := p.RequestForVote(context.Background(), &pb.VoteRequest{
+						Term:          r.currentTerm,
+						StoreName:     r.name,
+						CandidateName: r.serverName,
+					})
+					if err != nil {
+						r.logger.Warnf("RequestForVote Failed, Error = %v", err)
+						return
+					}
+
+					err = conn.Close()
+					if err != nil {
+						r.logger.Warnf("failed to close connection, error = %v", err)
+					}
+					respChan <- voteRequestReply
+				}(peer)
+			}
+
+			votesGranted = 1
+			timeoutChan = getRandomTimeout(r.ElectionTimeout(), r.ElectionTimeout()*2)
+			doVote = false
+
+		} // doVote loop finishes here
+
+		// If we received enough votes then stop waiting for more votes.
+		// And return from the candidate loop
+		if votesGranted == r.QuorumSize() {
+			r.SetState(Leader)
+			return
+		}
+
 		select {
 		case <-r.stopped:
+			r.logger.Debugf("Received executeCandidateLoop :: stop")
 			r.SetState(Stopped)
 			return
+		case resp := <-respChan:
+			if success := r.processVoteResponse(resp); success {
+				r.logger.Debugf("votesGranted")
+				votesGranted++
+			}
+		case <-timeoutChan:
+			doVote = true
 		}
 	}
 }
 
 func (r *raft) executeLeaderLoop() {
-	for r.State() == Leader {
-		select {
-		case <-r.stopped:
-			r.SetState(Stopped)
-			return
-		}
-	}
+	//for r.State() == Leader {
+	//	select {
+	//	case <-r.stopped:
+	//		r.SetState(Stopped)
+	//		return
+	//	}
+	//}
+	r.logger.Debugf("Returning executeLeaderLoop :: stop")
 }
 
 func (r *raft) promotable() bool {
@@ -217,13 +342,12 @@ func getRandomTimeout(min time.Duration, max time.Duration) <-chan time.Time {
 }
 
 func (r *raft) Stop() error {
-	r.logger.Debugf("Stopping Raft Instance")
 	if r.State() == Stopped {
 		return nil
 	}
 	close(r.stopped)
 	r.wg.Wait()
-
 	r.SetState(Stopped)
+	r.logger.Debugf("Stopped Raft Instance")
 	return nil
 }

@@ -25,6 +25,7 @@ type YadosServiceClient interface {
 	UpdateHealthStatus(ctx context.Context, in *HealthStatusRequest, opts ...grpc.CallOption) (*HealthStatusReply, error)
 	CreateStore(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error)
 	CreateStoreSecondary(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error)
+	RequestForVote(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*VoteRequestReply, error)
 }
 
 type yadosServiceClient struct {
@@ -98,6 +99,15 @@ func (c *yadosServiceClient) CreateStoreSecondary(ctx context.Context, in *Store
 	return out, nil
 }
 
+func (c *yadosServiceClient) RequestForVote(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*VoteRequestReply, error) {
+	out := new(VoteRequestReply)
+	err := c.cc.Invoke(ctx, "/YadosService/RequestForVote", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
@@ -109,6 +119,7 @@ type YadosServiceServer interface {
 	UpdateHealthStatus(context.Context, *HealthStatusRequest) (*HealthStatusReply, error)
 	CreateStore(context.Context, *StoreCreateRequest) (*StoreCreateReply, error)
 	CreateStoreSecondary(context.Context, *StoreCreateRequest) (*StoreCreateReply, error)
+	RequestForVote(context.Context, *VoteRequest) (*VoteRequestReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -136,6 +147,9 @@ func (UnimplementedYadosServiceServer) CreateStore(context.Context, *StoreCreate
 }
 func (UnimplementedYadosServiceServer) CreateStoreSecondary(context.Context, *StoreCreateRequest) (*StoreCreateReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStoreSecondary not implemented")
+}
+func (UnimplementedYadosServiceServer) RequestForVote(context.Context, *VoteRequest) (*VoteRequestReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestForVote not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -276,6 +290,24 @@ func _YadosService_CreateStoreSecondary_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_RequestForVote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).RequestForVote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/RequestForVote",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).RequestForVote(ctx, req.(*VoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -310,6 +342,10 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateStoreSecondary",
 			Handler:    _YadosService_CreateStoreSecondary_Handler,
+		},
+		{
+			MethodName: "RequestForVote",
+			Handler:    _YadosService_RequestForVote_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

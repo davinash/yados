@@ -46,3 +46,12 @@ message StoreCreateRequest {
 }
 message StoreCreateReply {
 }
+
+message VoteRequest {
+    uint64 Term = 1;
+    string CandidateName = 2;
+    string storeName = 3;
+}
+
+message VoteRequestReply {
+}

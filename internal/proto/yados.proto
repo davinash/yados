@@ -11,4 +11,5 @@ service YadosService {
   rpc UpdateHealthStatus(HealthStatusRequest) returns (HealthStatusReply) {}
   rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
   rpc CreateStoreSecondary(StoreCreateRequest) returns (StoreCreateReply) {}
+  rpc RequestForVote(VoteRequest) returns (VoteRequestReply) {}
 }

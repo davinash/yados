@@ -22,6 +22,7 @@ import (
 //Server server interface
 type Server interface {
 	pb.YadosServiceServer
+
 	//SetOrCreateDataDir TODO Add later
 	SetOrCreateDataDir(dir string) error
 	//SetLogLevel TODO Add later
@@ -187,7 +188,7 @@ func (server *server) SetLogLevel(level string) {
 	}
 }
 
-// StartGrpcServer Starts the GRPC server
+//StartGrpcServer Starts the GRPC server
 func (server *server) StartGrpcServer() error {
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.Address, server.self.Port))
 	if err != nil {
@@ -211,6 +212,7 @@ func (server *server) Start(peers []string) error {
 	if err != nil {
 		return err
 	}
+
 	err = server.PostInit(peers)
 	if err != nil {
 		server.logger.Error(err)
@@ -314,18 +316,19 @@ func (server *server) SetHealthCheckMaxWaitTime(maxTime int64) {
 func (server *server) Stop() error {
 	server.logger.Infof("Stopping the server [%s:%d] ...", server.self.Address, server.self.Port)
 	server.StopHealthCheck()
-
+	//server.logger.Infof("::11")
 	for _, s := range server.stores {
 		s.Close()
 	}
-
-	//server.raftInstance.Stop()
+	//server.logger.Infof("::13")
+	//server.logger.Infof("::1")
 	server.grpcServer.Stop()
-
+	//server.logger.Infof("::2")
 	server.wg.Wait()
 	if !server.isTestMode {
 		os.Exit(0)
 	}
+	//server.logger.Infof("::3")
 	return nil
 }
 

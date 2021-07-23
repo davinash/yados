@@ -3,12 +3,15 @@ package server
 import (
 	"context"
 	"testing"
+	"time"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
-func TestRaft_Start(t *testing.T) {
-	cluster, err := CreateClusterForTest(3)
+func TestRaft_Start_Stop(t *testing.T) {
+	numOfServers := 1
+
+	cluster, err := CreateClusterForTest(numOfServers)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()
@@ -20,19 +23,35 @@ func TestRaft_Start(t *testing.T) {
 			t.FailNow()
 		}
 	}(cluster)
+}
+
+func TestRaft_FollowerToCandidate(t *testing.T) {
+	numOfServers := 3
+	storeName := "Store-1"
+
+	cluster, err := CreateClusterForTest(numOfServers)
+	if err != nil {
+		t.Error(err)
+	}
+	defer func(cluster []Server) {
+		t.Log("Stopping the cluster now")
+		err := StopTestCluster(cluster)
+		if err != nil {
+			t.Error(err)
+		}
+	}(cluster)
 
 	_, err = cluster[0].CreateStore(context.Background(), &pb.StoreCreateRequest{
-		Name:        "Store-1",
-		Replication: 3,
+		Name:        storeName,
+		Replication: int32(numOfServers) - 1,
 	})
 	if err != nil {
-		t.Log(err)
-		t.FailNow()
+		t.Error(err)
 	}
-
-	for _, p := range cluster {
-		if len(p.Stores()) != 1 {
-			t.FailNow()
+	for {
+		if Candidate == cluster[0].Stores()[storeName].RaftInstance().State() {
+			break
 		}
+		time.Sleep(DefaultElectionTimeout)
 	}
 }
