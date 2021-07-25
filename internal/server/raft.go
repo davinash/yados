@@ -53,8 +53,19 @@ type Raft interface {
 	MemberCount() int
 
 	Leader() string
+	CommandChan() chan *Command
 
 	ProcessRequestVote(*pb.VoteRequest) (*pb.VoteRequestReply, error)
+
+	Log() Log
+	SetLog(log Log)
+}
+
+//Command represents the internal command for either follower, candidate or leader loop
+type Command struct {
+	Args      interface{}
+	Response  interface{}
+	errorChan chan error
 }
 
 type raft struct {
@@ -71,6 +82,8 @@ type raft struct {
 	currentTerm     uint64
 	votedFor        string
 	serverName      string
+	commandChan     chan *Command
+	log             Log
 }
 
 //RftArgs Arguments to create new raft instance
@@ -88,6 +101,8 @@ func NewRaftInstance(args *RftArgs) (Raft, error) {
 		state:           Stopped,
 		peers:           make(map[string]*pb.Member),
 		serverName:      args.ServerName,
+		commandChan:     make(chan *Command),
+		log:             NewLog(),
 	}
 	if args.IsTestMode {
 		r.isTestMode = true
@@ -101,6 +116,14 @@ func (r *raft) Logger() *logrus.Entry {
 
 func (r *raft) SetLogger(logger *logrus.Entry) {
 	r.logger = logger
+}
+
+func (r *raft) Log() Log {
+	return r.log
+}
+
+func (r *raft) SetLog(log Log) {
+	r.log = log
 }
 
 func (r *raft) Name() string {
@@ -119,6 +142,10 @@ func (r *raft) SetPeers(peers map[string]*pb.Member) {
 	r.peers = peers
 }
 
+func (r *raft) CommandChan() chan *Command {
+	return r.commandChan
+}
+
 func (r *raft) AddPeer(peer *pb.Member) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -130,6 +157,9 @@ func (r *raft) Leader() string {
 }
 
 func (r *raft) Term() uint64 {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
 	return r.currentTerm
 }
 
@@ -155,6 +185,7 @@ func (r *raft) SetState(state string) {
 
 	// Update state and leader.
 	r.state = state
+	r.logger.Debugf("Current State %s", r.state)
 	if state == Leader {
 		r.leader = r.Name()
 	}
@@ -230,6 +261,7 @@ func (r *raft) executeFollowerLoop() {
 	timeoutChan := getRandomTimeout(r.ElectionTimeout(), r.ElectionTimeout()*2)
 
 	for r.State() == Follower {
+
 		update := false
 		select {
 		case <-r.stopped:
@@ -241,6 +273,13 @@ func (r *raft) executeFollowerLoop() {
 			} else {
 				update = true
 			}
+		case c := <-r.commandChan:
+			var err error
+			switch c.Args.(type) {
+			case *pb.VoteRequest:
+				c.Response, err = r.ProcessRequestVote(c.Args.(*pb.VoteRequest))
+			}
+			c.errorChan <- err
 		}
 		if update {
 			//since = time.Now()
@@ -311,6 +350,13 @@ func (r *raft) executeCandidateLoop() {
 				r.logger.Debugf("votesGranted")
 				votesGranted++
 			}
+		case c := <-r.commandChan:
+			var err error
+			switch c.Args.(type) {
+			case *pb.VoteRequest:
+				c.Response, err = r.ProcessRequestVote(c.Args.(*pb.VoteRequest))
+			}
+			c.errorChan <- err
 		case <-timeoutChan:
 			doVote = true
 		}
@@ -318,13 +364,20 @@ func (r *raft) executeCandidateLoop() {
 }
 
 func (r *raft) executeLeaderLoop() {
-	//for r.State() == Leader {
-	//	select {
-	//	case <-r.stopped:
-	//		r.SetState(Stopped)
-	//		return
-	//	}
-	//}
+	for r.State() == Leader {
+		select {
+		case <-r.stopped:
+			r.SetState(Stopped)
+			return
+		case c := <-r.commandChan:
+			var err error
+			switch c.Args.(type) {
+			case *pb.VoteRequest:
+				c.Response, err = r.ProcessRequestVote(c.Args.(*pb.VoteRequest))
+			}
+			c.errorChan <- err
+		}
+	}
 	r.logger.Debugf("Returning executeLeaderLoop :: stop")
 }
 

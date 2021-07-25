@@ -48,10 +48,12 @@ message StoreCreateReply {
 }
 
 message VoteRequest {
-    uint64 Term = 1;
-    string CandidateName = 2;
-    string storeName = 3;
+  uint64 Term = 1;
+  string CandidateName = 2;
+  string storeName = 3;
 }
 
 message VoteRequestReply {
+  bool VoteGranted = 1;
+  uint64 Term = 2;
 }

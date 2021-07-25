@@ -16,11 +16,18 @@ var (
 )
 
 func (r *raft) processVoteResponse(resp *pb.VoteRequestReply) bool {
-	return true
+	if resp.VoteGranted && resp.Term == r.currentTerm {
+		return true
+	}
+	if resp.Term > r.currentTerm {
+		r.updateCurrentTerm(resp.Term, "")
+	}
+	return false
 }
 
 func (r *raft) updateCurrentTerm(term uint64, leaderName string) {
-	if term > r.currentTerm {
+	if term < r.currentTerm {
+		r.logger.Debug("update is called when term is not larger than currentTerm")
 		panic("update is called when term is not larger than currentTerm")
 	}
 	// TODO : Stop the heartbeat
@@ -55,12 +62,23 @@ func (r *raft) ProcessRequestVote(request *pb.VoteRequest) (*pb.VoteRequestReply
 	// TODO : If the candidate's log is not at least as up-to-date as our last log then don't vote.
 
 	r.votedFor = request.CandidateName
-	return emptyVoteRequestReply, nil
+	return &pb.VoteRequestReply{
+		Term:        r.currentTerm,
+		VoteGranted: true,
+	}, nil
 }
 
 func (server *server) RequestForVote(ctx context.Context, request *pb.VoteRequest) (*pb.VoteRequestReply, error) {
-	if s, ok := server.Stores()[request.StoreName]; ok {
-		return s.RaftInstance().ProcessRequestVote(request)
+	command := &Command{
+		Args:      request,
+		errorChan: make(chan error, 1),
 	}
-	return emptyVoteRequestReply, nil
+	if s, ok := server.Stores()[request.StoreName]; ok {
+		s.RaftInstance().CommandChan() <- command
+	}
+	err := <-command.errorChan
+	if err != nil {
+		return emptyVoteRequestReply, err
+	}
+	return command.Response.(*pb.VoteRequestReply), nil
 }

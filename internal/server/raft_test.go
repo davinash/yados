@@ -25,7 +25,7 @@ func TestRaft_Start_Stop(t *testing.T) {
 	}(cluster)
 }
 
-func TestRaft_FollowerToCandidate(t *testing.T) {
+func TestRaft_LeaderElection(t *testing.T) {
 	numOfServers := 3
 	storeName := "Store-1"
 
@@ -49,7 +49,9 @@ func TestRaft_FollowerToCandidate(t *testing.T) {
 		t.Error(err)
 	}
 	for {
-		if Candidate == cluster[0].Stores()[storeName].RaftInstance().State() {
+		if Leader == cluster[0].Stores()[storeName].RaftInstance().State() ||
+			Leader == cluster[1].Stores()[storeName].RaftInstance().State() ||
+			Leader == cluster[2].Stores()[storeName].RaftInstance().State() {
 			break
 		}
 		time.Sleep(DefaultElectionTimeout)
