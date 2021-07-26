@@ -57,3 +57,7 @@ message VoteRequestReply {
   bool VoteGranted = 1;
   uint64 Term = 2;
 }
+
+message AppendEntriesRequest {
+
+}

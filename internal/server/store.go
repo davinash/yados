@@ -115,7 +115,10 @@ func (server *server) CreateStore(ctx context.Context, request *pb.StoreCreateRe
 			server.logger.Warnf("Failed to close the connection, error = %v", err)
 		}
 
-		server.Stores()[request.GetName()].RaftInstance().AddPeer(p)
+		server.Stores()[request.GetName()].RaftInstance().AddPeer(&Peer{
+			member:            p,
+			heartbeatInterval: DefaultHeartbeatInterval,
+		})
 
 		counter++
 	}

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -28,7 +29,12 @@ const (
 const (
 	//DefaultElectionTimeout default election timeout
 	DefaultElectionTimeout = 150 * time.Millisecond
+	//DefaultHeartbeatInterval default heartbeat interval
+	DefaultHeartbeatInterval = 50 * time.Millisecond
 )
+
+// ErrorNotLeader = errors.New("this is not a leader") error for returning if not leader
+var ErrorNotLeader = errors.New("this is not a leader")
 
 //Raft raft interface
 type Raft interface {
@@ -44,12 +50,12 @@ type Raft interface {
 	SetElectionTimeout(duration time.Duration)
 	Name() string
 	SetName(name string)
-	Peers() map[string]*pb.Member
-	SetPeers(peers map[string]*pb.Member)
-	AddPeer(peer *pb.Member)
+	Peers() map[string]*Peer
+	SetPeers(peers map[string]*Peer)
+	AddPeer(peer *Peer)
 	Term() uint64
 
-	QuorumSize() int
+	IsMajority() int
 	MemberCount() int
 
 	Leader() string
@@ -68,6 +74,13 @@ type Command struct {
 	errorChan chan error
 }
 
+//Peer add later
+type Peer struct {
+	stopChan          chan bool
+	member            *pb.Member
+	heartbeatInterval time.Duration
+}
+
 type raft struct {
 	logger          *logrus.Entry
 	mutex           sync.RWMutex
@@ -76,7 +89,7 @@ type raft struct {
 	wg              sync.WaitGroup
 	electionTimeout time.Duration
 	name            string
-	peers           map[string]*pb.Member
+	peers           map[string]*Peer
 	isTestMode      bool
 	leader          string
 	currentTerm     uint64
@@ -99,7 +112,7 @@ func NewRaftInstance(args *RftArgs) (Raft, error) {
 	r := &raft{logger: args.Logger,
 		electionTimeout: DefaultElectionTimeout,
 		state:           Stopped,
-		peers:           make(map[string]*pb.Member),
+		peers:           make(map[string]*Peer),
 		serverName:      args.ServerName,
 		commandChan:     make(chan *Command),
 		log:             NewLog(),
@@ -134,11 +147,11 @@ func (r *raft) SetName(name string) {
 	r.name = name
 }
 
-func (r *raft) Peers() map[string]*pb.Member {
+func (r *raft) Peers() map[string]*Peer {
 	return r.peers
 }
 
-func (r *raft) SetPeers(peers map[string]*pb.Member) {
+func (r *raft) SetPeers(peers map[string]*Peer) {
 	r.peers = peers
 }
 
@@ -146,10 +159,10 @@ func (r *raft) CommandChan() chan *Command {
 	return r.commandChan
 }
 
-func (r *raft) AddPeer(peer *pb.Member) {
+func (r *raft) AddPeer(peer *Peer) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.peers[peer.Name] = peer
+	r.peers[peer.member.Name] = peer
 }
 
 func (r *raft) Leader() string {
@@ -213,7 +226,7 @@ func (r *raft) MemberCount() int {
 	return len(r.peers) + 1
 }
 
-func (r *raft) QuorumSize() int {
+func (r *raft) IsMajority() int {
 	return (r.MemberCount() / 2) + 1
 }
 
@@ -278,6 +291,9 @@ func (r *raft) executeFollowerLoop() {
 			switch c.Args.(type) {
 			case *pb.VoteRequest:
 				c.Response, err = r.ProcessRequestVote(c.Args.(*pb.VoteRequest))
+			case *pb.AppendEntriesRequest:
+			default:
+				err = ErrorNotLeader
 			}
 			c.errorChan <- err
 		}
@@ -304,8 +320,8 @@ func (r *raft) executeCandidateLoop() {
 			// Request for a vote to peers
 			respChan = make(chan *pb.VoteRequestReply, len(r.peers))
 			for _, peer := range r.peers {
-				go func(peer *pb.Member) {
-					conn, p, err := GetPeerConn(peer.Address, peer.Port)
+				go func(peer *Peer) {
+					conn, p, err := GetPeerConn(peer.member.Address, peer.member.Port)
 					if err != nil {
 						return
 					}
@@ -335,7 +351,7 @@ func (r *raft) executeCandidateLoop() {
 
 		// If we received enough votes then stop waiting for more votes.
 		// And return from the candidate loop
-		if votesGranted == r.QuorumSize() {
+		if votesGranted == r.IsMajority() {
 			r.SetState(Leader)
 			return
 		}
@@ -355,6 +371,7 @@ func (r *raft) executeCandidateLoop() {
 			switch c.Args.(type) {
 			case *pb.VoteRequest:
 				c.Response, err = r.ProcessRequestVote(c.Args.(*pb.VoteRequest))
+			case *pb.AppendEntriesRequest:
 			}
 			c.errorChan <- err
 		case <-timeoutChan:
@@ -364,6 +381,10 @@ func (r *raft) executeCandidateLoop() {
 }
 
 func (r *raft) executeLeaderLoop() {
+	for _, peer := range r.peers {
+		r.startHeartbeat(peer)
+	}
+
 	for r.State() == Leader {
 		select {
 		case <-r.stopped:
@@ -374,6 +395,9 @@ func (r *raft) executeLeaderLoop() {
 			switch c.Args.(type) {
 			case *pb.VoteRequest:
 				c.Response, err = r.ProcessRequestVote(c.Args.(*pb.VoteRequest))
+			case *pb.AppendEntriesRequest:
+			default:
+				err = ErrorNotLeader
 			}
 			c.errorChan <- err
 		}
@@ -382,7 +406,7 @@ func (r *raft) executeLeaderLoop() {
 }
 
 func (r *raft) promotable() bool {
-	return true
+	return r.Log().CurrentIndex() > 0
 }
 
 func getRandomTimeout(min time.Duration, max time.Duration) <-chan time.Time {
@@ -403,4 +427,29 @@ func (r *raft) Stop() error {
 	r.SetState(Stopped)
 	r.logger.Debugf("Stopped Raft Instance")
 	return nil
+}
+
+//HeartBeat add later
+func (p *Peer) HeartBeat(c chan bool) {
+	stopChan := p.stopChan
+	c <- true
+	ticker := time.Tick(p.heartbeatInterval)
+	for {
+		select {
+		case <-stopChan:
+			return
+		case <-ticker:
+		}
+	}
+}
+
+func (r *raft) startHeartbeat(peer *Peer) {
+	peer.stopChan = make(chan bool)
+	c := make(chan bool)
+	r.wg.Add(1)
+	go func() {
+		defer r.wg.Done()
+		peer.HeartBeat(c)
+	}()
+	<-c
 }
