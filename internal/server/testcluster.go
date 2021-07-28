@@ -62,6 +62,7 @@ func CreateNewCluster(numOfServers int) (*TestCluster, error) {
 			return nil, err
 		}
 	}
+	close(ready)
 	return t, nil
 }
 

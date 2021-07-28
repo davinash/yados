@@ -23,6 +23,8 @@ type Server interface {
 	Serve() error
 	RPCServer() RPCServer
 	Raft() Raft
+	Send(peer Server, serviceMethod string, args interface{}) (interface{}, error)
+	AddPeer(peer Server) error
 }
 
 type server struct {
@@ -77,6 +79,18 @@ func (srv *server) Serve() error {
 	}
 
 	return nil
+}
+
+func (srv *server) AddPeer(peer Server) error {
+	panic("implement me")
+}
+
+func (srv *server) Send(peer Server, serviceMethod string, args interface{}) (interface{}, error) {
+	reply, err := srv.RPCServer().Send(peer, serviceMethod, args)
+	if err != nil {
+		return nil, err
+	}
+	return reply, nil
 }
 
 func (srv *server) Name() string {

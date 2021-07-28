@@ -2,6 +2,8 @@ syntax = "proto3";
 option go_package = "/gen";
 
 message VoteRequest {
+    uint64 Term = 1;
+    string CandidateName = 2;
 }
 
 message VoteReply {
