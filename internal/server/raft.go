@@ -31,14 +31,15 @@ const (
 //Raft raft interface
 type Raft interface {
 	Server() Server
-	Peers() []Server
+	Peers() []*pb.Peer
+	AddPeer(peer *pb.Peer) error
 }
 
 type raft struct {
 	mutex  sync.Mutex
 	server Server
 	//TODO : Check if we need this or can work with from the object in Server interface
-	peers []Server
+	peers []*pb.Peer
 	state RaftState
 
 	currentTerm uint64
@@ -49,13 +50,24 @@ type raft struct {
 }
 
 //NewRaft creates new instance of Raft
-func NewRaft(srv Server, ready <-chan interface{}) Raft {
+func NewRaft(srv Server, peers []*pb.Peer, ready <-chan interface{}) (Raft, error) {
 	r := &raft{
 		server: srv,
 	}
-	r.peers = make([]Server, 0)
+	r.peers = make([]*pb.Peer, 0)
 	r.state = Follower
 	r.votedFor = ""
+
+	for _, p := range peers {
+		_, err := srv.Send(p, "server.AddNewMember", &pb.Peer{
+			Name:    srv.Name(),
+			Address: srv.Address(),
+			Port:    srv.Port(),
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	go func() {
 		<-ready
@@ -65,7 +77,7 @@ func NewRaft(srv Server, ready <-chan interface{}) Raft {
 		r.runElectionTimer()
 	}()
 
-	return r
+	return r, nil
 }
 
 func (s RaftState) String() string {
@@ -81,6 +93,14 @@ func (s RaftState) String() string {
 	default:
 		panic("unreachable")
 	}
+}
+
+func (r *raft) AddPeer(newPeer *pb.Peer) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	r.peers = append(r.peers, newPeer)
+	return nil
 }
 
 func (r *raft) electionTimeout() time.Duration {
@@ -128,7 +148,7 @@ func (r *raft) startElection() {
 	r.server.Logger().Debugf("becomes Candidate (currentTerm=%d); log=%v", savedCurrentTerm, r.log)
 	//votesReceived := 1
 	for _, peer := range r.peers {
-		go func(peer Server) {
+		go func(peer *pb.Peer) {
 			args := pb.VoteRequest{
 				Term:          savedCurrentTerm,
 				CandidateName: r.Server().Name(),
@@ -146,6 +166,6 @@ func (r *raft) Server() Server {
 	return r.server
 }
 
-func (r *raft) Peers() []Server {
+func (r *raft) Peers() []*pb.Peer {
 	return r.peers
 }

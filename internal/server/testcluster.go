@@ -3,6 +3,8 @@ package server
 import (
 	"fmt"
 	"net"
+
+	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
 //GetFreePort Get the next free port ( Only for test purpose )
@@ -42,7 +44,7 @@ type TestCluster struct {
 //CreateNewCluster creates a new cluster for the test
 func CreateNewCluster(numOfServers int) (*TestCluster, error) {
 	t := &TestCluster{
-		members:      make([]Server, numOfServers),
+		members:      make([]Server, 0),
 		numOfServers: numOfServers,
 	}
 	freePorts, err := GetFreePorts(numOfServers)
@@ -51,16 +53,33 @@ func CreateNewCluster(numOfServers int) (*TestCluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < numOfServers; i++ {
-		t.members[i], err = NewServer(fmt.Sprintf("Server-%d", i), "127.0.0.1", int32(freePorts[i]), "debug",
-			ready)
+
+	srv, err := NewServer(fmt.Sprintf("Server-%d", 0), "127.0.0.1",
+		int32(freePorts[0]), "debug", ready)
+	if err != nil {
+		return nil, err
+	}
+	err = srv.Serve(nil)
+	if err != nil {
+		return nil, err
+	}
+	t.members = append(t.members, srv)
+
+	for i := 1; i < numOfServers; i++ {
+		peers := make([]*pb.Peer, 0)
+		for _, p := range t.members {
+			peers = append(peers, p.Self())
+		}
+		srv, err := NewServer(fmt.Sprintf("Server-%d", i), "127.0.0.1",
+			int32(freePorts[i]), "debug", ready)
 		if err != nil {
 			return nil, err
 		}
-		err = t.members[i].Serve()
+		err = srv.Serve(peers)
 		if err != nil {
 			return nil, err
 		}
+		t.members = append(t.members, srv)
 	}
 	close(ready)
 	return t, nil

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"os"
 	"sync"
 
@@ -10,6 +11,9 @@ import (
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
+//ErrorInvalidFormat error for invalid format
+var ErrorInvalidFormat = errors.New("invalid format for peers, use <ip-address>:port")
+
 //Server Server interface
 type Server interface {
 	pb.YadosServiceServer
@@ -17,37 +21,35 @@ type Server interface {
 	Stop() error
 	Address() string
 	Port() int32
-	Peers() []*pb.Member
+	Peers() []*pb.Peer
 	Logger() *logrus.Entry
 	SetLogLevel(level string)
-	Serve() error
+	Serve([]*pb.Peer) error
 	RPCServer() RPCServer
 	Raft() Raft
-	Send(peer Server, serviceMethod string, args interface{}) (interface{}, error)
-	AddPeer(peer Server) error
+	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
+	Self() *pb.Peer
 }
 
 type server struct {
 	pb.UnimplementedYadosServiceServer
 	mutex     sync.Mutex
-	peers     []*pb.Member
 	raft      Raft
 	ready     <-chan interface{}
 	quit      chan interface{}
 	rpcServer RPCServer
-	self      *pb.Member
+	self      *pb.Peer
 	logger    *logrus.Entry
 }
 
 //NewServer creates new instance of a server
 func NewServer(name string, address string, port int32, loglevel string, ready <-chan interface{}) (Server, error) {
 	srv := &server{}
-	srv.self = &pb.Member{
+	srv.self = &pb.Peer{
 		Name:    name,
 		Address: address,
 		Port:    port,
 	}
-	srv.peers = make([]*pb.Member, 0)
 	srv.ready = ready
 
 	logger := &logrus.Logger{
@@ -66,26 +68,25 @@ func NewServer(name string, address string, port int32, loglevel string, ready <
 	return srv, nil
 }
 
-func (srv *server) Serve() error {
+func (srv *server) Serve(peers []*pb.Peer) error {
 	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	srv.mutex.Lock()
 	defer srv.mutex.Unlock()
 
-	srv.raft = NewRaft(srv, srv.ready)
 	srv.rpcServer = NewRPCServer(srv)
 	err := srv.rpcServer.Start()
 	if err != nil {
 		srv.logger.Fatalf("failed to start the rpc, error = %v", err)
 	}
 
+	srv.raft, err = NewRaft(srv, peers, srv.ready)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (srv *server) AddPeer(peer Server) error {
-	panic("implement me")
-}
-
-func (srv *server) Send(peer Server, serviceMethod string, args interface{}) (interface{}, error) {
+func (srv *server) Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error) {
 	reply, err := srv.RPCServer().Send(peer, serviceMethod, args)
 	if err != nil {
 		return nil, err
@@ -105,8 +106,8 @@ func (srv *server) Port() int32 {
 	return srv.self.Port
 }
 
-func (srv *server) Peers() []*pb.Member {
-	return srv.peers
+func (srv *server) Peers() []*pb.Peer {
+	return srv.Raft().Peers()
 }
 
 func (srv *server) Logger() *logrus.Entry {
@@ -119,6 +120,10 @@ func (srv *server) RPCServer() RPCServer {
 
 func (srv *server) Raft() Raft {
 	return srv.raft
+}
+
+func (srv *server) Self() *pb.Peer {
+	return srv.self
 }
 
 func (srv *server) SetLogLevel(level string) {

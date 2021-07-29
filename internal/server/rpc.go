@@ -20,7 +20,7 @@ var ErrorUnknownMethod = errors.New("unknown method ")
 type RPCServer interface {
 	Start() error
 	Stop() error
-	Send(peer Server, serviceMethod string, args interface{}) (interface{}, error)
+	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
 	Server() Server
 }
 
@@ -70,8 +70,8 @@ func GetPeerConn(address string, port int32) (*grpc.ClientConn, pb.YadosServiceC
 	return conn, peer, nil
 }
 
-func (rpc *rpcServer) Send(peer Server, serviceMethod string, args interface{}) (interface{}, error) {
-	peerConn, rpcClient, err := GetPeerConn(peer.Address(), peer.Port())
+func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error) {
+	peerConn, rpcClient, err := GetPeerConn(peer.Address, peer.Port)
 	if err != nil {
 		return nil, err
 	}
@@ -85,6 +85,12 @@ func (rpc *rpcServer) Send(peer Server, serviceMethod string, args interface{}) 
 	switch serviceMethod {
 	case "RPC.RequestVote":
 		reply, err := rpcClient.RequestVotes(context.Background(), args.(*pb.VoteRequest))
+		if err != nil {
+			return nil, err
+		}
+		return reply, nil
+	case "server.AddNewMember":
+		reply, err := rpcClient.AddMember(context.Background(), args.(*pb.Peer))
 		if err != nil {
 			return nil, err
 		}
