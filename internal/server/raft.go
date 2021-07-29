@@ -55,6 +55,8 @@ type raft struct {
 }
 
 func (r *raft) Stop() {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	r.state = Dead
 }
 
@@ -192,13 +194,13 @@ func (r *raft) startElection() {
 			reply := resp.(*pb.VoteReply)
 			r.mutex.Lock()
 			defer r.mutex.Unlock()
-			r.server.Logger().Debugf("received RequestVoteReply %+v", reply)
+			r.server.Logger().Debugf("[%s] received RequestVoteReply (%+v, %v)", reply.Id, reply.Term, reply.VoteGranted)
 			if r.state != Candidate {
-				r.server.Logger().Debugf("while waiting for reply, state = %v", r.state)
+				r.server.Logger().Debugf("[%s] while waiting for reply, state = %v", reply.Id, r.state)
 				return
 			}
 			if reply.Term > savedCurrentTerm {
-				r.server.Logger().Debug("term out of date in RequestVoteReply")
+				r.server.Logger().Debugf("[%s] term out of date in RequestVoteReply", reply.Id)
 				r.becomeFollower(reply.Term)
 				return
 			} else if reply.Term == savedCurrentTerm {
