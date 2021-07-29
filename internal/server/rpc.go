@@ -84,7 +84,13 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 
 	switch serviceMethod {
 	case "RPC.RequestVote":
-		reply, err := rpcClient.RequestVotes(context.Background(), args.(*pb.VoteRequest))
+		request := args.(*pb.VoteRequest)
+
+		rpc.Server().Logger().Debugf("Type = RequestVotes %s -----> %s  "+
+			"Request : {Term = %v Candidate Name = %v }", rpc.Server().Name(), peer.Name,
+			request.Term, request.CandidateName)
+
+		reply, err := rpcClient.RequestVotes(context.Background(), request)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +102,13 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 		}
 		return reply, nil
 	case "RPC.AppendEntries":
-		reply, err := rpcClient.AppendEntries(context.Background(), args.(*pb.AppendEntryRequest))
+		request := args.(*pb.AppendEntryRequest)
+
+		rpc.Server().Logger().Debugf("Type = AppendEntries %s -----> %s  "+
+			"Request : {Term = %v Leader Name = %v }", rpc.Server().Name(), peer.Name,
+			request.Term, request.LeaderName)
+
+		reply, err := rpcClient.AppendEntries(context.Background(), request)
 		if err != nil {
 			return nil, err
 		}

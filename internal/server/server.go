@@ -128,7 +128,10 @@ func (srv *server) Self() *pb.Peer {
 }
 
 func (srv *server) State() RaftState {
-	return srv.Raft().State()
+	if srv.Raft() != nil {
+		return srv.Raft().State()
+	}
+	return Follower
 }
 
 func (srv *server) SetLogLevel(level string) {

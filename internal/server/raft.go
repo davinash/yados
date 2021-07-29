@@ -183,8 +183,6 @@ func (r *raft) startElection() {
 				Term:          savedCurrentTerm,
 				CandidateName: r.Server().Name(),
 			}
-			r.server.Logger().Debugf("sending RequestVote to %s (Term %v Candidate Name %v)", peer.Name,
-				args.Term, args.CandidateName)
 			resp, err := r.Server().Send(peer, "RPC.RequestVote", &args)
 			if err != nil {
 				return
@@ -225,11 +223,10 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 	if r.state == Dead {
 		return EmptyVoteReply, nil
 	}
-	r.Server().Logger().Debugf("RequestVote: %+v [currentTerm=%d, votedFor=%s]",
-		request, r.currentTerm, r.votedFor)
+	r.Server().Logger().Debugf("Received RequestVote: [currentTerm=%d, votedFor=%s]", r.currentTerm, r.votedFor)
 
 	if request.Term > r.currentTerm {
-		r.Server().Logger().Debug("... term out of date in RequestVote")
+		r.Server().Logger().Debug("term out of date in RequestVote")
 		r.becomeFollower(request.Term)
 	}
 	reply := &pb.VoteReply{}
@@ -241,7 +238,7 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 		reply.VoteGranted = false
 	}
 	reply.Term = r.currentTerm
-	r.Server().Logger().Debugf("... RequestVote reply: %+v", reply)
+	r.Server().Logger().Debugf("RequestVote reply: [Term = %d, votedFor = %s ]", reply.Term, r.votedFor)
 
 	return reply, nil
 }
@@ -280,8 +277,6 @@ func (r *raft) leaderSendHeartbeats() {
 			LeaderName: peer.Name,
 		}
 		go func(peer *pb.Peer) {
-			r.Server().Logger().Debugf("sending AppendEntries to %v: ni=%d, args=(Term = %v "+
-				"Leader Name = %s)", peer.Name, 0, args.Term, args.LeaderName)
 			resp, err := r.Server().Send(peer, "RPC.AppendEntries", &args)
 			if err != nil {
 				return
