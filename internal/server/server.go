@@ -63,6 +63,7 @@ func NewServer(name string, address string, port int32, loglevel string, ready <
 	srv.logger = logger.WithFields(logrus.Fields{
 		"server": srv.self.Name,
 	})
+
 	srv.SetLogLevel(loglevel)
 	srv.quit = make(chan interface{})
 

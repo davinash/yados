@@ -8,13 +8,6 @@ import (
 )
 
 var (
-	//EmptyVoteReply to return from the vote reply operation
-	EmptyVoteReply = &pb.VoteReply{}
-	//EmptyAppendEntryReply empty reply from append entry operation
-	EmptyAppendEntryReply = &pb.AppendEntryReply{}
-	//EmptyNewMemberReply empty reply from Add member operation
-	EmptyNewMemberReply = &pb.NewPeerReply{}
-
 	//ErrorPeerAlreadyExists error if the peer with same name already exists
 	ErrorPeerAlreadyExists = errors.New("peer with this name already exists in cluster")
 )
@@ -27,17 +20,26 @@ func (srv *server) AppendEntries(ctx context.Context, request *pb.AppendEntryReq
 	return srv.Raft().AppendEntries(ctx, request)
 }
 
-func (srv *server) AddMember(ctx context.Context, newPeer *pb.Peer) (*pb.NewPeerReply, error) {
+func (srv *server) AddMember(ctx context.Context, newPeer *pb.NewPeerRequest) (*pb.NewPeerReply, error) {
+	EmptyNewMemberReply := &pb.NewPeerReply{Id: newPeer.Id}
+	srv.logger.Debugf("[%s] Received AddMember", newPeer.Id)
 	srv.mutex.Lock()
 	defer srv.mutex.Unlock()
 	// 1. check if the member with this name already exists
 	for _, peer := range srv.Peers() {
-		if peer.Name == newPeer.Name {
+		if peer.Name == newPeer.NewPeer.Name {
 			return EmptyNewMemberReply, ErrorPeerAlreadyExists
 		}
 	}
 	// Add new member
-	srv.Raft().AddPeer(newPeer)
+	err := srv.Raft().AddPeer(&pb.Peer{
+		Name:    newPeer.NewPeer.Name,
+		Address: newPeer.NewPeer.Address,
+		Port:    newPeer.NewPeer.Port,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	return EmptyNewMemberReply, nil
 }

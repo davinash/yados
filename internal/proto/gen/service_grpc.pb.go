@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type YadosServiceClient interface {
 	RequestVotes(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*VoteReply, error)
 	AppendEntries(ctx context.Context, in *AppendEntryRequest, opts ...grpc.CallOption) (*AppendEntryReply, error)
-	AddMember(ctx context.Context, in *Peer, opts ...grpc.CallOption) (*NewPeerReply, error)
+	AddMember(ctx context.Context, in *NewPeerRequest, opts ...grpc.CallOption) (*NewPeerReply, error)
 }
 
 type yadosServiceClient struct {
@@ -49,7 +49,7 @@ func (c *yadosServiceClient) AppendEntries(ctx context.Context, in *AppendEntryR
 	return out, nil
 }
 
-func (c *yadosServiceClient) AddMember(ctx context.Context, in *Peer, opts ...grpc.CallOption) (*NewPeerReply, error) {
+func (c *yadosServiceClient) AddMember(ctx context.Context, in *NewPeerRequest, opts ...grpc.CallOption) (*NewPeerReply, error) {
 	out := new(NewPeerReply)
 	err := c.cc.Invoke(ctx, "/YadosService/AddMember", in, out, opts...)
 	if err != nil {
@@ -64,7 +64,7 @@ func (c *yadosServiceClient) AddMember(ctx context.Context, in *Peer, opts ...gr
 type YadosServiceServer interface {
 	RequestVotes(context.Context, *VoteRequest) (*VoteReply, error)
 	AppendEntries(context.Context, *AppendEntryRequest) (*AppendEntryReply, error)
-	AddMember(context.Context, *Peer) (*NewPeerReply, error)
+	AddMember(context.Context, *NewPeerRequest) (*NewPeerReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -78,7 +78,7 @@ func (UnimplementedYadosServiceServer) RequestVotes(context.Context, *VoteReques
 func (UnimplementedYadosServiceServer) AppendEntries(context.Context, *AppendEntryRequest) (*AppendEntryReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppendEntries not implemented")
 }
-func (UnimplementedYadosServiceServer) AddMember(context.Context, *Peer) (*NewPeerReply, error) {
+func (UnimplementedYadosServiceServer) AddMember(context.Context, *NewPeerRequest) (*NewPeerReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddMember not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
@@ -131,7 +131,7 @@ func _YadosService_AppendEntries_Handler(srv interface{}, ctx context.Context, d
 }
 
 func _YadosService_AddMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Peer)
+	in := new(NewPeerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func _YadosService_AddMember_Handler(srv interface{}, ctx context.Context, dec f
 		FullMethod: "/YadosService/AddMember",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YadosServiceServer).AddMember(ctx, req.(*Peer))
+		return srv.(YadosServiceServer).AddMember(ctx, req.(*NewPeerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

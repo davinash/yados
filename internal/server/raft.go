@@ -68,10 +68,12 @@ func NewRaft(srv Server, peers []*pb.Peer, ready <-chan interface{}) (Raft, erro
 	r.votedFor = ""
 
 	for _, p := range peers {
-		_, err := srv.Send(p, "server.AddNewMember", &pb.Peer{
-			Name:    srv.Name(),
-			Address: srv.Address(),
-			Port:    srv.Port(),
+		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
+			NewPeer: &pb.Peer{
+				Name:    srv.Name(),
+				Address: srv.Address(),
+				Port:    srv.Port(),
+			},
 		})
 		if err != nil {
 			return nil, err
@@ -218,18 +220,21 @@ func (r *raft) startElection() {
 func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error) {
 	time.Sleep(time.Duration(1+rand.Intn(5)) * time.Millisecond)
 
+	EmptyVoteReply := &pb.VoteReply{Id: request.Id}
+
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	if r.state == Dead {
 		return EmptyVoteReply, nil
 	}
-	r.Server().Logger().Debugf("Received RequestVote: [currentTerm=%d, votedFor=%s]", r.currentTerm, r.votedFor)
+	r.Server().Logger().Debugf("[%s] Received RequestVote: [currentTerm=%d, votedFor=%s]",
+		request.Id, r.currentTerm, r.votedFor)
 
 	if request.Term > r.currentTerm {
-		r.Server().Logger().Debug("term out of date in RequestVote")
+		r.Server().Logger().Debugf("[%s] term out of date in RequestVote", request.Id)
 		r.becomeFollower(request.Term)
 	}
-	reply := &pb.VoteReply{}
+	reply := &pb.VoteReply{Id: request.Id}
 	if r.currentTerm == request.Term && (r.votedFor == "" || r.votedFor == request.CandidateName) {
 		reply.VoteGranted = true
 		r.votedFor = request.CandidateName
@@ -238,7 +243,8 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 		reply.VoteGranted = false
 	}
 	reply.Term = r.currentTerm
-	r.Server().Logger().Debugf("RequestVote reply: [Term = %d, votedFor = %s ]", reply.Term, r.votedFor)
+	r.Server().Logger().Debugf("[%s] RequestVote reply: [Term = %d, votedFor = %s ]",
+		request.Id, reply.Term, r.votedFor)
 
 	return reply, nil
 }
@@ -274,7 +280,7 @@ func (r *raft) leaderSendHeartbeats() {
 	for _, peer := range r.peers {
 		args := pb.AppendEntryRequest{
 			Term:       savedCurrentTerm,
-			LeaderName: peer.Name,
+			LeaderName: r.Server().Name(),
 		}
 		go func(peer *pb.Peer) {
 			resp, err := r.Server().Send(peer, "RPC.AppendEntries", &args)
@@ -294,16 +300,19 @@ func (r *raft) leaderSendHeartbeats() {
 }
 
 func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error) {
+	EmptyAppendEntryReply := &pb.AppendEntryReply{Id: request.Id}
+
 	time.Sleep(time.Duration(1+rand.Intn(5)) * time.Millisecond)
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	if r.state == Dead {
 		return EmptyAppendEntryReply, nil
 	}
-	r.Server().Logger().Debugf("AppendEntries: %+v", request)
+	r.Server().Logger().Debugf("[%s] AppendEntries: (Term = %v Leader Name = %s)",
+		request.Id, request.Term, request.LeaderName)
 
 	if request.Term > r.currentTerm {
-		r.Server().Logger().Debug("... term out of date in AppendEntries")
+		r.Server().Logger().Debugf("[%s]... term out of date in AppendEntries", request.Id)
 		r.becomeFollower(request.Term)
 	}
 	reply := &pb.AppendEntryReply{}
@@ -318,7 +327,8 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	}
 
 	reply.Term = r.currentTerm
-	r.Server().Logger().Debugf("AppendEntries reply: (Term = %v, Success = %v)", reply.Term, reply.Success)
+	r.Server().Logger().Debugf("[%s] AppendEntries reply: (Term = %v, Success = %v)", request.Id,
+		reply.Term, reply.Success)
 	return reply, nil
 }
 

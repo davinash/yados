@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/google/uuid"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/grpc"
 )
@@ -71,6 +73,7 @@ func GetPeerConn(address string, port int32) (*grpc.ClientConn, pb.YadosServiceC
 }
 
 func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error) {
+
 	peerConn, rpcClient, err := GetPeerConn(peer.Address, peer.Port)
 	if err != nil {
 		return nil, err
@@ -85,9 +88,9 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 	switch serviceMethod {
 	case "RPC.RequestVote":
 		request := args.(*pb.VoteRequest)
-
-		rpc.Server().Logger().Debugf("Type = RequestVotes %s -----> %s  "+
-			"Request : {Term = %v Candidate Name = %v }", rpc.Server().Name(), peer.Name,
+		request.Id = uuid.New().String()
+		rpc.Server().Logger().Debugf("[%s] Type = RequestVotes %s -----> %s  "+
+			"Request : {Term = %v Candidate Name = %v }", request.Id, rpc.Server().Name(), peer.Name,
 			request.Term, request.CandidateName)
 
 		reply, err := rpcClient.RequestVotes(context.Background(), request)
@@ -96,16 +99,21 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 		}
 		return reply, nil
 	case "server.AddNewMember":
-		reply, err := rpcClient.AddMember(context.Background(), args.(*pb.Peer))
+		request := args.(*pb.NewPeerRequest)
+		request.Id = uuid.New().String()
+		rpc.Server().Logger().Debugf("[%s] Type = AddNewMember %s -----> %s  ",
+			request.Id, rpc.Server().Name(), peer.Name)
+
+		reply, err := rpcClient.AddMember(context.Background(), request)
 		if err != nil {
 			return nil, err
 		}
 		return reply, nil
 	case "RPC.AppendEntries":
 		request := args.(*pb.AppendEntryRequest)
-
-		rpc.Server().Logger().Debugf("Type = AppendEntries %s -----> %s  "+
-			"Request : {Term = %v Leader Name = %v }", rpc.Server().Name(), peer.Name,
+		request.Id = uuid.New().String()
+		rpc.Server().Logger().Debugf("[%s] Type = AppendEntries %s -----> %s  "+
+			"Request : {Term = %v Leader Name = %v }", request.Id, rpc.Server().Name(), peer.Name,
 			request.Term, request.LeaderName)
 
 		reply, err := rpcClient.AppendEntries(context.Background(), request)
