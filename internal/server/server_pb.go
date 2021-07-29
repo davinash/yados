@@ -20,11 +20,11 @@ var (
 )
 
 func (srv *server) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error) {
-	panic("implement me")
+	return srv.Raft().RequestVotes(ctx, request)
 }
 
 func (srv *server) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error) {
-	panic("implement me")
+	return srv.Raft().AppendEntries(ctx, request)
 }
 
 func (srv *server) AddMember(ctx context.Context, newPeer *pb.Peer) (*pb.NewPeerReply, error) {

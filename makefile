@@ -38,8 +38,8 @@ generate: getdeps
 
 lint:
 	@echo "Running $@ check"
-	GO111MODULE=on ${GOPATH}/bin/golangci-lint -v cache clean
-	GO111MODULE=on ${GOPATH}/bin/golangci-lint run -v --build-tags kqueue --timeout=10m --skip-dirs internal/proto/gen --config ./.golangci.yml
+	GO111MODULE=on ${GOPATH}/bin/golangci-lint cache clean
+	GO111MODULE=on ${GOPATH}/bin/golangci-lint run --build-tags kqueue --timeout=10m --skip-dirs internal/proto/gen --config ./.golangci.yml
 	@echo "Running vet"
 	go list ./... | grep -v gen | xargs go vet
 
@@ -50,7 +50,7 @@ test-with-cover:
 	go test github.com/davinash/yados/... -v -count=1 -failfast -coverprofile=coverage.out
 
 test-single:
-	go test github.com/davinash/yados/... -v -count=1 -failfast -test.v -test.paniconexit0 -test.run ^\$(TEST_NAME)\$
+	go test -v github.com/davinash/yados/... -v -count=1 -failfast -test.paniconexit0 -test.run ^\$(TEST_NAME)\$
 
 clean:
 	rm -rf out/*

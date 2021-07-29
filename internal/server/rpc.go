@@ -95,6 +95,12 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 			return nil, err
 		}
 		return reply, nil
+	case "RPC.AppendEntries":
+		reply, err := rpcClient.AppendEntries(context.Background(), args.(*pb.AppendEntryRequest))
+		if err != nil {
+			return nil, err
+		}
+		return reply, nil
 	default:
 		return nil, ErrorUnknownMethod
 	}

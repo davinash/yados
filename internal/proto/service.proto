@@ -7,12 +7,19 @@ message VoteRequest {
 }
 
 message VoteReply {
+  bool VoteGranted = 1;
+  string CandidateName = 2;
+  uint64 Term = 3;
 }
 
 message AppendEntryRequest {
+  uint64 Term = 1;
+  string LeaderName = 2;
 }
 
 message AppendEntryReply {
+  uint64 Term = 1;
+  bool Success = 2;
 }
 
 message Peer {

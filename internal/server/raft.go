@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"time"
@@ -33,6 +34,10 @@ type Raft interface {
 	Server() Server
 	Peers() []*pb.Peer
 	AddPeer(peer *pb.Peer) error
+	State() RaftState
+	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
+	Stop()
+	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 }
 
 type raft struct {
@@ -47,6 +52,10 @@ type raft struct {
 
 	votedFor           string
 	electionResetEvent time.Time
+}
+
+func (r *raft) Stop() {
+	r.state = Dead
 }
 
 //NewRaft creates new instance of Raft
@@ -99,6 +108,18 @@ func (s RaftState) String() string {
 	}
 }
 
+func (r *raft) State() RaftState {
+	return r.state
+}
+
+func (r *raft) Server() Server {
+	return r.server
+}
+
+func (r *raft) Peers() []*pb.Peer {
+	return r.peers
+}
+
 func (r *raft) AddPeer(newPeer *pb.Peer) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -117,22 +138,26 @@ func (r *raft) runElectionTimer() {
 	termStarted := r.currentTerm
 	r.mutex.Unlock()
 	r.server.Logger().Debugf("election timer started (%v), term=%d", timeoutDuration, termStarted)
+
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		<-ticker.C
+
 		r.mutex.Lock()
 		if r.state != Candidate && r.state != Follower {
 			r.server.Logger().Debugf("in election timer state=%s, bailing out", r.state)
 			r.mutex.Unlock()
 			return
 		}
+
 		if termStarted != r.currentTerm {
 			r.server.Logger().Debugf("in election timer term changed from %d to %d, bailing out",
 				termStarted, r.currentTerm)
 			r.mutex.Unlock()
 			return
 		}
+
 		if elapsed := time.Since(r.electionResetEvent); elapsed >= timeoutDuration {
 			r.startElection()
 			r.mutex.Unlock()
@@ -148,28 +173,166 @@ func (r *raft) startElection() {
 	r.currentTerm++
 	savedCurrentTerm := r.currentTerm
 	r.electionResetEvent = time.Now()
-	r.votedFor = r.server.Name()
+	r.votedFor = r.Server().Name()
 	r.server.Logger().Debugf("becomes Candidate (currentTerm=%d); log=%v", savedCurrentTerm, r.log)
-	//votesReceived := 1
+
+	votesReceived := 1
 	for _, peer := range r.peers {
 		go func(peer *pb.Peer) {
 			args := pb.VoteRequest{
 				Term:          savedCurrentTerm,
 				CandidateName: r.Server().Name(),
 			}
-			//var reply *pb.VoteReply
-			if r, err := r.Server().Send(peer, "RPC.RequestVote", &args); err == nil {
-				_ = r.(*pb.VoteReply)
+			r.server.Logger().Debugf("sending RequestVote to %s (Term %v Candidate Name %v)", peer.Name,
+				args.Term, args.CandidateName)
+			resp, err := r.Server().Send(peer, "RPC.RequestVote", &args)
+			if err != nil {
+				return
+			}
+			reply := resp.(*pb.VoteReply)
+			r.mutex.Lock()
+			defer r.mutex.Unlock()
+			r.server.Logger().Debugf("received RequestVoteReply %+v", reply)
+			if r.state != Candidate {
+				r.server.Logger().Debugf("while waiting for reply, state = %v", r.state)
+				return
+			}
+			if reply.Term > savedCurrentTerm {
+				r.server.Logger().Debug("term out of date in RequestVoteReply")
+				r.becomeFollower(reply.Term)
+				return
+			} else if reply.Term == savedCurrentTerm {
+				if reply.VoteGranted {
+					votesReceived++
+					if votesReceived*2 > len(r.peers)+1 {
+						r.server.Logger().Debugf("wins election with %d votes", votesReceived)
+						r.startLeader()
+						return
+					}
+				}
 			}
 		}(peer)
 	}
-
+	// Run another election timer, in case this election is not successful.
+	go r.runElectionTimer()
 }
 
-func (r *raft) Server() Server {
-	return r.server
+func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error) {
+	time.Sleep(time.Duration(1+rand.Intn(5)) * time.Millisecond)
+
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if r.state == Dead {
+		return EmptyVoteReply, nil
+	}
+	r.Server().Logger().Debugf("RequestVote: %+v [currentTerm=%d, votedFor=%s]",
+		request, r.currentTerm, r.votedFor)
+
+	if request.Term > r.currentTerm {
+		r.Server().Logger().Debug("... term out of date in RequestVote")
+		r.becomeFollower(request.Term)
+	}
+	reply := &pb.VoteReply{}
+	if r.currentTerm == request.Term && (r.votedFor == "" || r.votedFor == request.CandidateName) {
+		reply.VoteGranted = true
+		r.votedFor = request.CandidateName
+		r.electionResetEvent = time.Now()
+	} else {
+		reply.VoteGranted = false
+	}
+	reply.Term = r.currentTerm
+	r.Server().Logger().Debugf("... RequestVote reply: %+v", reply)
+
+	return reply, nil
 }
 
-func (r *raft) Peers() []*pb.Peer {
-	return r.peers
+func (r *raft) startLeader() {
+	r.state = Leader
+	r.Server().Logger().Debugf("becomes Leader; term=%d, log=%v", r.currentTerm, r.log)
+
+	go func() {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+
+		// Send periodic heartbeats, as long as still leader.
+		for {
+			r.leaderSendHeartbeats()
+			<-ticker.C
+
+			r.mutex.Lock()
+			if r.state != Leader {
+				r.mutex.Unlock()
+				return
+			}
+			r.mutex.Unlock()
+		}
+	}()
+}
+
+func (r *raft) leaderSendHeartbeats() {
+	r.mutex.Lock()
+	savedCurrentTerm := r.currentTerm
+	r.mutex.Unlock()
+
+	for _, peer := range r.peers {
+		args := pb.AppendEntryRequest{
+			Term:       savedCurrentTerm,
+			LeaderName: peer.Name,
+		}
+		go func(peer *pb.Peer) {
+			r.Server().Logger().Debugf("sending AppendEntries to %v: ni=%d, args=(Term = %v "+
+				"Leader Name = %s)", peer.Name, 0, args.Term, args.LeaderName)
+			resp, err := r.Server().Send(peer, "RPC.AppendEntries", &args)
+			if err != nil {
+				return
+			}
+			reply := resp.(*pb.AppendEntryReply)
+			r.mutex.Lock()
+			defer r.mutex.Unlock()
+			if reply.Term > savedCurrentTerm {
+				r.Server().Logger().Debug("term out of date in heartbeat reply")
+				r.becomeFollower(reply.Term)
+				return
+			}
+		}(peer)
+	}
+}
+
+func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error) {
+	time.Sleep(time.Duration(1+rand.Intn(5)) * time.Millisecond)
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if r.state == Dead {
+		return EmptyAppendEntryReply, nil
+	}
+	r.Server().Logger().Debugf("AppendEntries: %+v", request)
+
+	if request.Term > r.currentTerm {
+		r.Server().Logger().Debug("... term out of date in AppendEntries")
+		r.becomeFollower(request.Term)
+	}
+	reply := &pb.AppendEntryReply{}
+
+	reply.Success = false
+	if request.Term == r.currentTerm {
+		if r.state != Follower {
+			r.becomeFollower(request.Term)
+		}
+		r.electionResetEvent = time.Now()
+		reply.Success = true
+	}
+
+	reply.Term = r.currentTerm
+	r.Server().Logger().Debugf("AppendEntries reply: (Term = %v, Success = %v)", reply.Term, reply.Success)
+	return reply, nil
+}
+
+func (r *raft) becomeFollower(term uint64) {
+	r.Server().Logger().Debugf("becomes Follower with term=%d; log=%v", term, r.log)
+	r.state = Follower
+	r.currentTerm = term
+	r.votedFor = ""
+	r.electionResetEvent = time.Now()
+
+	go r.runElectionTimer()
 }

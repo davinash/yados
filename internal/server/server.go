@@ -29,6 +29,7 @@ type Server interface {
 	Raft() Raft
 	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
 	Self() *pb.Peer
+	State() RaftState
 }
 
 type server struct {
@@ -55,7 +56,7 @@ func NewServer(name string, address string, port int32, loglevel string, ready <
 	logger := &logrus.Logger{
 		Out: os.Stderr,
 		Formatter: &easy.Formatter{
-			LogFormat:       "[%lvl%]:[%server%] %time% - %msg% \n",
+			LogFormat:       "[%lvl%]:%time% [%server%] %msg% \n",
 			TimestampFormat: "2006-01-02 15:04:05",
 		},
 	}
@@ -126,6 +127,10 @@ func (srv *server) Self() *pb.Peer {
 	return srv.self
 }
 
+func (srv *server) State() RaftState {
+	return srv.Raft().State()
+}
+
 func (srv *server) SetLogLevel(level string) {
 	switch level {
 	case "trace":
@@ -144,6 +149,8 @@ func (srv *server) SetLogLevel(level string) {
 }
 
 func (srv *server) Stop() error {
-	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
+	srv.logger.Infof("Stopping Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
+	srv.Raft().Stop()
+	srv.RPCServer().Stop()
 	return nil
 }
