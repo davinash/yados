@@ -38,8 +38,8 @@ generate: getdeps
 
 lint:
 	@echo "Running $@ check"
-	@GO111MODULE=on ${GOPATH}/bin/golangci-lint cache clean
-	@GO111MODULE=on ${GOPATH}/bin/golangci-lint run --build-tags kqueue --timeout=10m --skip-dirs internal/proto/gen --config ./.golangci.yml
+	@GO111MODULE=on ${GOPATH}/bin/golangci-lint -v cache clean
+	@GO111MODULE=on ${GOPATH}/bin/golangci-lint run -v --build-tags kqueue --timeout=10m --skip-dirs internal/proto/gen --config ./.golangci.yml
 	@echo "Running vet"
 	@go list ./... | grep -v gen | xargs go vet
 
