@@ -21,12 +21,12 @@ build: getdeps lint buildx
 
 buildx:
 	@echo "Building the product"
-	@GO111MODULE=on go build -ldflags "-X main.Version=$(VERSION)" -o out/yadosctl$(EXE)  cmd/cli/main.go
+	GO111MODULE=on go build -ldflags "-X main.Version=$(VERSION)" -o out/yadosctl$(EXE)  cmd/cli/main.go
 
 getdeps:
 	@echo "Checking dependencies"
 	@mkdir -p ${GOPATH}/bin 
-	@sh ./deps.sh
+	sh ./deps.sh
 
 generate: getdeps
 	@echo "Generating protobuf/grpc resources"
@@ -38,19 +38,19 @@ generate: getdeps
 
 lint:
 	@echo "Running $@ check"
-	@GO111MODULE=on ${GOPATH}/bin/golangci-lint -v cache clean
-	@GO111MODULE=on ${GOPATH}/bin/golangci-lint run -v --build-tags kqueue --timeout=10m --skip-dirs internal/proto/gen --config ./.golangci.yml
+	GO111MODULE=on ${GOPATH}/bin/golangci-lint -v cache clean
+	GO111MODULE=on ${GOPATH}/bin/golangci-lint run -v --build-tags kqueue --timeout=10m --skip-dirs internal/proto/gen --config ./.golangci.yml
 	@echo "Running vet"
-	@go list ./... | grep -v gen | xargs go vet
+	go list ./... | grep -v gen | xargs go vet
 
 test:
-	@go test github.com/davinash/yados/... -v -count=1 -failfast
+	go test github.com/davinash/yados/... -v -count=1 -failfast
 
 test-with-cover:
 	go test github.com/davinash/yados/... -v -count=1 -failfast -coverprofile=coverage.out
 
 test-single:
-	@go test github.com/davinash/yados/... -v -count=1 -failfast -test.v -test.paniconexit0 -test.run ^\$(TEST_NAME)\$
+	go test github.com/davinash/yados/... -v -count=1 -failfast -test.v -test.paniconexit0 -test.run ^\$(TEST_NAME)\$
 
 clean:
-	@rm -rf out/*
+	rm -rf out/*
