@@ -67,6 +67,10 @@ func NewRaft(srv Server, peers []*pb.Peer, ready <-chan interface{}) (Raft, erro
 		if err != nil {
 			return nil, err
 		}
+		err = r.AddPeer(p)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	go func() {
