@@ -53,6 +53,9 @@ func (suite *YadosTestSuite) GetFreePorts(n int) ([]int, error) {
 
 func (suite *YadosTestSuite) AddNewServer(suffix int) error {
 	freePorts, err := suite.GetFreePorts(1)
+	if err != nil {
+		return err
+	}
 	peers := make([]*pb.Peer, 0)
 	for _, p := range suite.cluster.members {
 		peers = append(peers, p.Self())
