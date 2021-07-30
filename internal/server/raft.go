@@ -52,18 +52,30 @@ type raft struct {
 
 	votedFor           string
 	electionResetEvent time.Time
+
+	quit chan interface{}
+
+	wg sync.WaitGroup
 }
 
 func (r *raft) Stop() {
+	r.Server().Logger().Debug("Stopping Raft Instance")
+
+	close(r.quit)
+	r.wg.Wait()
+
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.state = Dead
+
+	r.Server().Logger().Debug("Stopped Raft Instance")
 }
 
 //NewRaft creates new instance of Raft
 func NewRaft(srv Server, peers []*pb.Peer, ready <-chan interface{}) (Raft, error) {
 	r := &raft{
 		server: srv,
+		quit:   make(chan interface{}),
 	}
 	r.peers = make([]*pb.Peer, 0)
 	r.state = Follower
@@ -86,12 +98,15 @@ func NewRaft(srv Server, peers []*pb.Peer, ready <-chan interface{}) (Raft, erro
 		}
 	}
 
+	r.wg.Add(1)
 	go func() {
+		defer r.wg.Done()
 		<-ready
 		r.mutex.Lock()
 		r.electionResetEvent = time.Now()
 		r.mutex.Unlock()
 		r.runElectionTimer()
+		r.Server().Logger().Debug("runElectionTimer::NewRaft")
 	}()
 
 	return r, nil
@@ -146,29 +161,32 @@ func (r *raft) runElectionTimer() {
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		<-ticker.C
-
-		r.mutex.Lock()
-		if r.state != Candidate && r.state != Follower {
-			r.server.Logger().Debugf("in election timer state=%s, bailing out", r.state)
-			r.mutex.Unlock()
+		select {
+		case <-r.quit:
+			r.server.Logger().Debug("Stopping runElectionTimer")
 			return
-		}
+		case <-ticker.C:
+			r.mutex.Lock()
+			if r.state != Candidate && r.state != Follower {
+				r.server.Logger().Debugf("in election timer state=%s, bailing out", r.state)
+				r.mutex.Unlock()
+				return
+			}
 
-		if termStarted != r.currentTerm {
-			r.server.Logger().Debugf("in election timer term changed from %d to %d, bailing out",
-				termStarted, r.currentTerm)
+			if termStarted != r.currentTerm {
+				r.server.Logger().Debugf("in election timer term changed from %d to %d, bailing out",
+					termStarted, r.currentTerm)
+				r.mutex.Unlock()
+				return
+			}
+
+			if elapsed := time.Since(r.electionResetEvent); elapsed >= timeoutDuration {
+				r.startElection()
+				r.mutex.Unlock()
+				return
+			}
 			r.mutex.Unlock()
-			return
 		}
-
-		if elapsed := time.Since(r.electionResetEvent); elapsed >= timeoutDuration {
-			r.startElection()
-			r.mutex.Unlock()
-			return
-		}
-
-		r.mutex.Unlock()
 	}
 }
 
@@ -182,7 +200,9 @@ func (r *raft) startElection() {
 
 	votesReceived := 1
 	for _, peer := range r.peers {
+		r.wg.Add(1)
 		go func(peer *pb.Peer) {
+			defer r.wg.Done()
 			args := pb.VoteRequest{
 				Term:          savedCurrentTerm,
 				CandidateName: r.Server().Name(),
@@ -216,7 +236,13 @@ func (r *raft) startElection() {
 		}(peer)
 	}
 	// Run another election timer, in case this election is not successful.
-	go r.runElectionTimer()
+	r.wg.Add(1)
+	go func() {
+		defer r.wg.Done()
+		r.runElectionTimer()
+		r.Server().Logger().Debug("runElectionTimer::StartElection")
+	}()
+
 }
 
 func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error) {
@@ -226,6 +252,7 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+
 	if r.state == Dead {
 		return EmptyVoteReply, nil
 	}
@@ -255,21 +282,27 @@ func (r *raft) startLeader() {
 	r.state = Leader
 	r.Server().Logger().Debugf("becomes Leader; term=%d, log=%v", r.currentTerm, r.log)
 
+	r.wg.Add(1)
 	go func() {
+		defer r.wg.Done()
 		ticker := time.NewTicker(50 * time.Millisecond)
 		defer ticker.Stop()
 
 		// Send periodic heartbeats, as long as still leader.
 		for {
 			r.leaderSendHeartbeats()
-			<-ticker.C
-
-			r.mutex.Lock()
-			if r.state != Leader {
-				r.mutex.Unlock()
+			select {
+			case <-r.quit:
+				r.server.Logger().Debug("Stopping startLeader")
 				return
+			case <-ticker.C:
+				r.mutex.Lock()
+				if r.state != Leader {
+					r.mutex.Unlock()
+					return
+				}
+				r.mutex.Unlock()
 			}
-			r.mutex.Unlock()
 		}
 	}()
 }
@@ -284,7 +317,9 @@ func (r *raft) leaderSendHeartbeats() {
 			Term:       savedCurrentTerm,
 			LeaderName: r.Server().Name(),
 		}
+		r.wg.Add(1)
 		go func(peer *pb.Peer) {
+			defer r.wg.Done()
 			resp, err := r.Server().Send(peer, "RPC.AppendEntries", &args)
 			if err != nil {
 				return
@@ -341,5 +376,11 @@ func (r *raft) becomeFollower(term uint64) {
 	r.votedFor = ""
 	r.electionResetEvent = time.Now()
 
-	go r.runElectionTimer()
+	r.wg.Add(1)
+	go func() {
+		defer r.wg.Done()
+		r.runElectionTimer()
+		r.Server().Logger().Debug("runElectionTimer::becomeFollower")
+	}()
+
 }

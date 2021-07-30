@@ -153,5 +153,6 @@ func (srv *server) Stop() error {
 	srv.logger.Infof("Stopping Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	srv.Raft().Stop()
 	srv.RPCServer().Stop()
+	srv.logger.Infof("Stopped Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	return nil
 }

@@ -54,7 +54,9 @@ func (rpc *rpcServer) Start() error {
 }
 
 func (rpc *rpcServer) Stop() error {
+	rpc.Server().Logger().Debug("Stopping RPC server")
 	rpc.grpcServer.Stop()
+	rpc.Server().Logger().Debug("Stopped RPC server")
 	return nil
 }
 

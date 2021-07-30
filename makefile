@@ -17,6 +17,8 @@ else
 	EXE=
 endif
 
+TEST_COUNT=1
+
 build: getdeps lint buildx
 
 buildx:
@@ -44,13 +46,14 @@ lint:
 	go list ./... | grep -v gen | xargs go vet
 
 test:
-	go test github.com/davinash/yados/... -v -count=1 -failfast
+	GOFLAGS="-count=1" go test github.com/davinash/yados/tests -v
 
 test-with-cover:
 	go test github.com/davinash/yados/... -v -count=1 -failfast -coverprofile=coverage.out
 
 test-single:
-	go test -v github.com/davinash/yados/... -v -count=1 -failfast -test.paniconexit0 -test.run ^\$(TEST_NAME)\$
+	go test -v github.com/davinash/yados/tests -testify.m $(TEST_NAME) -count $(TEST_COUNT)
+
 
 clean:
 	rm -rf out/*

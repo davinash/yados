@@ -1,14 +1,29 @@
-package server
+package tests
 
 import (
 	"fmt"
 	"net"
+	"sync"
+	"testing"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
+	"github.com/davinash/yados/internal/server"
+	"github.com/stretchr/testify/suite"
 )
 
+//TestCluster structure to manage the cluster for Tests
+type TestCluster struct {
+	members      []server.Server
+	numOfServers int
+}
+
+type YadosTestSuite struct {
+	suite.Suite
+	cluster *TestCluster
+}
+
 //GetFreePort Get the next free port ( Only for test purpose )
-func GetFreePort() (int, *net.TCPListener, error) {
+func (suite *YadosTestSuite) GetFreePort() (int, *net.TCPListener, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
 		return 0, nil, err
@@ -22,10 +37,10 @@ func GetFreePort() (int, *net.TCPListener, error) {
 }
 
 // GetFreePorts allocates a batch of n TCP ports in one go to avoid collisions. ( Only for test purpose )
-func GetFreePorts(n int) ([]int, error) {
+func (suite *YadosTestSuite) GetFreePorts(n int) ([]int, error) {
 	ports := make([]int, 0)
 	for i := 0; i < n; i++ {
-		port, listener, err := GetFreePort()
+		port, listener, err := suite.GetFreePort()
 		if err != nil {
 			return nil, err
 		}
@@ -35,26 +50,20 @@ func GetFreePorts(n int) ([]int, error) {
 	return ports, nil
 }
 
-//TestCluster structure to manage the cluster for Tests
-type TestCluster struct {
-	members      []Server
-	numOfServers int
-}
-
 //CreateNewCluster creates a new cluster for the test
-func CreateNewCluster(numOfServers int) (*TestCluster, error) {
+func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) (*TestCluster, error) {
 	t := &TestCluster{
-		members:      make([]Server, 0),
+		members:      make([]server.Server, 0),
 		numOfServers: numOfServers,
 	}
-	freePorts, err := GetFreePorts(numOfServers)
+	freePorts, err := suite.GetFreePorts(numOfServers)
 	ready := make(chan interface{})
 
 	if err != nil {
 		return nil, err
 	}
 
-	srv, err := NewServer(fmt.Sprintf("Server-%d", 0), "127.0.0.1",
+	srv, err := server.NewServer(fmt.Sprintf("Server-%d", 0), "127.0.0.1",
 		int32(freePorts[0]), "debug", ready)
 	if err != nil {
 		return nil, err
@@ -70,7 +79,7 @@ func CreateNewCluster(numOfServers int) (*TestCluster, error) {
 		for _, p := range t.members {
 			peers = append(peers, p.Self())
 		}
-		srv, err := NewServer(fmt.Sprintf("Server-%d", i), "127.0.0.1",
+		srv, err := server.NewServer(fmt.Sprintf("Server-%d", i), "127.0.0.1",
 			int32(freePorts[i]), "debug", ready)
 		if err != nil {
 			return nil, err
@@ -87,8 +96,35 @@ func CreateNewCluster(numOfServers int) (*TestCluster, error) {
 
 //StopCluster To stop the cluster ( Only for Test Purpose )
 func (t *TestCluster) StopCluster() {
+	var wg sync.WaitGroup
 	for i := 0; i < t.numOfServers; i++ {
-		t.members[i].RPCServer().Stop()
-		t.members[i].Stop()
+		wg.Add(1)
+		go func(wg *sync.WaitGroup, index int) {
+			defer wg.Done()
+			t.members[index].Stop()
+		}(&wg, i)
 	}
+	wg.Wait()
+}
+
+func (suite *YadosTestSuite) SetupTest() {
+	suite.T().Log("Running SetupTest")
+	cluster, err := suite.CreateNewCluster(3)
+	if err != nil {
+		suite.T().Error(err)
+	}
+	suite.cluster = cluster
+}
+
+func (suite *YadosTestSuite) Cleanup() {
+}
+
+func (suite *YadosTestSuite) TearDownTest() {
+	suite.T().Log("Running TearDownTest")
+	suite.Cleanup()
+	suite.cluster.StopCluster()
+}
+
+func TestAgentTestSuite(t *testing.T) {
+	suite.Run(t, new(YadosTestSuite))
 }
