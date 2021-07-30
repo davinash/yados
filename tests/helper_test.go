@@ -20,6 +20,7 @@ type TestCluster struct {
 type YadosTestSuite struct {
 	suite.Suite
 	cluster *TestCluster
+	ready   chan interface{}
 }
 
 //GetFreePort Get the next free port ( Only for test purpose )
@@ -50,48 +51,42 @@ func (suite *YadosTestSuite) GetFreePorts(n int) ([]int, error) {
 	return ports, nil
 }
 
+func (suite *YadosTestSuite) AddNewServer(suffix int) error {
+	freePorts, err := suite.GetFreePorts(1)
+	peers := make([]*pb.Peer, 0)
+	for _, p := range suite.cluster.members {
+		peers = append(peers, p.Self())
+	}
+	srv, err := server.NewServer(fmt.Sprintf("Server-%d", suffix), "127.0.0.1", int32(freePorts[0]),
+		"debug", suite.ready)
+	if err != nil {
+		return err
+	}
+	err = srv.Serve(peers)
+	if err != nil {
+		return err
+	}
+	suite.cluster.members = append(suite.cluster.members, srv)
+	return nil
+}
+
 //CreateNewCluster creates a new cluster for the test
-func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) (*TestCluster, error) {
-	t := &TestCluster{
+func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
+	suite.cluster = &TestCluster{
 		members:      make([]server.Server, 0),
 		numOfServers: numOfServers,
 	}
-	freePorts, err := suite.GetFreePorts(numOfServers)
-	ready := make(chan interface{})
-
+	err := suite.AddNewServer(0)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	srv, err := server.NewServer(fmt.Sprintf("Server-%d", 0), "127.0.0.1",
-		int32(freePorts[0]), "debug", ready)
-	if err != nil {
-		return nil, err
-	}
-	err = srv.Serve(nil)
-	if err != nil {
-		return nil, err
-	}
-	t.members = append(t.members, srv)
-
 	for i := 1; i < numOfServers; i++ {
-		peers := make([]*pb.Peer, 0)
-		for _, p := range t.members {
-			peers = append(peers, p.Self())
-		}
-		srv, err := server.NewServer(fmt.Sprintf("Server-%d", i), "127.0.0.1",
-			int32(freePorts[i]), "debug", ready)
+		err := suite.AddNewServer(i)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		err = srv.Serve(peers)
-		if err != nil {
-			return nil, err
-		}
-		t.members = append(t.members, srv)
 	}
-	close(ready)
-	return t, nil
+	return nil
 }
 
 //StopCluster To stop the cluster ( Only for Test Purpose )
@@ -109,11 +104,15 @@ func (t *TestCluster) StopCluster() {
 
 func (suite *YadosTestSuite) SetupTest() {
 	suite.T().Log("Running SetupTest")
-	cluster, err := suite.CreateNewCluster(3)
+
+	suite.ready = make(chan interface{})
+
+	err := suite.CreateNewCluster(3)
 	if err != nil {
 		suite.T().Error(err)
 	}
-	suite.cluster = cluster
+
+	close(suite.ready)
 }
 
 func (suite *YadosTestSuite) Cleanup() {
@@ -126,5 +125,9 @@ func (suite *YadosTestSuite) TearDownTest() {
 }
 
 func TestAgentTestSuite(t *testing.T) {
-	suite.Run(t, new(YadosTestSuite))
+	s := &YadosTestSuite{
+		Suite:   suite.Suite{},
+		cluster: nil,
+	}
+	suite.Run(t, s)
 }
