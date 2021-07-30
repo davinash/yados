@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -30,6 +31,7 @@ type Server interface {
 	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
 	Self() *pb.Peer
 	State() RaftState
+	LogDir() string
 }
 
 type server struct {
@@ -41,10 +43,12 @@ type server struct {
 	rpcServer RPCServer
 	self      *pb.Peer
 	logger    *logrus.Entry
+	logDir    string
 }
 
 //NewServer creates new instance of a server
-func NewServer(name string, address string, port int32, loglevel string, ready <-chan interface{}) (Server, error) {
+func NewServer(name string, address string, port int32, loglevel string, logDir string,
+	ready <-chan interface{}) (Server, error) {
 	srv := &server{}
 	srv.self = &pb.Peer{
 		Name:    name,
@@ -52,6 +56,7 @@ func NewServer(name string, address string, port int32, loglevel string, ready <
 		Port:    port,
 	}
 	srv.ready = ready
+	srv.logDir = logDir
 
 	logger := &logrus.Logger{
 		Out: os.Stderr,
@@ -66,6 +71,12 @@ func NewServer(name string, address string, port int32, loglevel string, ready <
 
 	srv.SetLogLevel(loglevel)
 	srv.quit = make(chan interface{})
+
+	d := filepath.Join(srv.logDir, srv.Name(), "log")
+	err := os.MkdirAll(d, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
 
 	return srv, nil
 }
@@ -94,6 +105,10 @@ func (srv *server) Send(peer *pb.Peer, serviceMethod string, args interface{}) (
 		return nil, err
 	}
 	return reply, nil
+}
+
+func (srv *server) LogDir() string {
+	return srv.logDir
 }
 
 func (srv *server) Name() string {

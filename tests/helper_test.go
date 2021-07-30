@@ -2,7 +2,10 @@ package tests
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -21,6 +24,7 @@ type YadosTestSuite struct {
 	suite.Suite
 	cluster *TestCluster
 	ready   chan interface{}
+	logDir  string
 }
 
 //GetFreePort Get the next free port ( Only for test purpose )
@@ -61,7 +65,7 @@ func (suite *YadosTestSuite) AddNewServer(suffix int) error {
 		peers = append(peers, p.Self())
 	}
 	srv, err := server.NewServer(fmt.Sprintf("Server-%d", suffix), "127.0.0.1", int32(freePorts[0]),
-		"debug", suite.ready)
+		"debug", suite.logDir, suite.ready)
 	if err != nil {
 		return err
 	}
@@ -108,9 +112,19 @@ func (t *TestCluster) StopCluster() {
 func (suite *YadosTestSuite) SetupTest() {
 	suite.T().Log("Running SetupTest")
 
+	logDir, err := ioutil.TempDir("", "YadosLogStorage")
+	if err != nil {
+		panic(err)
+	}
+	err = os.MkdirAll(filepath.Join(logDir), os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	suite.logDir = logDir
+
 	suite.ready = make(chan interface{})
 
-	err := suite.CreateNewCluster(3)
+	err = suite.CreateNewCluster(3)
 	if err != nil {
 		suite.T().Error(err)
 	}
@@ -119,6 +133,7 @@ func (suite *YadosTestSuite) SetupTest() {
 }
 
 func (suite *YadosTestSuite) Cleanup() {
+	_ = os.RemoveAll(suite.logDir)
 }
 
 func (suite *YadosTestSuite) TearDownTest() {
