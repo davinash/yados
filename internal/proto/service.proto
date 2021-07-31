@@ -5,6 +5,8 @@ message VoteRequest {
   string Id = 1;
   uint64 Term = 2;
   string CandidateName = 3;
+  int64 LastLogIndex = 4;
+  int64 LastLogTerm = 5;
 }
 
 message VoteReply {

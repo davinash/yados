@@ -32,6 +32,7 @@ type Server interface {
 	Self() *pb.Peer
 	State() RaftState
 	LogDir() string
+	Store() Store
 }
 
 type server struct {
@@ -44,6 +45,7 @@ type server struct {
 	self      *pb.Peer
 	logger    *logrus.Entry
 	logDir    string
+	store     Store
 }
 
 //NewServer creates new instance of a server
@@ -74,6 +76,17 @@ func NewServer(name string, address string, port int32, loglevel string, logDir 
 
 	d := filepath.Join(srv.logDir, srv.Name(), "log")
 	err := os.MkdirAll(d, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	srv.logDir = d
+
+	store, err := NewStorage(srv.LogDir(), srv.Logger())
+	if err != nil {
+		return nil, err
+	}
+	srv.store = store
+	err = srv.store.Open()
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +160,10 @@ func (srv *server) State() RaftState {
 	return srv.Raft().State()
 }
 
+func (srv *server) Store() Store {
+	return srv.store
+}
+
 func (srv *server) SetLogLevel(level string) {
 	switch level {
 	case "trace":
@@ -168,6 +185,7 @@ func (srv *server) Stop() error {
 	srv.logger.Infof("Stopping Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	srv.Raft().Stop()
 	srv.RPCServer().Stop()
+	srv.Store().Close()
 	srv.logger.Infof("Stopped Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	return nil
 }

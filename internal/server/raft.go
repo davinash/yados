@@ -9,10 +9,23 @@ import (
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
+// CommitEntry is the data reported by Raft to the commit channel. Each commit
+// entry notifies the client that consensus was reached on a command and it can
+// be applied to the client's state machine.
+type CommitEntry struct {
+	// Command is the client command being committed.
+	Command interface{}
+	// Index is the log index at which the client command is committed.
+	Index int
+	// Term is the Raft term at which the client command is committed.
+	Term uint64
+}
+
 //LogEntry represents the log entry
 type LogEntry struct {
 	Command interface{}
-	Term    int
+	Term    uint64
+	Index   uint64
 }
 
 //RaftState state of the raft instance
@@ -38,6 +51,7 @@ type Raft interface {
 	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
+	Log() []LogEntry
 }
 
 type raft struct {
@@ -45,17 +59,28 @@ type raft struct {
 	server Server
 	//TODO : Check if we need this or can work with from the object in Server interface
 	peers []*pb.Peer
-	state RaftState
 
+	// Persistent Raft state on all servers
 	currentTerm uint64
 	log         []LogEntry
+	votedFor    string
 
-	votedFor           string
+	// Volatile Raft state on all servers
+	commitIndex        int
+	lastApplied        int
+	state              RaftState
 	electionResetEvent time.Time
 
-	quit chan interface{}
+	// Volatile Raft state on leaders
+	nextIndex  map[int]int
+	matchIndex map[int]int
 
-	wg sync.WaitGroup
+	quit chan interface{}
+	wg   sync.WaitGroup
+}
+
+func (r *raft) Log() []LogEntry {
+	return r.log
 }
 
 func (r *raft) Stop() {
@@ -80,6 +105,10 @@ func NewRaft(srv Server, peers []*pb.Peer, ready <-chan interface{}) (Raft, erro
 	r.peers = make([]*pb.Peer, 0)
 	r.state = Follower
 	r.votedFor = ""
+	r.commitIndex = -1
+	r.lastApplied = -1
+	r.nextIndex = make(map[int]int)
+	r.matchIndex = make(map[int]int)
 
 	for _, p := range peers {
 		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
@@ -203,9 +232,15 @@ func (r *raft) startElection() {
 		r.wg.Add(1)
 		go func(peer *pb.Peer) {
 			defer r.wg.Done()
+			r.mutex.Lock()
+			savedLastLogIndex, savedLastLogTerm := r.lastLogIndexAndTerm()
+			r.mutex.Unlock()
+
 			args := pb.VoteRequest{
 				Term:          savedCurrentTerm,
 				CandidateName: r.Server().Name(),
+				LastLogIndex:  savedLastLogIndex,
+				LastLogTerm:   savedLastLogTerm,
 			}
 			resp, err := r.Server().Send(peer, "RPC.RequestVote", &args)
 			if err != nil {
@@ -256,15 +291,21 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 	if r.state == Dead {
 		return EmptyVoteReply, nil
 	}
-	r.Server().Logger().Debugf("[%s] Received RequestVote: [currentTerm=%d, votedFor=%s]",
-		request.Id, r.currentTerm, r.votedFor)
+	lastLogIndex, lastLogTerm := r.lastLogIndexAndTerm()
+	r.Server().Logger().Debugf("[%s] Received RequestVote: [currentTerm=%d, votedFor=%s] log index/term=(%v, %v)",
+		request.Id, r.currentTerm, r.votedFor, lastLogIndex, lastLogTerm)
 
 	if request.Term > r.currentTerm {
 		r.Server().Logger().Debugf("[%s] term out of date in RequestVote", request.Id)
 		r.becomeFollower(request.Term)
 	}
+
 	reply := &pb.VoteReply{Id: request.Id}
-	if r.currentTerm == request.Term && (r.votedFor == "" || r.votedFor == request.CandidateName) {
+
+	if r.currentTerm == request.Term &&
+		(r.votedFor == "" || r.votedFor == request.CandidateName) &&
+		(request.LastLogTerm > lastLogTerm ||
+			(request.LastLogTerm == lastLogTerm && request.LastLogIndex >= lastLogIndex)) {
 		reply.VoteGranted = true
 		r.votedFor = request.CandidateName
 		r.electionResetEvent = time.Now()
@@ -272,6 +313,7 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 		reply.VoteGranted = false
 	}
 	reply.Term = r.currentTerm
+	r.persistToStorage()
 	r.Server().Logger().Debugf("[%s] RequestVote reply: [Term = %d, votedFor = %s ]",
 		request.Id, reply.Term, r.votedFor)
 
@@ -382,5 +424,17 @@ func (r *raft) becomeFollower(term uint64) {
 		r.runElectionTimer()
 		r.Server().Logger().Debug("runElectionTimer::becomeFollower")
 	}()
+
+}
+
+func (r *raft) lastLogIndexAndTerm() (int64, int64) {
+	if len(r.log) > 0 {
+		lastIndex := len(r.log) - 1
+		return int64(lastIndex), int64(r.log[lastIndex].Term)
+	}
+	return -1, -1
+}
+
+func (r *raft) persistToStorage() {
 
 }
