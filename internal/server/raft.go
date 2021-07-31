@@ -21,13 +21,6 @@ type CommitEntry struct {
 	Term uint64
 }
 
-//LogEntry represents the log entry
-type LogEntry struct {
-	Command interface{}
-	Term    uint64
-	Index   uint64
-}
-
 //RaftState state of the raft instance
 type RaftState int
 
@@ -51,7 +44,7 @@ type Raft interface {
 	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
-	Log() []LogEntry
+	Log() []*pb.LogEntry
 }
 
 type raft struct {
@@ -61,25 +54,27 @@ type raft struct {
 	peers []*pb.Peer
 
 	// Persistent Raft state on all servers
-	currentTerm uint64
-	log         []LogEntry
+	currentTerm int32
+	log         []*pb.LogEntry
 	votedFor    string
 
 	// Volatile Raft state on all servers
-	commitIndex        int
+	commitIndex        int32
 	lastApplied        int
 	state              RaftState
 	electionResetEvent time.Time
 
 	// Volatile Raft state on leaders
-	nextIndex  map[int]int
-	matchIndex map[int]int
+	nextIndex  map[string]int
+	matchIndex map[string]int
+
+	triggerAEChan chan struct{}
 
 	quit chan interface{}
 	wg   sync.WaitGroup
 }
 
-func (r *raft) Log() []LogEntry {
+func (r *raft) Log() []*pb.LogEntry {
 	return r.log
 }
 
@@ -99,16 +94,17 @@ func (r *raft) Stop() {
 //NewRaft creates new instance of Raft
 func NewRaft(srv Server, peers []*pb.Peer, ready <-chan interface{}) (Raft, error) {
 	r := &raft{
-		server: srv,
-		quit:   make(chan interface{}),
+		server:        srv,
+		quit:          make(chan interface{}),
+		triggerAEChan: make(chan struct{}, 1),
 	}
 	r.peers = make([]*pb.Peer, 0)
 	r.state = Follower
 	r.votedFor = ""
 	r.commitIndex = -1
 	r.lastApplied = -1
-	r.nextIndex = make(map[int]int)
-	r.matchIndex = make(map[int]int)
+	r.nextIndex = make(map[string]int)
+	r.matchIndex = make(map[string]int)
 
 	for _, p := range peers {
 		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
@@ -322,58 +318,89 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 
 func (r *raft) startLeader() {
 	r.state = Leader
-	r.Server().Logger().Debugf("becomes Leader; term=%d, log=%v", r.currentTerm, r.log)
+	for _, peer := range r.Peers() {
+		r.nextIndex[peer.Name] = len(r.Log())
+		r.matchIndex[peer.Name] = -1
+	}
+	r.Server().Logger().Debugf("becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; log=%v", r.currentTerm,
+		r.nextIndex, r.matchIndex, r.log)
 
 	r.wg.Add(1)
-	go func() {
+	go func(heartbeatTimeout time.Duration) {
 		defer r.wg.Done()
-		ticker := time.NewTicker(50 * time.Millisecond)
-		defer ticker.Stop()
-
-		// Send periodic heartbeats, as long as still leader.
+		// Immediately send AEs to peers.
+		r.leaderSendAEs()
+		t := time.NewTimer(heartbeatTimeout)
+		defer t.Stop()
 		for {
-			r.leaderSendHeartbeats()
+			doSend := false
 			select {
 			case <-r.quit:
 				r.server.Logger().Debug("Stopping startLeader")
 				return
-			case <-ticker.C:
+			case <-t.C:
+				doSend = true
+
+				// Reset timer to fire again after heartbeatTimeout.
+				t.Stop()
+				t.Reset(heartbeatTimeout)
+			case _, ok := <-r.triggerAEChan:
+				if ok {
+					doSend = true
+				} else {
+					return
+				}
+				// Reset timer for heartbeatTimeout.
+				if !t.Stop() {
+					<-t.C
+				}
+				t.Reset(heartbeatTimeout)
+			}
+			if doSend {
 				r.mutex.Lock()
 				if r.state != Leader {
 					r.mutex.Unlock()
 					return
 				}
 				r.mutex.Unlock()
+				r.leaderSendAEs()
 			}
 		}
-	}()
+	}(50 * time.Millisecond)
 }
 
-func (r *raft) leaderSendHeartbeats() {
+func (r *raft) leaderSendAEs() {
 	r.mutex.Lock()
 	savedCurrentTerm := r.currentTerm
 	r.mutex.Unlock()
 
-	for _, peer := range r.peers {
-		args := pb.AppendEntryRequest{
-			Term:       savedCurrentTerm,
-			LeaderName: r.Server().Name(),
-		}
+	for _, peer := range r.Peers() {
 		r.wg.Add(1)
 		go func(peer *pb.Peer) {
 			defer r.wg.Done()
-			resp, err := r.Server().Send(peer, "RPC.AppendEntries", &args)
-			if err != nil {
-				return
-			}
-			reply := resp.(*pb.AppendEntryReply)
 			r.mutex.Lock()
-			defer r.mutex.Unlock()
-			if reply.Term > savedCurrentTerm {
-				r.Server().Logger().Debug("term out of date in heartbeat reply")
-				r.becomeFollower(reply.Term)
-				return
+			ni := r.nextIndex[peer.Name]
+
+			var prevLogTerm, prevLogIndex int32
+			prevLogIndex = int32(ni - 1)
+
+			prevLogTerm = -1
+			if prevLogIndex >= 0 {
+				prevLogTerm = r.log[prevLogIndex].Term
 			}
+			entries := r.log[ni:]
+
+			args := pb.AppendEntryRequest{
+				Term:         savedCurrentTerm,
+				LeaderName:   r.Server().Name(),
+				PrevLogIndex: prevLogIndex,
+				PrevLogTerm:  prevLogTerm,
+				Entries:      entries,
+				LeaderCommit: r.commitIndex,
+			}
+			r.mutex.Unlock()
+			r.Server().Logger().Debugf("sending AppendEntries to %s: ni=%d, args=%+v", peer.Name, ni, &args)
+
 		}(peer)
 	}
 }
@@ -411,7 +438,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	return reply, nil
 }
 
-func (r *raft) becomeFollower(term uint64) {
+func (r *raft) becomeFollower(term int32) {
 	r.Server().Logger().Debugf("becomes Follower with term=%d; log=%v", term, r.log)
 	r.state = Follower
 	r.currentTerm = term
@@ -427,10 +454,14 @@ func (r *raft) becomeFollower(term uint64) {
 
 }
 
-func (r *raft) lastLogIndexAndTerm() (int64, int64) {
+func (r *raft) lastLogIndexAndTerm() (int32, int32) {
 	if len(r.log) > 0 {
-		lastIndex := len(r.log) - 1
-		return int64(lastIndex), int64(r.log[lastIndex].Term)
+		var lastIndex, term int32
+
+		lastIndex = int32(len(r.log) - 1)
+		term = r.log[lastIndex].Term
+
+		return lastIndex, term
 	}
 	return -1, -1
 }
