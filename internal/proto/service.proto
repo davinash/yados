@@ -34,6 +34,7 @@ message AppendEntryRequest {
   int64 PrevLogTerm = 5;
   repeated LogEntry Entries = 6;
   int64 LeaderCommit = 7;
+  int64 NextIndex = 8;
 }
 
 message AppendEntryReply {

@@ -247,7 +247,7 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 		if reply.VoteGranted {
 			*votesReceived++
 			if *votesReceived*2 > len(r.peers)+1 {
-				r.logger.Debugf("wins election with %d votes", votesReceived)
+				r.logger.Debugf("wins election with %d votes", *votesReceived)
 				r.startLeader()
 				return
 			}
@@ -317,11 +317,12 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 		return EmptyVoteReply, nil
 	}
 	lastLogIndex, lastLogTerm := r.lastLogIndexAndTerm()
-	r.logger.Debugf("[%s] Received RequestVote: [currentTerm=%d, votedFor=%s] log index/term=(%v, %v)",
+	r.logger.Debugf("[%s] RequestVote: Received currentTerm=%d; votedFor=%s; lastLogIndex=%v; lastLogTerm %v",
 		request.Id, r.currentTerm, r.votedFor, lastLogIndex, lastLogTerm)
 
 	if request.Term > r.currentTerm {
-		r.logger.Debugf("[%s] term out of date in RequestVote", request.Id)
+		r.logger.Debugf("[%s] RequestVote: request.Term =%v; r.currentTerm =%v; "+
+			"term out of date in RequestVote", request.Id, request.Term, r.currentTerm)
 		r.becomeFollower(request.Term)
 	}
 	reply := &pb.VoteReply{Id: request.Id}
@@ -337,11 +338,12 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 		reply.VoteGranted = false
 	}
 	reply.Term = r.currentTerm
+	reply.CandidateName = r.Server().Name()
 
 	r.persistToStorage()
 
-	r.logger.Debugf("[%s] RequestVote reply: [Term = %d, votedFor = %s ]",
-		request.Id, reply.Term, r.votedFor)
+	r.logger.Debugf("[%s] RequestVote: Reply Term = %v; VoteGranted = %v; CandidateName = %s",
+		reply.Id, reply.Term, reply.VoteGranted, reply.CandidateName)
 
 	return reply, nil
 }
@@ -428,20 +430,20 @@ func (r *raft) leaderSendAEs() {
 				PrevLogTerm:  prevLogTerm,
 				Entries:      entries,
 				LeaderCommit: r.commitIndex,
+				NextIndex:    ni,
 			}
 			r.mutex.Unlock()
-			r.logger.Debugf("sending AppendEntries to %s: ni=%d, args=%+v", peer.Name, ni, &request)
-
 			resp, err := r.Server().Send(peer, "RPC.AppendEntries", &request)
 			if err != nil {
-				r.logger.Errorf("Sending AppendEntries failed, Error = %v", err)
+				r.logger.Errorf("[%s] Sending AppendEntries failed, Error = %v", request.Id, err)
 				return
 			}
 			r.mutex.Lock()
 			defer r.mutex.Unlock()
 			reply := resp.(*pb.AppendEntryReply)
 			if reply.Term > savedCurrentTerm {
-				r.logger.Debug("term out of date in heartbeat reply")
+				r.logger.Debugf("Reply.Term = %v; SavedCurrentTerm = %v; term out of date in heartbeat reply",
+					reply.Term, savedCurrentTerm)
 				r.becomeFollower(reply.Term)
 				return
 			}
@@ -530,10 +532,11 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	if r.state == Dead {
 		return reply, nil
 	}
-	r.logger.Debugf("AppendEntries: %+v", request)
+	r.logger.Debugf("[%s] [%s]  Received AppendEntries, current Term = %v", r.state, request.Id, r.currentTerm)
 
 	if request.Term > r.currentTerm {
-		r.logger.Debugf("term out of date in AppendEntries")
+		r.logger.Debugf("[%s] [%s] request.Term = %v; currentTerm = %v; term out of date in AppendEntries",
+			r.state, request.Id, request.Term, r.currentTerm)
 		r.becomeFollower(request.Term)
 	}
 
@@ -561,14 +564,15 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 				newEntriesIndex++
 			}
 			if newEntriesIndex < len(request.Entries) {
-				r.logger.Debugf("inserting entries %v from index %d", request.Entries[newEntriesIndex:], logInsertIndex)
+				r.logger.Debugf("[%s] [%s] inserting entries %v from index %d", r.state, request.Id,
+					request.Entries[newEntriesIndex:], logInsertIndex)
 				r.log = append(r.log[:logInsertIndex], request.Entries[newEntriesIndex:]...)
-				r.logger.Debugf("log is now: %v", r.log)
+				r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, r.log)
 			}
 
 			if request.LeaderCommit > r.commitIndex {
 				r.commitIndex = intMin(request.LeaderCommit, int64(len(r.log)-1))
-				r.logger.Debugf("setting commitIndex=%d", r.commitIndex)
+				r.logger.Debugf("[%s] [%s] setting commitIndex=%d", r.state, request.Id, r.commitIndex)
 				r.newCommitReadyChan <- struct{}{}
 			}
 		} else {
@@ -591,7 +595,8 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 
 	reply.Term = r.currentTerm
 	r.persistToStorage()
-	r.logger.Debugf("AppendEntries reply: %+v", reply.Term)
+	r.logger.Debugf("[%s] [%s] AppendEntries reply: Term = %v; ConflictTerm =%v; ConflictIndex =%v; Success =%v;",
+		r.state, request.Id, reply.Term, reply.ConflictTerm, reply.ConflictIndex, reply.Success)
 	return reply, nil
 }
 

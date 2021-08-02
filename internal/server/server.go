@@ -74,23 +74,6 @@ func NewServer(name string, address string, port int32, loglevel string, logDir 
 	srv.SetLogLevel(loglevel)
 	srv.quit = make(chan interface{})
 
-	//d := filepath.Join(srv.logDir, srv.Name(), "log")
-	//err := os.MkdirAll(d, os.ModePerm)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//srv.logDir = d
-	//
-	//store, err := NewStorage(srv.LogDir(), srv.Logger())
-	//if err != nil {
-	//	return nil, err
-	//}
-	//srv.store = store
-	//err = srv.store.Open()
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	return srv, nil
 }
 
