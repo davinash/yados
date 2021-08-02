@@ -3,17 +3,17 @@ option go_package = "/gen";
 
 message VoteRequest {
   string Id = 1;
-  int32 Term = 2;
+  int64 Term = 2;
   string CandidateName = 3;
-  int32 LastLogIndex = 4;
-  int32 LastLogTerm = 5;
+  int64 LastLogIndex = 4;
+  int64 LastLogTerm = 5;
 }
 
 message VoteReply {
   string Id = 1;
   bool VoteGranted = 2;
   string CandidateName = 3;
-  int32 Term = 4;
+  int64 Term = 4;
 }
 
 message Command {
@@ -21,25 +21,27 @@ message Command {
 }
 
 message LogEntry {
-  int32 Term = 1;
-  int32 Index = 2;
+  int64 Term = 1;
+  int64 Index = 2;
   Command Command = 3;
 }
 
 message AppendEntryRequest {
   string Id = 1;
-  int32 Term = 2;
+  int64 Term = 2;
   string LeaderName = 3;
-  int32 PrevLogIndex = 4;
-  int32 PrevLogTerm = 5;
+  int64 PrevLogIndex = 4;
+  int64 PrevLogTerm = 5;
   repeated LogEntry Entries = 6;
-  int32 LeaderCommit = 7;
+  int64 LeaderCommit = 7;
 }
 
 message AppendEntryReply {
   string Id = 1;
-  int32 Term = 2;
+  int64 Term = 2;
   bool Success = 3;
+  int64 ConflictIndex = 4;
+  int64 ConflictTerm = 5;
 }
 
 message Peer {
