@@ -54,6 +54,5 @@ test-with-cover:
 test-single:
 	go test -v github.com/davinash/yados/tests -testify.m $(TEST_NAME) -count $(TEST_COUNT)
 
-
 clean:
 	rm -rf out/*

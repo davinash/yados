@@ -74,41 +74,67 @@ func NewServer(name string, address string, port int32, loglevel string, logDir 
 	srv.SetLogLevel(loglevel)
 	srv.quit = make(chan interface{})
 
+	//d := filepath.Join(srv.logDir, srv.Name(), "log")
+	//err := os.MkdirAll(d, os.ModePerm)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//srv.logDir = d
+	//
+	//store, err := NewStorage(srv.LogDir(), srv.Logger())
+	//if err != nil {
+	//	return nil, err
+	//}
+	//srv.store = store
+	//err = srv.store.Open()
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	return srv, nil
+}
+
+func (srv *server) GetOrCreateStorage() error {
 	d := filepath.Join(srv.logDir, srv.Name(), "log")
 	err := os.MkdirAll(d, os.ModePerm)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	srv.logDir = d
 
 	store, err := NewStorage(srv.LogDir(), srv.Logger())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	srv.store = store
 	err = srv.store.Open()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	return srv, nil
+	return nil
 }
 
 func (srv *server) Serve(peers []*pb.Peer) error {
+	err := srv.GetOrCreateStorage()
+	if err != nil {
+		return err
+	}
 	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	srv.mutex.Lock()
 	defer srv.mutex.Unlock()
 
 	srv.rpcServer = NewRPCServer(srv)
-	err := srv.rpcServer.Start()
+	err = srv.rpcServer.Start()
 	if err != nil {
 		srv.logger.Fatalf("failed to start the rpc, error = %v", err)
 	}
 
-	srv.raft, err = NewRaft(srv, peers, srv.ready)
+	srv.raft, err = NewRaft(srv, peers)
 	if err != nil {
 		return err
 	}
+	srv.raft.Start(srv.ready)
+
 	return nil
 }
 
