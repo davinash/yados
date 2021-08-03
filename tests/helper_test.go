@@ -128,7 +128,6 @@ func (suite *YadosTestSuite) SetupTest() {
 	if err != nil {
 		suite.T().Error(err)
 	}
-
 	close(suite.ready)
 }
 

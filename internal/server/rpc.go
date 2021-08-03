@@ -48,7 +48,11 @@ func (rpc *rpcServer) Start() error {
 
 	pb.RegisterYadosServiceServer(rpc.grpcServer, rpc.server)
 	go func() {
-		rpc.grpcServer.Serve(lis)
+		err := rpc.grpcServer.Serve(lis)
+		if err != nil {
+			rpc.Server().Logger().Errorf("failed to start the grpc server, Error = %v", err)
+			return
+		}
 	}()
 	return nil
 }

@@ -442,8 +442,8 @@ func (r *raft) leaderSendAEs() {
 			defer r.mutex.Unlock()
 			reply := resp.(*pb.AppendEntryReply)
 			if reply.Term > savedCurrentTerm {
-				r.logger.Debugf("Reply.Term = %v; SavedCurrentTerm = %v; term out of date in heartbeat reply",
-					reply.Term, savedCurrentTerm)
+				r.logger.Debugf("[%s] Reply.Term = %v; SavedCurrentTerm = %v; term out of date in heartbeat reply",
+					reply.Id, reply.Term, savedCurrentTerm)
 				r.becomeFollower(reply.Term)
 				return
 			}
@@ -465,10 +465,10 @@ func (r *raft) leaderSendAEs() {
 							}
 						}
 					}
-					r.logger.Debugf("AppendEntries reply from %s success: nextIndex := %v, "+
-						"matchIndex := %v; commitIndex := %d", peer.Name, r.nextIndex, r.matchIndex, r.commitIndex)
+					r.logger.Debugf("[%s] AppendEntries reply from %s success: nextIndex := %v, "+
+						"matchIndex := %v; commitIndex := %d", reply.Id, peer.Name, r.nextIndex, r.matchIndex, r.commitIndex)
 					if r.commitIndex != savedCommitIndex {
-						r.logger.Debugf("leader sets commitIndex := %d", r.commitIndex)
+						r.logger.Debugf("[%s] leader sets commitIndex := %d", reply.Id, r.commitIndex)
 						r.newCommitReadyChan <- struct{}{}
 						r.triggerAEChan <- struct{}{}
 					}
@@ -490,8 +490,8 @@ func (r *raft) leaderSendAEs() {
 					} else {
 						r.nextIndex[peer.Name] = reply.ConflictIndex
 					}
-					r.logger.Debugf("AppendEntries reply from %s !success: nextIndex := %d",
-						peer.Name, ni-1)
+					r.logger.Debugf("[%s] AppendEntries reply from %s !success: nextIndex := %d",
+						reply.Id, peer.Name, ni-1)
 				}
 			}
 		}(peer)

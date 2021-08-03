@@ -193,8 +193,16 @@ func (srv *server) SetLogLevel(level string) {
 func (srv *server) Stop() error {
 	srv.logger.Infof("Stopping Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	srv.Raft().Stop()
-	srv.RPCServer().Stop()
-	srv.Store().Close()
+	err := srv.RPCServer().Stop()
+	if err != nil {
+		srv.logger.Errorf("failed to stop grpc server, Error = %v", err)
+		return err
+	}
+	err = srv.Store().Close()
+	if err != nil {
+		srv.logger.Errorf("failed to close the store, Error = %v", err)
+		return err
+	}
 	srv.logger.Infof("Stopped Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	return nil
 }

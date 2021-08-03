@@ -21,7 +21,12 @@ TEST_COUNT=1
 
 build: getdeps lint buildx
 
-buildx:
+format:
+	go fmt ./...
+	${GOPATH}/bin/goimports -l -w .
+	${GOPATH}/bin/errcheck -ignoretests -blank ./...
+
+buildx: format
 	@echo "Building the product"
 	GO111MODULE=on go build -ldflags "-X main.Version=$(VERSION)" -o out/yadosctl$(EXE)  cmd/cli/main.go
 
