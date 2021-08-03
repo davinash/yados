@@ -19,14 +19,15 @@ endif
 
 TEST_COUNT=1
 
-build: getdeps lint buildx
+build: getdeps format lint buildx
 
 format:
+	go mod tidy
 	go fmt ./...
 	${GOPATH}/bin/goimports -l -w .
 	${GOPATH}/bin/errcheck -ignoretests -blank ./...
 
-buildx: format
+buildx:
 	@echo "Building the product"
 	GO111MODULE=on go build -ldflags "-X main.Version=$(VERSION)" -o out/yadosctl$(EXE)  cmd/cli/main.go
 
@@ -61,3 +62,4 @@ test-single:
 
 clean:
 	rm -rf out/*
+
