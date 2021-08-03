@@ -22,6 +22,7 @@ type YadosServiceClient interface {
 	RequestVotes(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*VoteReply, error)
 	AppendEntries(ctx context.Context, in *AppendEntryRequest, opts ...grpc.CallOption) (*AppendEntryReply, error)
 	AddMember(ctx context.Context, in *NewPeerRequest, opts ...grpc.CallOption) (*NewPeerReply, error)
+	BootStrap(ctx context.Context, in *BootStrapRequest, opts ...grpc.CallOption) (*BootStrapReply, error)
 }
 
 type yadosServiceClient struct {
@@ -59,6 +60,15 @@ func (c *yadosServiceClient) AddMember(ctx context.Context, in *NewPeerRequest, 
 	return out, nil
 }
 
+func (c *yadosServiceClient) BootStrap(ctx context.Context, in *BootStrapRequest, opts ...grpc.CallOption) (*BootStrapReply, error) {
+	out := new(BootStrapReply)
+	err := c.cc.Invoke(ctx, "/YadosService/BootStrap", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
@@ -66,6 +76,7 @@ type YadosServiceServer interface {
 	RequestVotes(context.Context, *VoteRequest) (*VoteReply, error)
 	AppendEntries(context.Context, *AppendEntryRequest) (*AppendEntryReply, error)
 	AddMember(context.Context, *NewPeerRequest) (*NewPeerReply, error)
+	BootStrap(context.Context, *BootStrapRequest) (*BootStrapReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -81,6 +92,9 @@ func (UnimplementedYadosServiceServer) AppendEntries(context.Context, *AppendEnt
 }
 func (UnimplementedYadosServiceServer) AddMember(context.Context, *NewPeerRequest) (*NewPeerReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddMember not implemented")
+}
+func (UnimplementedYadosServiceServer) BootStrap(context.Context, *BootStrapRequest) (*BootStrapReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BootStrap not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -149,6 +163,24 @@ func _YadosService_AddMember_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_BootStrap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BootStrapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).BootStrap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/BootStrap",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).BootStrap(ctx, req.(*BootStrapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -167,6 +199,10 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AddMember",
 			Handler:    _YadosService_AddMember_Handler,
+		},
+		{
+			MethodName: "BootStrap",
+			Handler:    _YadosService_BootStrap_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

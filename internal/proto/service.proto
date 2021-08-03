@@ -60,8 +60,17 @@ message NewPeerReply {
   string Id = 1;
 }
 
+message BootStrapRequest {
+  string Id = 1;
+}
+
+message BootStrapReply {
+  string Id = 1;
+}
+
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
   rpc AppendEntries(AppendEntryRequest) returns (AppendEntryReply) {}
   rpc AddMember(NewPeerRequest) returns (NewPeerReply) {}
+  rpc BootStrap(BootStrapRequest) returns (BootStrapReply) {}
 }

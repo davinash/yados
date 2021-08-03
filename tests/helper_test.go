@@ -23,7 +23,6 @@ type TestCluster struct {
 type YadosTestSuite struct {
 	suite.Suite
 	cluster *TestCluster
-	ready   chan interface{}
 	logDir  string
 }
 
@@ -55,7 +54,7 @@ func (suite *YadosTestSuite) GetFreePorts(n int) ([]int, error) {
 	return ports, nil
 }
 
-func (suite *YadosTestSuite) AddNewServer(suffix int) error {
+func (suite *YadosTestSuite) AddNewServer(suffix int, isBootStrap bool) error {
 	freePorts, err := suite.GetFreePorts(1)
 	if err != nil {
 		return err
@@ -64,12 +63,18 @@ func (suite *YadosTestSuite) AddNewServer(suffix int) error {
 	for _, p := range suite.cluster.members {
 		peers = append(peers, p.Self())
 	}
-	srv, err := server.NewServer(fmt.Sprintf("Server-%d", suffix), "127.0.0.1", int32(freePorts[0]),
-		"debug", suite.logDir, suite.ready)
+	srvArgs := &server.NewServerArgs{
+		Name:     fmt.Sprintf("Server-%d", suffix),
+		Address:  "127.0.0.1",
+		Port:     int32(freePorts[0]),
+		Loglevel: "debug",
+		LogDir:   suite.logDir,
+	}
+	srv, err := server.NewServer(srvArgs)
 	if err != nil {
 		return err
 	}
-	err = srv.Serve(peers)
+	err = srv.Serve(peers, isBootStrap)
 	if err != nil {
 		return err
 	}
@@ -83,12 +88,16 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 		members:      make([]server.Server, 0),
 		numOfServers: numOfServers,
 	}
-	err := suite.AddNewServer(0)
+	err := suite.AddNewServer(0, false)
 	if err != nil {
 		return err
 	}
 	for i := 1; i < numOfServers; i++ {
-		err := suite.AddNewServer(i)
+		isBootStrap := false
+		if i == numOfServers-1 {
+			isBootStrap = true
+		}
+		err := suite.AddNewServer(i, isBootStrap)
 		if err != nil {
 			return err
 		}
@@ -122,13 +131,10 @@ func (suite *YadosTestSuite) SetupTest() {
 	}
 	suite.logDir = logDir
 
-	suite.ready = make(chan interface{})
-
 	err = suite.CreateNewCluster(3)
 	if err != nil {
 		suite.T().Error(err)
 	}
-	close(suite.ready)
 }
 
 func (suite *YadosTestSuite) Cleanup() {

@@ -129,6 +129,15 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 			return nil, err
 		}
 		return reply, nil
+	case "RPC.BootstrapRequest":
+		request := args.(*pb.BootStrapRequest)
+		request.Id = uuid.New().String()
+		rpc.Server().Logger().Debugf("[%s] BootstrapRequest ", request.Id)
+		reply, err := rpcClient.BootStrap(context.Background(), request)
+		if err != nil {
+			return nil, err
+		}
+		return reply, nil
 	default:
 		return nil, ErrorUnknownMethod
 	}

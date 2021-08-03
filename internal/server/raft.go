@@ -44,10 +44,11 @@ type Raft interface {
 	AddPeer(peer *pb.Peer) error
 	State() RaftState
 	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
-	Start(ready <-chan interface{})
+	Start(bool)
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.LogEntry
+	BootStrap()
 }
 
 type raft struct {
@@ -79,7 +80,7 @@ type raft struct {
 	newCommitReadyChan chan struct{}
 	logger             *logrus.Entry
 
-	//commitChan         chan<- CommitEntry
+	bootStrapWaitChan chan struct{}
 }
 
 func (r *raft) Log() []*pb.LogEntry {
@@ -117,6 +118,7 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 	r.nextIndex = make(map[string]int64)
 	r.matchIndex = make(map[string]int64)
 	r.newCommitReadyChan = make(chan struct{}, 16)
+	r.bootStrapWaitChan = make(chan struct{})
 
 	for _, p := range peers {
 		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
@@ -137,17 +139,34 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 	return r, nil
 }
 
-func (r *raft) Start(ready <-chan interface{}) {
+func (r *raft) Start(isBootStrap bool) {
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
-		<-ready
+		<-r.bootStrapWaitChan
 		r.mutex.Lock()
 		r.electionResetEvent = time.Now()
 		r.mutex.Unlock()
 		r.runElectionTimer()
 		r.logger.Debug("runElectionTimer::NewRaft")
 	}()
+
+	if isBootStrap {
+		for _, peer := range r.peers {
+			r.wg.Add(1)
+			go func(peer *pb.Peer) {
+				defer r.wg.Done()
+				args := pb.BootStrapRequest{}
+				_, err := r.Server().Send(peer, "RPC.BootstrapRequest", &args)
+				if err != nil {
+					r.logger.Errorf("failed to send RequestVote to %s, Error = %v", peer.Name, err)
+					return
+				}
+
+			}(peer)
+		}
+		r.BootStrap()
+	}
 }
 
 func (s RaftState) String() string {
@@ -177,6 +196,10 @@ func (r *raft) Peers() []*pb.Peer {
 	return r.peers
 }
 
+func (r *raft) BootStrap() {
+	close(r.bootStrapWaitChan)
+}
+
 func (r *raft) AddPeer(newPeer *pb.Peer) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -194,7 +217,7 @@ func (r *raft) runElectionTimer() {
 	r.mutex.Lock()
 	termStarted := r.currentTerm
 	r.mutex.Unlock()
-	r.logger.Debugf("election timer started (%v), term=%d", timeoutDuration, termStarted)
+	r.logger.Tracef("election timer started (%v), term=%d", timeoutDuration, termStarted)
 
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
@@ -214,12 +237,12 @@ func (r *raft) startOrIgnoreElection(termStarted int64, timeoutDuration time.Dur
 	defer r.mutex.Unlock()
 
 	if r.state != Candidate && r.state != Follower {
-		r.logger.Debugf("in election timer state=%s, bailing out", r.state)
+		r.logger.Tracef("in election timer state=%s, bailing out", r.state)
 		return
 	}
 
 	if termStarted != r.currentTerm {
-		r.logger.Debugf("in election timer term changed from %d to %d, bailing out",
+		r.logger.Tracef("in election timer term changed from %d to %d, bailing out",
 			termStarted, r.currentTerm)
 		return
 	}
@@ -264,7 +287,7 @@ func (r *raft) startElection() {
 	r.electionResetEvent = time.Now()
 	// vote for yourself
 	r.votedFor = r.Server().Name()
-	r.logger.Debugf("becomes Candidate (currentTerm=%d); log=%v", savedCurrentTerm, r.log)
+	r.logger.Tracef("becomes Candidate (currentTerm=%d); log=%v", savedCurrentTerm, r.log)
 
 	votesReceived := 1
 	for _, peer := range r.peers {

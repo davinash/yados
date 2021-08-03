@@ -25,7 +25,7 @@ type Server interface {
 	Peers() []*pb.Peer
 	Logger() *logrus.Entry
 	SetLogLevel(level string)
-	Serve([]*pb.Peer) error
+	Serve([]*pb.Peer, bool) error
 	RPCServer() RPCServer
 	Raft() Raft
 	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
@@ -37,9 +37,9 @@ type Server interface {
 
 type server struct {
 	pb.UnimplementedYadosServiceServer
-	mutex     sync.Mutex
-	raft      Raft
-	ready     <-chan interface{}
+	mutex sync.Mutex
+	raft  Raft
+	//ready     <-chan interface{}
 	quit      chan interface{}
 	rpcServer RPCServer
 	self      *pb.Peer
@@ -48,17 +48,24 @@ type server struct {
 	store     Store
 }
 
+//NewServerArgs argument structure for new server
+type NewServerArgs struct {
+	Name     string
+	Address  string
+	Port     int32
+	Loglevel string
+	LogDir   string
+}
+
 //NewServer creates new instance of a server
-func NewServer(name string, address string, port int32, loglevel string, logDir string,
-	ready <-chan interface{}) (Server, error) {
+func NewServer(args *NewServerArgs) (Server, error) {
 	srv := &server{}
 	srv.self = &pb.Peer{
-		Name:    name,
-		Address: address,
-		Port:    port,
+		Name:    args.Name,
+		Address: args.Address,
+		Port:    args.Port,
 	}
-	srv.ready = ready
-	srv.logDir = logDir
+	srv.logDir = args.LogDir
 
 	logger := &logrus.Logger{
 		Out: os.Stderr,
@@ -71,7 +78,7 @@ func NewServer(name string, address string, port int32, loglevel string, logDir 
 		"server": srv.self.Name,
 	})
 
-	srv.SetLogLevel(loglevel)
+	srv.SetLogLevel(args.Loglevel)
 	srv.quit = make(chan interface{})
 
 	return srv, nil
@@ -97,7 +104,7 @@ func (srv *server) GetOrCreateStorage() error {
 	return nil
 }
 
-func (srv *server) Serve(peers []*pb.Peer) error {
+func (srv *server) Serve(peers []*pb.Peer, isBootStrap bool) error {
 	err := srv.GetOrCreateStorage()
 	if err != nil {
 		return err
@@ -116,7 +123,7 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 	if err != nil {
 		return err
 	}
-	srv.raft.Start(srv.ready)
+	srv.raft.Start(isBootStrap)
 
 	return nil
 }
