@@ -1,16 +1,20 @@
 package server
 
-//// CreateStoreInClusterFn Creates a new Store
-//func CreateStoreInClusterFn(args interface{}, server *YadosServer) (*Response, error) {
-//	return nil, nil
-//}
-//
-////DeleteStoreFromClusterFn DeleteObjectFn the store
-//func DeleteStoreFromClusterFn(args interface{}, server *YadosServer) (*Response, error) {
-//	return nil, nil
-//}
-//
-//// GetStore GetObjectFn a new store
-//func GetStore(args interface{}, server *YadosServer) (*Response, error) {
-//	return nil, nil
-//}
+import "github.com/sirupsen/logrus"
+
+//Store represents the store
+type Store interface {
+	Open() error
+	Close() error
+	Put() error
+	Get() error
+}
+
+//NewStorage Creates new storage
+func NewStorage(logDir string, logger *logrus.Entry) (Store, error) {
+	ms := &MemoryStore{
+		logDir: logDir,
+		logger: logger,
+	}
+	return ms, nil
+}

@@ -1,220 +1,214 @@
 package server
 
 import (
-	"context"
-	"fmt"
-	"net"
+	"errors"
 	"os"
-	"os/signal"
-	"strconv"
-	"strings"
+	"path/filepath"
 	"sync"
-	"syscall"
-
-	pb "github.com/davinash/yados/internal/proto/gen"
-	"google.golang.org/grpc"
 
 	"github.com/sirupsen/logrus"
 	easy "github.com/t-tomalak/logrus-easy-formatter"
+
+	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
-//YadosServer represents the YadosServer object in the cluster
-type YadosServer struct {
-	pb.UnimplementedYadosServiceServer
+//ErrorInvalidFormat error for invalid format
+var ErrorInvalidFormat = errors.New("invalid format for peers, use <ip-address>:port")
 
-	self *pb.Member
-	//OSSignalCh channel listening for the OS events
-	OSSignalCh        chan os.Signal
-	peers             map[string]*pb.Member
-	isTestMode        bool
-	logger            *logrus.Entry
-	grpcServer        *grpc.Server
-	healthCheckChan   chan struct{}
-	hcTriggerDuration int
-	wg                sync.WaitGroup
-	hcMaxWaitTime     int64
-	mutex             *sync.RWMutex
+//Server Server interface
+type Server interface {
+	pb.YadosServiceServer
+	Name() string
+	Stop() error
+	Address() string
+	Port() int32
+	Peers() []*pb.Peer
+	Logger() *logrus.Entry
+	SetLogLevel(level string)
+	Serve([]*pb.Peer) error
+	RPCServer() RPCServer
+	Raft() Raft
+	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
+	Self() *pb.Peer
+	State() RaftState
+	LogDir() string
+	Store() Store
 }
 
-// CreateNewServer Creates a new object of the YadosServer
-func CreateNewServer(name string, address string, port int32) (*YadosServer, error) {
+type server struct {
+	pb.UnimplementedYadosServiceServer
+	mutex     sync.Mutex
+	raft      Raft
+	quit      chan interface{}
+	rpcServer RPCServer
+	self      *pb.Peer
+	logger    *logrus.Entry
+	logDir    string
+	store     Store
+}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
-	if err != nil {
-		return nil, fmt.Errorf("[CreateNewServer] failed to listen: %v", err)
-	}
-	lis.Close()
+//NewServerArgs argument structure for new server
+type NewServerArgs struct {
+	Name     string
+	Address  string
+	Port     int32
+	Loglevel string
+	LogDir   string
+}
 
-	server := YadosServer{
-		self: &pb.Member{
-			Port:    port,
-			Address: address,
-			Name:    name,
-		},
-		peers:             map[string]*pb.Member{},
-		isTestMode:        false,
-		grpcServer:        grpc.NewServer(),
-		healthCheckChan:   make(chan struct{}, 1),
-		hcTriggerDuration: 30,
-		hcMaxWaitTime:     180,
-		mutex:             &sync.RWMutex{},
+//NewServer creates new instance of a server
+func NewServer(args *NewServerArgs) (Server, error) {
+	srv := &server{}
+	srv.self = &pb.Peer{
+		Name:    args.Name,
+		Address: args.Address,
+		Port:    args.Port,
 	}
+	srv.logDir = args.LogDir
 
 	logger := &logrus.Logger{
-		Out:   os.Stderr,
-		Level: logrus.DebugLevel,
+		Out: os.Stderr,
 		Formatter: &easy.Formatter{
-			LogFormat:       "[%lvl%]:[%YadosServer%] %time% - %msg% \n",
+			LogFormat:       "[%lvl%]:%time% [%server%] %msg% \n",
 			TimestampFormat: "2006-01-02 15:04:05",
 		},
 	}
-	server.logger = logger.WithFields(logrus.Fields{
-		"YadosServer": server.self.Name,
+	srv.logger = logger.WithFields(logrus.Fields{
+		"server": srv.self.Name,
 	})
-	server.OSSignalCh = make(chan os.Signal, 1)
-	return &server, nil
+
+	srv.SetLogLevel(args.Loglevel)
+	srv.quit = make(chan interface{})
+
+	return srv, nil
 }
 
-// StartGrpcServer Starts the GRPC server
-func (server *YadosServer) StartGrpcServer() error {
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", server.self.Address, server.self.Port))
-	if err != nil {
-		return fmt.Errorf("failed to listen: %v", err)
-	}
-
-	pb.RegisterYadosServiceServer(server.grpcServer, server)
-	go func() {
-		server.grpcServer.Serve(lis)
-	}()
-	server.logger.Printf("server listening at %v", lis.Addr())
-	return err
-}
-
-//Start start the server and wait for the OS signal
-func (server *YadosServer) Start(peers []string) error {
-	signal.Notify(server.OSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	go server.HandleSignal()
-
-	err := server.StartGrpcServer()
+func (srv *server) GetOrCreateStorage() error {
+	d := filepath.Join(srv.logDir, srv.Name(), "log")
+	err := os.MkdirAll(d, os.ModePerm)
 	if err != nil {
 		return err
 	}
+	srv.logDir = d
 
-	err = server.postInit(peers)
+	store, err := NewStorage(srv.LogDir(), srv.Logger())
 	if err != nil {
-		server.logger.Error(err)
-		_ = server.StopServerFn()
 		return err
 	}
-	err = server.StartHealthCheck()
+	srv.store = store
+	err = srv.store.Open()
 	if err != nil {
-		server.logger.Error(err)
-		_ = server.StopServerFn()
 		return err
 	}
 	return nil
 }
 
-// HandleSignal Handles the CTRL-C signals
-func (server *YadosServer) HandleSignal() {
-	for {
-		<-server.OSSignalCh
-		err := server.StopServerFn()
-		if err != nil {
-			return
-		}
-		if !server.isTestMode {
-			os.Exit(0)
-		}
-	}
-}
-
-// EnableTestMode To be ued from the test
-func (server *YadosServer) EnableTestMode() {
-	server.isTestMode = true
-}
-
-// JoinWith admits the new members in the existing cluster
-func (server *YadosServer) JoinWith(address string, port int32) error {
-	server.mutex.Lock()
-	defer server.mutex.Unlock()
-
-	conn, peer, err := GetPeerConn(address, port)
+func (srv *server) Serve(peers []*pb.Peer) error {
+	err := srv.GetOrCreateStorage()
 	if err != nil {
 		return err
 	}
-	defer func(conn *grpc.ClientConn) {
-		err := conn.Close()
-		if err != nil {
-			server.logger.Warnf("Failed to close connection, Error = %v", err)
-		}
-	}(conn)
+	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
+	srv.mutex.Lock()
+	defer srv.mutex.Unlock()
 
-	self := &pb.Member{
-		Name:    server.self.Name,
-		Address: server.self.Address,
-		Port:    server.self.Port,
+	srv.rpcServer = NewRPCServer(srv)
+	err = srv.rpcServer.Start()
+	if err != nil {
+		srv.logger.Fatalf("failed to start the rpc, error = %v", err)
 	}
 
-	remotePeer, err := peer.AddNewMemberInCluster(context.Background(), &pb.NewMemberRequest{Member: self})
+	srv.raft, err = NewRaft(srv, peers)
 	if err != nil {
 		return err
 	}
-	// Add the remote to self peer list
-	server.peers[remotePeer.Member.Name] = remotePeer.Member
+	srv.raft.Start()
+
 	return nil
 }
 
-// postInit performs the post initialization
-func (server *YadosServer) postInit(peers []string) error {
-	server.logger.Info("Performing Post Initialization ...")
-
-	if len(peers) == 0 {
-		return nil
+func (srv *server) Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error) {
+	reply, err := srv.RPCServer().Send(peer, serviceMethod, args)
+	if err != nil {
+		return nil, err
 	}
+	return reply, nil
+}
 
-	for _, p := range peers {
-		split := strings.Split(p, ":")
-		if len(split) != 2 {
-			return fmt.Errorf("invalid format for peers, use <ip-address>:port")
-		}
-		port, err := strconv.Atoi(split[1])
-		if err != nil {
-			return fmt.Errorf("invalid format for peers, use <ip-address>:port")
-		}
-		err = server.JoinWith(split[0], int32(port))
-		if err != nil {
-			return err
-		}
+func (srv *server) LogDir() string {
+	return srv.logDir
+}
+
+func (srv *server) Name() string {
+	return srv.self.Name
+}
+
+func (srv *server) Address() string {
+	return srv.self.Address
+}
+
+func (srv *server) Port() int32 {
+	return srv.self.Port
+}
+
+func (srv *server) Peers() []*pb.Peer {
+	return srv.Raft().Peers()
+}
+
+func (srv *server) Logger() *logrus.Entry {
+	return srv.logger
+}
+
+func (srv *server) RPCServer() RPCServer {
+	return srv.rpcServer
+}
+
+func (srv *server) Raft() Raft {
+	return srv.raft
+}
+
+func (srv *server) Self() *pb.Peer {
+	return srv.self
+}
+
+func (srv *server) State() RaftState {
+	return srv.Raft().State()
+}
+
+func (srv *server) Store() Store {
+	return srv.store
+}
+
+func (srv *server) SetLogLevel(level string) {
+	switch level {
+	case "trace":
+		srv.logger.Logger.SetLevel(logrus.TraceLevel)
+	case "debug":
+		srv.logger.Logger.SetLevel(logrus.DebugLevel)
+	case "info":
+		srv.logger.Logger.SetLevel(logrus.InfoLevel)
+	case "warn":
+		srv.logger.Logger.SetLevel(logrus.WarnLevel)
+	case "error":
+		srv.logger.Logger.SetLevel(logrus.ErrorLevel)
+	default:
+		srv.logger.Logger.SetLevel(logrus.InfoLevel)
 	}
-	return nil
 }
 
-// SetHealthCheckDuration Sets the time duration to run the health check
-func (server *YadosServer) SetHealthCheckDuration(duration int) {
-	server.hcTriggerDuration = duration
-}
-
-//SetHealthCheckMaxWaitTime Set the max time to wait for members response before declaring
-//it is un-healthy
-func (server *YadosServer) SetHealthCheckMaxWaitTime(maxTime int64) {
-	server.hcMaxWaitTime = maxTime
-}
-
-//StopServerFn Stops the server
-func (server *YadosServer) StopServerFn() error {
-	server.logger.Infof("Stopping the server [%s:%d] ...", server.self.Address, server.self.Port)
-	server.StopHealthCheck()
-	server.grpcServer.Stop()
-
-	server.wg.Wait()
-	if !server.isTestMode {
-		os.Exit(0)
+func (srv *server) Stop() error {
+	srv.logger.Infof("Stopping Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
+	srv.Raft().Stop()
+	err := srv.RPCServer().Stop()
+	if err != nil {
+		srv.logger.Errorf("failed to stop grpc server, Error = %v", err)
+		return err
 	}
-	return nil
-}
-
-// Status returns the status of the server
-func (server *YadosServer) Status() error {
+	err = srv.Store().Close()
+	if err != nil {
+		srv.logger.Errorf("failed to close the store, Error = %v", err)
+		return err
+	}
+	srv.logger.Infof("Stopped Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	return nil
 }
