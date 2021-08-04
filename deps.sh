@@ -26,3 +26,5 @@ if test ! -f "${GOPATH}/bin/errcheck"; then
   echo "Installing errcheck" && go get github.com/kisielk/errcheck
 fi
 
+
+
