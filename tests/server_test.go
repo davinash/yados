@@ -58,7 +58,7 @@ func (suite *YadosTestSuite) TestServerLeaderElectionWithWait() {
 
 func (suite *YadosTestSuite) TestServerNewLeader() {
 	for i := 4; i < 7; i++ {
-		err := suite.AddNewServer(i, false)
+		err := suite.AddNewServer(i)
 		if err != nil {
 			suite.T().Fail()
 		}

@@ -15,13 +15,12 @@ import (
 
 //StartSrvArgs represents the Start server Arguments
 type StartSrvArgs struct {
-	name        string
-	address     string
-	port        int32
-	peers       []string
-	logLevel    string
-	logDir      string
-	isBootstrap bool
+	name     string
+	address  string
+	port     int32
+	peers    []string
+	logLevel string
+	logDir   string
 }
 
 //StartCommands command for starting a server
@@ -63,7 +62,7 @@ func StartCommands(rootCmd *cobra.Command) {
 				}
 				peers = append(peers, peer)
 			}
-			err = srv.Serve(peers, srvStartArgs.isBootstrap)
+			err = srv.Serve(peers)
 			if err != nil {
 				return err
 			}
@@ -102,9 +101,6 @@ func StartCommands(rootCmd *cobra.Command) {
 	if err != nil {
 		panic(err)
 	}
-
-	cmd.Flags().BoolVar(&srvStartArgs.isBootstrap, "bootstrap", false, "flag should be used when cluster"+
-		"has minimum number of servers ( e.g., 3 )")
 
 	rootCmd.AddCommand(cmd)
 }

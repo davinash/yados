@@ -25,7 +25,7 @@ type Server interface {
 	Peers() []*pb.Peer
 	Logger() *logrus.Entry
 	SetLogLevel(level string)
-	Serve([]*pb.Peer, bool) error
+	Serve([]*pb.Peer) error
 	RPCServer() RPCServer
 	Raft() Raft
 	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
@@ -37,9 +37,8 @@ type Server interface {
 
 type server struct {
 	pb.UnimplementedYadosServiceServer
-	mutex sync.Mutex
-	raft  Raft
-	//ready     <-chan interface{}
+	mutex     sync.Mutex
+	raft      Raft
 	quit      chan interface{}
 	rpcServer RPCServer
 	self      *pb.Peer
@@ -104,7 +103,7 @@ func (srv *server) GetOrCreateStorage() error {
 	return nil
 }
 
-func (srv *server) Serve(peers []*pb.Peer, isBootStrap bool) error {
+func (srv *server) Serve(peers []*pb.Peer) error {
 	err := srv.GetOrCreateStorage()
 	if err != nil {
 		return err
@@ -123,7 +122,7 @@ func (srv *server) Serve(peers []*pb.Peer, isBootStrap bool) error {
 	if err != nil {
 		return err
 	}
-	srv.raft.Start(isBootStrap)
+	srv.raft.Start()
 
 	return nil
 }

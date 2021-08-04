@@ -44,7 +44,7 @@ type Raft interface {
 	AddPeer(peer *pb.Peer) error
 	State() RaftState
 	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
-	Start(bool)
+	Start()
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.LogEntry
@@ -79,8 +79,6 @@ type raft struct {
 
 	newCommitReadyChan chan struct{}
 	logger             *logrus.Entry
-
-	bootStrapWaitChan chan struct{}
 }
 
 func (r *raft) Log() []*pb.LogEntry {
@@ -118,7 +116,6 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 	r.nextIndex = make(map[string]int64)
 	r.matchIndex = make(map[string]int64)
 	r.newCommitReadyChan = make(chan struct{}, 16)
-	r.bootStrapWaitChan = make(chan struct{})
 
 	for _, p := range peers {
 		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
@@ -131,6 +128,7 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 		if err != nil {
 			return nil, err
 		}
+		// add this peer to self
 		err = r.AddPeer(p)
 		if err != nil {
 			return nil, err
@@ -139,34 +137,17 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 	return r, nil
 }
 
-func (r *raft) Start(isBootStrap bool) {
-	r.wg.Add(1)
+func (r *raft) Start() {
 	go func() {
-		defer r.wg.Done()
-		<-r.bootStrapWaitChan
 		r.mutex.Lock()
 		r.electionResetEvent = time.Now()
 		r.mutex.Unlock()
+
 		r.runElectionTimer()
 		r.logger.Debug("runElectionTimer::NewRaft")
 	}()
 
-	if isBootStrap {
-		for _, peer := range r.peers {
-			r.wg.Add(1)
-			go func(peer *pb.Peer) {
-				defer r.wg.Done()
-				args := pb.BootStrapRequest{}
-				_, err := r.Server().Send(peer, "RPC.BootstrapRequest", &args)
-				if err != nil {
-					r.logger.Errorf("failed to send RequestVote to %s, Error = %v", peer.Name, err)
-					return
-				}
-
-			}(peer)
-		}
-		r.BootStrap()
-	}
+	r.logger.Info("Bootstrap Completed ...")
 }
 
 func (s RaftState) String() string {
@@ -197,7 +178,7 @@ func (r *raft) Peers() []*pb.Peer {
 }
 
 func (r *raft) BootStrap() {
-	close(r.bootStrapWaitChan)
+	//close(r.bootStrapWaitChan)
 }
 
 func (r *raft) AddPeer(newPeer *pb.Peer) error {
@@ -217,7 +198,7 @@ func (r *raft) runElectionTimer() {
 	r.mutex.Lock()
 	termStarted := r.currentTerm
 	r.mutex.Unlock()
-	r.logger.Tracef("election timer started (%v), term=%d", timeoutDuration, termStarted)
+	r.logger.Debugf("election timer started (%v), term=%d", timeoutDuration, termStarted)
 
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
@@ -270,7 +251,7 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 		if reply.VoteGranted {
 			*votesReceived++
 			if *votesReceived*2 > len(r.peers)+1 {
-				r.logger.Debugf("wins election with %d votes", *votesReceived)
+				r.logger.Infof("wins election with %d votes", *votesReceived)
 				r.startLeader()
 				return
 			}
@@ -395,7 +376,6 @@ func (r *raft) startLeader() {
 				return
 			case <-t.C:
 				doSend = true
-
 				// Reset timer to fire again after heartbeatTimeout.
 				t.Stop()
 				t.Reset(heartbeatTimeout)
@@ -520,33 +500,6 @@ func (r *raft) leaderSendAEs() {
 		}(peer)
 	}
 }
-
-//
-//func (r *raft) commitChanSender() {
-//	for range r.newCommitReadyChan {
-//		// Find which entries we have to apply.
-//		r.mutex.Lock()
-//		var savedTerm, savedLastApplied int64
-//		savedTerm = r.currentTerm
-//		savedLastApplied = r.lastApplied
-//		var entries []*pb.LogEntry
-//		if r.commitIndex > r.lastApplied {
-//			entries = r.log[r.lastApplied+1 : r.commitIndex+1]
-//			r.lastApplied = r.commitIndex
-//		}
-//		r.mutex.Unlock()
-//		r.logger.Debugf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
-//
-//		for i, entry := range entries {
-//			r.commitChan <- CommitEntry{
-//				Command: entry.Command,
-//				Index:   savedLastApplied + int64(i) + 1,
-//				Term:    savedTerm,
-//			}
-//		}
-//	}
-//	r.logger.Debug("commitChanSender done")
-//}
 
 func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error) {
 	reply := &pb.AppendEntryReply{Id: request.Id}

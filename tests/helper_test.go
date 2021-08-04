@@ -54,7 +54,7 @@ func (suite *YadosTestSuite) GetFreePorts(n int) ([]int, error) {
 	return ports, nil
 }
 
-func (suite *YadosTestSuite) AddNewServer(suffix int, isBootStrap bool) error {
+func (suite *YadosTestSuite) AddNewServer(suffix int) error {
 	freePorts, err := suite.GetFreePorts(1)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func (suite *YadosTestSuite) AddNewServer(suffix int, isBootStrap bool) error {
 	if err != nil {
 		return err
 	}
-	err = srv.Serve(peers, isBootStrap)
+	err = srv.Serve(peers)
 	if err != nil {
 		return err
 	}
@@ -88,18 +88,15 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 		members:      make([]server.Server, 0),
 		numOfServers: numOfServers,
 	}
-	err := suite.AddNewServer(0, false)
+	err := suite.AddNewServer(0)
 	if err != nil {
-		return err
+		panic(err)
 	}
+
 	for i := 1; i < numOfServers; i++ {
-		isBootStrap := false
-		if i == numOfServers-1 {
-			isBootStrap = true
-		}
-		err := suite.AddNewServer(i, isBootStrap)
+		err := suite.AddNewServer(i)
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 	return nil
