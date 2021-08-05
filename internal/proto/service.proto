@@ -68,9 +68,20 @@ message BootStrapReply {
   string Id = 1;
 }
 
+
+message RemovePeerRequest {
+  string Id = 1;
+  Peer peer = 2;
+}
+
+
+message RemovePeerReply {
+  string Id = 1;
+}
+
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
   rpc AppendEntries(AppendEntryRequest) returns (AppendEntryReply) {}
   rpc AddMember(NewPeerRequest) returns (NewPeerReply) {}
-  rpc BootStrap(BootStrapRequest) returns (BootStrapReply) {}
+  rpc RemovePeer(RemovePeerRequest) returns(RemovePeerReply) {}
 }

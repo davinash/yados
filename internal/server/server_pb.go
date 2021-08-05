@@ -44,11 +44,14 @@ func (srv *server) AddMember(ctx context.Context, newPeer *pb.NewPeerRequest) (*
 	return EmptyNewMemberReply, nil
 }
 
-func (srv *server) BootStrap(ctx context.Context, request *pb.BootStrapRequest) (*pb.BootStrapReply, error) {
-	EmptyBootStrapReply := &pb.BootStrapReply{Id: request.Id}
-	srv.logger.Debugf("[%s] Received BootStrap", request.Id)
+func (srv *server) RemovePeer(ctx context.Context, request *pb.RemovePeerRequest) (*pb.RemovePeerReply, error) {
+	EmptyRemovePeerReply := &pb.RemovePeerReply{Id: request.Id}
+	srv.logger.Debugf("[%s] Received RemovePeer", request.Id)
 
-	srv.Raft().BootStrap()
+	err := srv.Raft().RemovePeer(request)
+	if err != nil {
+		return EmptyRemovePeerReply, err
+	}
 
-	return EmptyBootStrapReply, nil
+	return EmptyRemovePeerReply, nil
 }

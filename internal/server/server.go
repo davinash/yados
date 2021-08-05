@@ -22,7 +22,7 @@ type Server interface {
 	Stop() error
 	Address() string
 	Port() int32
-	Peers() []*pb.Peer
+	Peers() map[string]*pb.Peer
 	Logger() *logrus.Entry
 	SetLogLevel(level string)
 	Serve([]*pb.Peer) error
@@ -151,7 +151,7 @@ func (srv *server) Port() int32 {
 	return srv.self.Port
 }
 
-func (srv *server) Peers() []*pb.Peer {
+func (srv *server) Peers() map[string]*pb.Peer {
 	return srv.Raft().Peers()
 }
 

@@ -30,9 +30,8 @@ func StartCommands(rootCmd *cobra.Command) {
 		Use:   "start",
 		Short: "create and start a new server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-
-			osSignal := make(chan os.Signal, 1)
-			signal.Notify(osSignal, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+			oSSignalCh := make(chan os.Signal, 1)
+			signal.Notify(oSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 			srvArgs := &server.NewServerArgs{
 				Name:     srvStartArgs.name,
@@ -49,11 +48,11 @@ func StartCommands(rootCmd *cobra.Command) {
 			for _, p := range srvStartArgs.peers {
 				split := strings.Split(p, ":")
 				if len(split) != 3 {
-					return fmt.Errorf("invalid format for peers, use <name:ip-address>:port")
+					return fmt.Errorf("invalid format for peers, use <name:ip-address:port>")
 				}
 				port, err := strconv.Atoi(split[2])
 				if err != nil {
-					return fmt.Errorf("invalid format for peers, use <name:ip-address>:port")
+					return fmt.Errorf("invalid format for peers, use <name:ip-address:port>")
 				}
 				peer := &pb.Peer{
 					Name:    split[0],
@@ -66,7 +65,7 @@ func StartCommands(rootCmd *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			<-osSignal
+			<-oSSignalCh
 			err = srv.Stop()
 			if err != nil {
 				return err
