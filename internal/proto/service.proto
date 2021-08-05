@@ -49,6 +49,13 @@ message Peer {
   string name = 1;
   string address = 2;
   int32  port = 3;
+  enum RaftState {
+    Follower = 0;
+    Candidate = 1;
+    Leader = 2;
+    Dead = 3;
+  }
+  RaftState state = 4;
 }
 
 message NewPeerRequest {
@@ -68,20 +75,29 @@ message BootStrapReply {
   string Id = 1;
 }
 
-
 message RemovePeerRequest {
   string Id = 1;
   Peer peer = 2;
 }
 
-
 message RemovePeerReply {
   string Id = 1;
 }
+
+message ListMembersRequest {
+  string Id = 1;
+}
+
+message ListMembersReply {
+  string Id = 1;
+  repeated Peer peers = 2;
+}
+
 
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
   rpc AppendEntries(AppendEntryRequest) returns (AppendEntryReply) {}
   rpc AddMember(NewPeerRequest) returns (NewPeerReply) {}
   rpc RemovePeer(RemovePeerRequest) returns(RemovePeerReply) {}
+  rpc ListMembers(ListMembersRequest) returns (ListMembersReply) {}
 }

@@ -52,6 +52,20 @@ func (srv *server) RemovePeer(ctx context.Context, request *pb.RemovePeerRequest
 	if err != nil {
 		return EmptyRemovePeerReply, err
 	}
-
 	return EmptyRemovePeerReply, nil
+}
+
+func (srv *server) ListMembers(ctx context.Context, request *pb.ListMembersRequest) (*pb.ListMembersReply, error) {
+	srv.logger.Debugf("[%s] Received ListMembers", request.Id)
+	reply := &pb.ListMembersReply{Id: request.Id}
+
+	peers := srv.Peers()
+	for _, p := range peers {
+		reply.Peers = append(reply.Peers, p)
+	}
+	self := srv.Self()
+	self.State = srv.State()
+	reply.Peers = append(reply.Peers, self)
+
+	return reply, nil
 }
