@@ -25,6 +25,8 @@ type YadosServiceClient interface {
 	RemovePeer(ctx context.Context, in *RemovePeerRequest, opts ...grpc.CallOption) (*RemovePeerReply, error)
 	PeerStatus(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusReply, error)
 	ClusterStatus(ctx context.Context, in *ClusterStatusRequest, opts ...grpc.CallOption) (*ClusterStatusReply, error)
+	CreateStore(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error)
+	CreateStoreOnPeer(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error)
 }
 
 type yadosServiceClient struct {
@@ -89,6 +91,24 @@ func (c *yadosServiceClient) ClusterStatus(ctx context.Context, in *ClusterStatu
 	return out, nil
 }
 
+func (c *yadosServiceClient) CreateStore(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error) {
+	out := new(StoreCreateReply)
+	err := c.cc.Invoke(ctx, "/YadosService/CreateStore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yadosServiceClient) CreateStoreOnPeer(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error) {
+	out := new(StoreCreateReply)
+	err := c.cc.Invoke(ctx, "/YadosService/CreateStoreOnPeer", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
@@ -99,6 +119,8 @@ type YadosServiceServer interface {
 	RemovePeer(context.Context, *RemovePeerRequest) (*RemovePeerReply, error)
 	PeerStatus(context.Context, *StatusRequest) (*StatusReply, error)
 	ClusterStatus(context.Context, *ClusterStatusRequest) (*ClusterStatusReply, error)
+	CreateStore(context.Context, *StoreCreateRequest) (*StoreCreateReply, error)
+	CreateStoreOnPeer(context.Context, *StoreCreateRequest) (*StoreCreateReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -123,6 +145,12 @@ func (UnimplementedYadosServiceServer) PeerStatus(context.Context, *StatusReques
 }
 func (UnimplementedYadosServiceServer) ClusterStatus(context.Context, *ClusterStatusRequest) (*ClusterStatusReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ClusterStatus not implemented")
+}
+func (UnimplementedYadosServiceServer) CreateStore(context.Context, *StoreCreateRequest) (*StoreCreateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateStore not implemented")
+}
+func (UnimplementedYadosServiceServer) CreateStoreOnPeer(context.Context, *StoreCreateRequest) (*StoreCreateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateStoreOnPeer not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -245,6 +273,42 @@ func _YadosService_ClusterStatus_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_CreateStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreCreateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).CreateStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/CreateStore",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).CreateStore(ctx, req.(*StoreCreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _YadosService_CreateStoreOnPeer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreCreateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).CreateStoreOnPeer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/CreateStoreOnPeer",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).CreateStoreOnPeer(ctx, req.(*StoreCreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -275,6 +339,14 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ClusterStatus",
 			Handler:    _YadosService_ClusterStatus_Handler,
+		},
+		{
+			MethodName: "CreateStore",
+			Handler:    _YadosService_CreateStore_Handler,
+		},
+		{
+			MethodName: "CreateStoreOnPeer",
+			Handler:    _YadosService_CreateStoreOnPeer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

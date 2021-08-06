@@ -84,17 +84,25 @@ message StatusRequest {
 message StatusReply {
   string Id = 1;
   Peer server = 2;
-  string Status= 3;
+  string Status = 3;
 }
 
 message ClusterStatusRequest {
   string Id = 1;
 }
 
-
 message ClusterStatusReply {
   string Id = 1;
   repeated StatusReply PeerStatus = 2;
+}
+
+message StoreCreateRequest {
+  string Id = 1;
+  string name = 2;
+}
+
+message StoreCreateReply {
+  string Id = 1;
 }
 
 service YadosService {
@@ -104,4 +112,6 @@ service YadosService {
   rpc RemovePeer(RemovePeerRequest) returns(RemovePeerReply) {}
   rpc PeerStatus(StatusRequest) returns (StatusReply) {}
   rpc ClusterStatus(ClusterStatusRequest) returns (ClusterStatusReply) {}
+  rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
+  rpc CreateStoreOnPeer(StoreCreateRequest) returns (StoreCreateReply) {}
 }

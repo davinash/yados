@@ -80,3 +80,23 @@ func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusR
 	reply.PeerStatus = append(reply.PeerStatus, status)
 	return reply, nil
 }
+
+func (srv *server) CreateStoreOnPeer(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
+	panic("implement me")
+}
+
+func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
+	reply := &pb.StoreCreateReply{}
+	for _, peer := range srv.Peers() {
+		_, err := srv.Send(peer, "RPC.CreateStoreOnPeer", request)
+		if err != nil {
+			srv.logger.Errorf("failed to send CreateStore to %s, Error = %v", peer.Name, err)
+			return reply, err
+		}
+	}
+	_, err := srv.CreateStoreOnPeer(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	return reply, nil
+}

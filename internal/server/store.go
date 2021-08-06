@@ -1,8 +1,6 @@
 package server
 
-import "github.com/sirupsen/logrus"
-
-//Store represents the store
+//Store Interface for store
 type Store interface {
 	Open() error
 	Close() error
@@ -10,11 +8,31 @@ type Store interface {
 	Get() error
 }
 
-//NewStorage Creates new storage
-func NewStorage(logDir string, logger *logrus.Entry) (Store, error) {
-	ms := &MemoryStore{
-		logDir: logDir,
-		logger: logger,
-	}
-	return ms, nil
+//StoreArgs arguments for creating new store
+type StoreArgs struct {
+}
+
+//NewStore creates a new store
+func NewStore(args *StoreArgs) (Store, error) {
+	s := &store{}
+	return s, nil
+}
+
+type store struct {
+}
+
+func (s *store) Open() error {
+	panic("implement me")
+}
+
+func (s *store) Close() error {
+	panic("implement me")
+}
+
+func (s *store) Put() error {
+	panic("implement me")
+}
+
+func (s *store) Get() error {
+	panic("implement me")
 }

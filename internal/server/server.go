@@ -32,7 +32,8 @@ type Server interface {
 	Self() *pb.Peer
 	State() RaftState
 	LogDir() string
-	Store() Store
+	PLog() PLog
+	StoreCreate(request *pb.StoreCreateRequest) error
 }
 
 type server struct {
@@ -44,7 +45,8 @@ type server struct {
 	self      *pb.Peer
 	logger    *logrus.Entry
 	logDir    string
-	store     Store
+	pLog      PLog
+	stores    map[string]Store
 }
 
 //NewServerArgs argument structure for new server
@@ -79,6 +81,7 @@ func NewServer(args *NewServerArgs) (Server, error) {
 
 	srv.SetLogLevel(args.Loglevel)
 	srv.quit = make(chan interface{})
+	srv.stores = make(map[string]Store)
 
 	return srv, nil
 }
@@ -91,12 +94,12 @@ func (srv *server) GetOrCreateStorage() error {
 	}
 	srv.logDir = d
 
-	store, err := NewStorage(srv.LogDir(), srv.Logger())
+	store, err := NewPLog(srv.LogDir(), srv.Logger())
 	if err != nil {
 		return err
 	}
-	srv.store = store
-	err = srv.store.Open()
+	srv.pLog = store
+	err = srv.pLog.Open()
 	if err != nil {
 		return err
 	}
@@ -124,6 +127,10 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 	}
 	srv.raft.Start()
 
+	return nil
+}
+
+func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
 	return nil
 }
 
@@ -175,8 +182,8 @@ func (srv *server) State() RaftState {
 	return srv.Raft().State()
 }
 
-func (srv *server) Store() Store {
-	return srv.store
+func (srv *server) PLog() PLog {
+	return srv.pLog
 }
 
 func (srv *server) SetLogLevel(level string) {
@@ -204,9 +211,9 @@ func (srv *server) Stop() error {
 		srv.logger.Errorf("failed to stop grpc server, Error = %v", err)
 		return err
 	}
-	err = srv.Store().Close()
+	err = srv.PLog().Close()
 	if err != nil {
-		srv.logger.Errorf("failed to close the store, Error = %v", err)
+		srv.logger.Errorf("failed to close the pLog, Error = %v", err)
 		return err
 	}
 	srv.logger.Infof("Stopped Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())

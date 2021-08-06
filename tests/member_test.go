@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
