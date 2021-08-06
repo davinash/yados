@@ -40,22 +40,22 @@ const (
 //Raft raft interface
 type Raft interface {
 	Server() Server
-	Peers() []*pb.Peer
+	Peers() map[string]*pb.Peer
 	AddPeer(peer *pb.Peer) error
 	State() RaftState
 	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
+	RemovePeer(*pb.RemovePeerRequest) error
 	Start()
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.LogEntry
-	BootStrap()
 }
 
 type raft struct {
 	mutex  sync.Mutex
 	server Server
 	//TODO : Check if we need this or can work with from the object in Server interface
-	peers []*pb.Peer
+	peers map[string]*pb.Peer
 
 	// Persistent Raft state on all servers
 	currentTerm int64
@@ -91,6 +91,11 @@ func (r *raft) Stop() {
 		return
 	}
 	close(r.quit)
+
+	err := r.RemoveSelf()
+	if err != nil {
+		return
+	}
 	r.wg.Wait()
 
 	r.mutex.Lock()
@@ -108,7 +113,7 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 		triggerAEChan: make(chan struct{}, 1),
 		logger:        srv.Logger(),
 	}
-	r.peers = make([]*pb.Peer, 0)
+	r.peers = make(map[string]*pb.Peer)
 	r.state = Follower
 	r.votedFor = ""
 	r.commitIndex = -1
@@ -142,12 +147,9 @@ func (r *raft) Start() {
 		r.mutex.Lock()
 		r.electionResetEvent = time.Now()
 		r.mutex.Unlock()
-
 		r.runElectionTimer()
 		r.logger.Debug("runElectionTimer::NewRaft")
 	}()
-
-	r.logger.Info("Bootstrap Completed ...")
 }
 
 func (s RaftState) String() string {
@@ -173,19 +175,48 @@ func (r *raft) Server() Server {
 	return r.server
 }
 
-func (r *raft) Peers() []*pb.Peer {
+func (r *raft) Peers() map[string]*pb.Peer {
 	return r.peers
-}
-
-func (r *raft) BootStrap() {
-	//close(r.bootStrapWaitChan)
 }
 
 func (r *raft) AddPeer(newPeer *pb.Peer) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	r.peers = append(r.peers, newPeer)
+	r.peers[newPeer.Name] = newPeer
+	return nil
+}
+
+func (r *raft) RemovePeer(request *pb.RemovePeerRequest) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	r.logger.Debugf("[%s] RemovePeer: Received Name = %s; Address = %s; Port = %d;",
+		request.Id, request.GetPeer().Name, request.GetPeer().Address, request.GetPeer().Port)
+
+	delete(r.peers, request.GetPeer().Name)
+
+	return nil
+}
+
+func (r *raft) RemoveSelf() error {
+	for _, peer := range r.peers {
+		r.wg.Add(1)
+		go func(peer *pb.Peer) {
+			defer r.wg.Done()
+			args := pb.RemovePeerRequest{
+				Peer: r.Server().Self(),
+			}
+
+			resp, err := r.Server().Send(peer, "RPC.RemoveSelf", &args)
+			if err != nil {
+				r.logger.Errorf("failed to send RemoveSelf to %s, Error = %v", peer.Name, err)
+				return
+			}
+			_ = resp.(*pb.RemovePeerReply)
+
+		}(peer)
+	}
 	return nil
 }
 
@@ -508,7 +539,8 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	if r.state == Dead {
 		return reply, nil
 	}
-	r.logger.Debugf("[%s] [%s]  Received AppendEntries, current Term = %v", r.state, request.Id, r.currentTerm)
+	r.logger.Debugf("[%s] [%s]  Received AppendEntries, current Term = %v", r.state,
+		request.Id, r.currentTerm)
 
 	if request.Term > r.currentTerm {
 		r.logger.Debugf("[%s] [%s] request.Term = %v; currentTerm = %v; term out of date in AppendEntries",
@@ -540,15 +572,16 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 				newEntriesIndex++
 			}
 			if newEntriesIndex < len(request.Entries) {
-				r.logger.Debugf("[%s] [%s] inserting entries %v from index %d", r.state, request.Id,
-					request.Entries[newEntriesIndex:], logInsertIndex)
+				r.logger.Debugf("[%s] [%s] inserting entries %v from index %d", r.state,
+					request.Id, request.Entries[newEntriesIndex:], logInsertIndex)
 				r.log = append(r.log[:logInsertIndex], request.Entries[newEntriesIndex:]...)
 				r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, r.log)
 			}
 
 			if request.LeaderCommit > r.commitIndex {
 				r.commitIndex = intMin(request.LeaderCommit, int64(len(r.log)-1))
-				r.logger.Debugf("[%s] [%s] setting commitIndex=%d", r.state, request.Id, r.commitIndex)
+				r.logger.Debugf("[%s] [%s] setting commitIndex=%d", r.state,
+					request.Id, r.commitIndex)
 				r.newCommitReadyChan <- struct{}{}
 			}
 		} else {
