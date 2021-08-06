@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
@@ -17,14 +16,14 @@ func (suite *YadosTestSuite) TestAddNewMember() {
 	}
 }
 
-func (suite *YadosTestSuite) TestListMembers() {
+func (suite *YadosTestSuite) TestClusterStatus() {
 	for _, peer := range suite.cluster.members {
-		members, err := peer.ListMembers(context.Background(), &pb.ListMembersRequest{})
+		status, err := peer.ClusterStatus(context.Background(), &pb.ClusterStatusRequest{})
 		if err != nil {
 			suite.T().Error(err)
 		}
-		if len(members.Peers) != 3 {
-			suite.T().Errorf("Number of members mismatch Expected = 3, Actual = %d", len(members.Peers))
+		if len(status.PeerStatus) != 3 {
+			suite.T().Errorf("Number of members mismatch Expected = 3, Actual = %d", len(status.PeerStatus))
 		}
 	}
 }

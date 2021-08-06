@@ -23,7 +23,8 @@ type YadosServiceClient interface {
 	AppendEntries(ctx context.Context, in *AppendEntryRequest, opts ...grpc.CallOption) (*AppendEntryReply, error)
 	AddMember(ctx context.Context, in *NewPeerRequest, opts ...grpc.CallOption) (*NewPeerReply, error)
 	RemovePeer(ctx context.Context, in *RemovePeerRequest, opts ...grpc.CallOption) (*RemovePeerReply, error)
-	ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersReply, error)
+	PeerStatus(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusReply, error)
+	ClusterStatus(ctx context.Context, in *ClusterStatusRequest, opts ...grpc.CallOption) (*ClusterStatusReply, error)
 }
 
 type yadosServiceClient struct {
@@ -70,9 +71,18 @@ func (c *yadosServiceClient) RemovePeer(ctx context.Context, in *RemovePeerReque
 	return out, nil
 }
 
-func (c *yadosServiceClient) ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersReply, error) {
-	out := new(ListMembersReply)
-	err := c.cc.Invoke(ctx, "/YadosService/ListMembers", in, out, opts...)
+func (c *yadosServiceClient) PeerStatus(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusReply, error) {
+	out := new(StatusReply)
+	err := c.cc.Invoke(ctx, "/YadosService/PeerStatus", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yadosServiceClient) ClusterStatus(ctx context.Context, in *ClusterStatusRequest, opts ...grpc.CallOption) (*ClusterStatusReply, error) {
+	out := new(ClusterStatusReply)
+	err := c.cc.Invoke(ctx, "/YadosService/ClusterStatus", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +97,8 @@ type YadosServiceServer interface {
 	AppendEntries(context.Context, *AppendEntryRequest) (*AppendEntryReply, error)
 	AddMember(context.Context, *NewPeerRequest) (*NewPeerReply, error)
 	RemovePeer(context.Context, *RemovePeerRequest) (*RemovePeerReply, error)
-	ListMembers(context.Context, *ListMembersRequest) (*ListMembersReply, error)
+	PeerStatus(context.Context, *StatusRequest) (*StatusReply, error)
+	ClusterStatus(context.Context, *ClusterStatusRequest) (*ClusterStatusReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -107,8 +118,11 @@ func (UnimplementedYadosServiceServer) AddMember(context.Context, *NewPeerReques
 func (UnimplementedYadosServiceServer) RemovePeer(context.Context, *RemovePeerRequest) (*RemovePeerReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemovePeer not implemented")
 }
-func (UnimplementedYadosServiceServer) ListMembers(context.Context, *ListMembersRequest) (*ListMembersReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListMembers not implemented")
+func (UnimplementedYadosServiceServer) PeerStatus(context.Context, *StatusRequest) (*StatusReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PeerStatus not implemented")
+}
+func (UnimplementedYadosServiceServer) ClusterStatus(context.Context, *ClusterStatusRequest) (*ClusterStatusReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClusterStatus not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -195,20 +209,38 @@ func _YadosService_RemovePeer_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _YadosService_ListMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListMembersRequest)
+func _YadosService_PeerStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StatusRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(YadosServiceServer).ListMembers(ctx, in)
+		return srv.(YadosServiceServer).PeerStatus(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/YadosService/ListMembers",
+		FullMethod: "/YadosService/PeerStatus",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YadosServiceServer).ListMembers(ctx, req.(*ListMembersRequest))
+		return srv.(YadosServiceServer).PeerStatus(ctx, req.(*StatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _YadosService_ClusterStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClusterStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).ClusterStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/ClusterStatus",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).ClusterStatus(ctx, req.(*ClusterStatusRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -237,8 +269,12 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _YadosService_RemovePeer_Handler,
 		},
 		{
-			MethodName: "ListMembers",
-			Handler:    _YadosService_ListMembers_Handler,
+			MethodName: "PeerStatus",
+			Handler:    _YadosService_PeerStatus_Handler,
+		},
+		{
+			MethodName: "ClusterStatus",
+			Handler:    _YadosService_ClusterStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

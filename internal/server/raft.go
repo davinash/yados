@@ -23,12 +23,26 @@ type CommitEntry struct {
 	Term int64
 }
 
+//RaftState state of the raft instance
+type RaftState int
+
+const (
+	//Follower indicate follower state
+	Follower RaftState = iota
+	//Candidate indicate candidate state
+	Candidate
+	//Leader indicate leader state
+	Leader
+	//Dead indicate dead state
+	Dead
+)
+
 //Raft raft interface
 type Raft interface {
 	Server() Server
 	Peers() map[string]*pb.Peer
 	AddPeer(peer *pb.Peer) error
-	State() pb.Peer_RaftState
+	State() RaftState
 	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
 	RemovePeer(*pb.RemovePeerRequest) error
 	Start()
@@ -49,9 +63,9 @@ type raft struct {
 	votedFor    string
 
 	// Volatile Raft state on all servers
-	commitIndex int64
-	lastApplied int64
-	//state              pb.Peer_RaftState
+	commitIndex        int64
+	lastApplied        int64
+	state              RaftState
 	electionResetEvent time.Time
 
 	// Volatile Raft state on leaders
@@ -73,7 +87,7 @@ func (r *raft) Log() []*pb.LogEntry {
 
 func (r *raft) Stop() {
 	r.logger.Debug("Stopping Raft Instance")
-	if r.Server().Self().State == pb.Peer_Dead {
+	if r.state == Dead {
 		return
 	}
 	close(r.quit)
@@ -86,7 +100,7 @@ func (r *raft) Stop() {
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.Server().Self().State = pb.Peer_Dead
+	r.state = Dead
 
 	r.logger.Debug("Stopped Raft Instance")
 }
@@ -100,7 +114,7 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 		logger:        srv.Logger(),
 	}
 	r.peers = make(map[string]*pb.Peer)
-	r.Server().Self().State = pb.Peer_Follower
+	r.state = Follower
 	r.votedFor = ""
 	r.commitIndex = -1
 	r.lastApplied = -1
@@ -138,8 +152,23 @@ func (r *raft) Start() {
 	}()
 }
 
-func (r *raft) State() pb.Peer_RaftState {
-	return r.Server().Self().State
+func (s RaftState) String() string {
+	switch s {
+	case Follower:
+		return "Follower"
+	case Candidate:
+		return "Candidate"
+	case Leader:
+		return "Leader"
+	case Dead:
+		return "Dead"
+	default:
+		panic("unreachable")
+	}
+}
+
+func (r *raft) State() RaftState {
+	return r.state
 }
 
 func (r *raft) Server() Server {
@@ -219,8 +248,8 @@ func (r *raft) startOrIgnoreElection(termStarted int64, timeoutDuration time.Dur
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if r.Server().Self().State != pb.Peer_Candidate && r.Server().Self().State != pb.Peer_Follower {
-		r.logger.Tracef("in election timer state=%s, bailing out", r.Server().Self().State)
+	if r.state != Candidate && r.state != Follower {
+		r.logger.Tracef("in election timer state=%s, bailing out", r.state)
 		return
 	}
 
@@ -240,8 +269,8 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if r.Server().Self().State != pb.Peer_Candidate {
-		r.logger.Debugf("[%s] while waiting for reply, state = %v", reply.Id, r.Server().Self().State)
+	if r.state != Candidate {
+		r.logger.Debugf("[%s] while waiting for reply, state = %v", reply.Id, r.state)
 		return
 	}
 
@@ -263,7 +292,7 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 
 func (r *raft) startElection() {
 	// Make yourself candidate
-	r.Server().Self().State = pb.Peer_Candidate
+	r.state = Candidate
 	// Increase the current term
 	r.currentTerm++
 	savedCurrentTerm := r.currentTerm
@@ -319,7 +348,7 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if r.Server().Self().State == pb.Peer_Dead {
+	if r.state == Dead {
 		return EmptyVoteReply, nil
 	}
 	lastLogIndex, lastLogTerm := r.lastLogIndexAndTerm()
@@ -355,7 +384,7 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 }
 
 func (r *raft) startLeader() {
-	r.Server().Self().State = pb.Peer_Leader
+	r.state = Leader
 	for _, peer := range r.Peers() {
 		r.nextIndex[peer.Name] = int64(len(r.Log()))
 		r.matchIndex[peer.Name] = -1
@@ -395,7 +424,7 @@ func (r *raft) startLeader() {
 			}
 			if doSend {
 				r.mutex.Lock()
-				if r.Server().Self().State != pb.Peer_Leader {
+				if r.state != Leader {
 					r.mutex.Unlock()
 					return
 				}
@@ -452,7 +481,7 @@ func (r *raft) leaderSendAEs() {
 				r.becomeFollower(reply.Term)
 				return
 			}
-			if r.Server().Self().State == pb.Peer_Leader && savedCurrentTerm == reply.Term {
+			if r.state == Leader && savedCurrentTerm == reply.Term {
 				if reply.Success {
 					r.nextIndex[peer.Name] = ni + int64(len(entries))
 					r.matchIndex[peer.Name] = r.nextIndex[peer.Name] - 1
@@ -507,20 +536,20 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	reply := &pb.AppendEntryReply{Id: request.Id}
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	if r.Server().Self().State == pb.Peer_Dead {
+	if r.state == Dead {
 		return reply, nil
 	}
-	r.logger.Debugf("[%s] [%s]  Received AppendEntries, current Term = %v", r.Server().Self().State,
+	r.logger.Debugf("[%s] [%s]  Received AppendEntries, current Term = %v", r.state,
 		request.Id, r.currentTerm)
 
 	if request.Term > r.currentTerm {
 		r.logger.Debugf("[%s] [%s] request.Term = %v; currentTerm = %v; term out of date in AppendEntries",
-			r.Server().Self().State, request.Id, request.Term, r.currentTerm)
+			r.state, request.Id, request.Term, r.currentTerm)
 		r.becomeFollower(request.Term)
 	}
 
 	if request.Term == r.currentTerm {
-		if r.Server().Self().State != pb.Peer_Follower {
+		if r.state != Follower {
 			r.becomeFollower(request.Term)
 		}
 		r.electionResetEvent = time.Now()
@@ -543,15 +572,15 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 				newEntriesIndex++
 			}
 			if newEntriesIndex < len(request.Entries) {
-				r.logger.Debugf("[%s] [%s] inserting entries %v from index %d", r.Server().Self().State,
+				r.logger.Debugf("[%s] [%s] inserting entries %v from index %d", r.state,
 					request.Id, request.Entries[newEntriesIndex:], logInsertIndex)
 				r.log = append(r.log[:logInsertIndex], request.Entries[newEntriesIndex:]...)
-				r.logger.Debugf("[%s] [%s] log is now: %v", r.Server().Self().State, request.Id, r.log)
+				r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, r.log)
 			}
 
 			if request.LeaderCommit > r.commitIndex {
 				r.commitIndex = intMin(request.LeaderCommit, int64(len(r.log)-1))
-				r.logger.Debugf("[%s] [%s] setting commitIndex=%d", r.Server().Self().State,
+				r.logger.Debugf("[%s] [%s] setting commitIndex=%d", r.state,
 					request.Id, r.commitIndex)
 				r.newCommitReadyChan <- struct{}{}
 			}
@@ -576,13 +605,13 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	reply.Term = r.currentTerm
 	r.persistToStorage()
 	r.logger.Debugf("[%s] [%s] AppendEntries reply: Term = %v; ConflictTerm =%v; ConflictIndex =%v; Success =%v;",
-		r.Server().Self().State, request.Id, reply.Term, reply.ConflictTerm, reply.ConflictIndex, reply.Success)
+		r.state, request.Id, reply.Term, reply.ConflictTerm, reply.ConflictIndex, reply.Success)
 	return reply, nil
 }
 
 func (r *raft) becomeFollower(term int64) {
 	r.logger.Debugf("becomes Follower with term=%d; log=%v", term, r.log)
-	r.Server().Self().State = pb.Peer_Follower
+	r.state = Follower
 	r.currentTerm = term
 	r.votedFor = ""
 	r.electionResetEvent = time.Now()

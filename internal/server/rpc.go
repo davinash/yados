@@ -138,6 +138,15 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 			return nil, err
 		}
 		return reply, nil
+	case "RPC.PeerStatus":
+		request := args.(*pb.StatusRequest)
+		request.Id = uuid.New().String()
+		rpc.Server().Logger().Debugf("[%s] PeerStatus ", request.Id)
+		reply, err := rpcClient.PeerStatus(context.Background(), request)
+		if err != nil {
+			return nil, err
+		}
+		return reply, nil
 
 	default:
 		return nil, ErrorUnknownMethod

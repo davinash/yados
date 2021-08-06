@@ -55,17 +55,28 @@ func (srv *server) RemovePeer(ctx context.Context, request *pb.RemovePeerRequest
 	return EmptyRemovePeerReply, nil
 }
 
-func (srv *server) ListMembers(ctx context.Context, request *pb.ListMembersRequest) (*pb.ListMembersReply, error) {
-	srv.logger.Debugf("[%s] Received ListMembers", request.Id)
-	reply := &pb.ListMembersReply{Id: request.Id}
+func (srv *server) PeerStatus(ctx context.Context, request *pb.StatusRequest) (*pb.StatusReply, error) {
+	reply := &pb.StatusReply{Id: request.Id}
+	reply.Server = srv.Self()
+	reply.Status = srv.State().String()
+	return reply, nil
+}
 
-	peers := srv.Peers()
-	for _, p := range peers {
-		reply.Peers = append(reply.Peers, p)
+func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusRequest) (*pb.ClusterStatusReply, error) {
+	reply := &pb.ClusterStatusReply{Id: request.Id}
+	for _, peer := range srv.Peers() {
+		args := pb.StatusRequest{}
+		status, err := srv.Send(peer, "RPC.PeerStatus", &args)
+		if err != nil {
+			srv.logger.Errorf("failed to send PeerStatus to %s, Error = %v", peer.Name, err)
+			return reply, err
+		}
+		reply.PeerStatus = append(reply.PeerStatus, status.(*pb.StatusReply))
 	}
-	self := srv.Self()
-	self.State = srv.State()
-	reply.Peers = append(reply.Peers, self)
-
+	status, err := srv.PeerStatus(ctx, &pb.StatusRequest{})
+	if err != nil {
+		return nil, err
+	}
+	reply.PeerStatus = append(reply.PeerStatus, status)
 	return reply, nil
 }

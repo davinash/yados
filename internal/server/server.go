@@ -30,7 +30,7 @@ type Server interface {
 	Raft() Raft
 	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
 	Self() *pb.Peer
-	State() pb.Peer_RaftState
+	State() RaftState
 	LogDir() string
 	Store() Store
 }
@@ -171,7 +171,7 @@ func (srv *server) Self() *pb.Peer {
 	return srv.self
 }
 
-func (srv *server) State() pb.Peer_RaftState {
+func (srv *server) State() RaftState {
 	return srv.Raft().State()
 }
 

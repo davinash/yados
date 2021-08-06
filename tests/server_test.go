@@ -3,8 +3,6 @@ package tests
 import (
 	"time"
 
-	pb "github.com/davinash/yados/internal/proto/gen"
-
 	"github.com/davinash/yados/internal/server"
 )
 
@@ -15,7 +13,7 @@ func (suite *YadosTestSuite) TestServerLeaderElection() {
 	foundLeader := false
 	for {
 		for _, m := range suite.cluster.members {
-			if m.State() == pb.Peer_Leader {
+			if m.State() == server.Leader {
 				foundLeader = true
 				break
 			}
@@ -32,7 +30,7 @@ func (suite *YadosTestSuite) TestServerLeaderElectionWithWait() {
 	var leader server.Server
 	for {
 		for _, m := range suite.cluster.members {
-			if m.State() == pb.Peer_Leader {
+			if m.State() == server.Leader {
 				foundLeader = true
 				leader = m
 				break
@@ -48,7 +46,7 @@ func (suite *YadosTestSuite) TestServerLeaderElectionWithWait() {
 		suite.T().Log("Waiting and checking for Leader change if any ...")
 		for _, m := range suite.cluster.members {
 			if m.Name() == leader.Name() {
-				if m.State() != pb.Peer_Leader {
+				if m.State() != server.Leader {
 					suite.T().Error("Leader Change not expected")
 				}
 			}
@@ -69,7 +67,7 @@ func (suite *YadosTestSuite) TestServerNewLeader() {
 	var leader server.Server
 	for {
 		for _, m := range suite.cluster.members {
-			if m.State() == pb.Peer_Leader {
+			if m.State() == server.Leader {
 				foundLeader = true
 				leader = m
 				break
@@ -85,7 +83,7 @@ func (suite *YadosTestSuite) TestServerNewLeader() {
 		suite.T().Log("Waiting and checking for Leader change if any ...")
 		for _, m := range suite.cluster.members {
 			if m.Name() == leader.Name() {
-				if m.State() != pb.Peer_Leader {
+				if m.State() != server.Leader {
 					suite.T().Error("Leader Change not expected")
 				}
 			}
@@ -101,7 +99,7 @@ func (suite *YadosTestSuite) TestServerNewLeader() {
 	foundLeader = false
 	for {
 		for _, m := range suite.cluster.members {
-			if m.State() == pb.Peer_Leader {
+			if m.State() == server.Leader {
 				foundLeader = true
 				leader = m
 				break

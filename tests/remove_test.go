@@ -1,8 +1,6 @@
 package tests
 
-import (
-	pb "github.com/davinash/yados/internal/proto/gen"
-)
+import "github.com/davinash/yados/internal/server"
 
 func (suite *YadosTestSuite) TestRemoveServer() {
 	numOfServers := 7
@@ -26,7 +24,7 @@ func (suite *YadosTestSuite) TestRemoveServer() {
 	}
 	numOfPeers--
 	for _, peer := range suite.cluster.members {
-		if peer.State() == pb.Peer_Dead {
+		if peer.State() == server.Dead {
 			continue
 		}
 		if len(peer.Peers()) != numOfPeers {
