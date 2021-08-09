@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"sync"
 	"time"
@@ -49,6 +50,7 @@ type Raft interface {
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.LogEntry
+	Submit([]byte) error
 }
 
 type raft struct {
@@ -97,7 +99,6 @@ func (r *raft) Stop() {
 		return
 	}
 	r.wg.Wait()
-
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.state = Dead
@@ -222,6 +223,22 @@ func (r *raft) RemoveSelf() error {
 
 func (r *raft) electionTimeout() time.Duration {
 	return time.Duration(150+rand.Intn(150)) * time.Millisecond
+}
+
+//ErrorNotALeader error returned where no server leader
+var ErrorNotALeader = errors.New("now a leader")
+
+func (r *raft) Submit(command []byte) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if r.state != Leader {
+		return ErrorNotALeader
+	}
+	r.log = append(r.log, &pb.LogEntry{Command: command, Term: r.currentTerm})
+	r.persistToStorage()
+	r.triggerAEChan <- struct{}{}
+	return nil
 }
 
 func (r *raft) runElectionTimer() {
@@ -385,6 +402,9 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 
 func (r *raft) startLeader() {
 	r.state = Leader
+
+	r.Server().SetLeader(r.Server().Self())
+
 	for _, peer := range r.Peers() {
 		r.nextIndex[peer.Name] = int64(len(r.Log()))
 		r.matchIndex[peer.Name] = -1
@@ -459,7 +479,7 @@ func (r *raft) leaderSendAEs() {
 
 			request := pb.AppendEntryRequest{
 				Term:         savedCurrentTerm,
-				LeaderName:   r.Server().Name(),
+				Leader:       r.Server().Self(),
 				PrevLogIndex: prevLogIndex,
 				PrevLogTerm:  prevLogTerm,
 				Entries:      entries,
@@ -539,6 +559,8 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	if r.state == Dead {
 		return reply, nil
 	}
+	r.Server().SetLeader(request.Leader)
+
 	r.logger.Debugf("[%s] [%s]  Received AppendEntries, current Term = %v", r.state,
 		request.Id, r.currentTerm)
 
@@ -616,6 +638,8 @@ func (r *raft) becomeFollower(term int64) {
 	r.votedFor = ""
 	r.electionResetEvent = time.Now()
 
+	r.Server().SetLeader(nil)
+
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
@@ -637,7 +661,6 @@ func (r *raft) lastLogIndexAndTerm() (int64, int64) {
 }
 
 func (r *raft) persistToStorage() {
-
 }
 
 func intMin(a, b int64) int64 {

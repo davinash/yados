@@ -34,6 +34,9 @@ type Server interface {
 	LogDir() string
 	PLog() PLog
 	StoreCreate(request *pb.StoreCreateRequest) error
+	IsLeader() bool
+	Leader() *pb.Peer
+	SetLeader(leader *pb.Peer)
 }
 
 type server struct {
@@ -47,6 +50,7 @@ type server struct {
 	logDir    string
 	pLog      PLog
 	stores    map[string]Store
+	leader    *pb.Peer
 }
 
 //NewServerArgs argument structure for new server
@@ -184,6 +188,18 @@ func (srv *server) State() RaftState {
 
 func (srv *server) PLog() PLog {
 	return srv.pLog
+}
+
+func (srv *server) IsLeader() bool {
+	return srv.State() == Leader
+}
+
+func (srv *server) Leader() *pb.Peer {
+	return srv.leader
+}
+
+func (srv *server) SetLeader(leader *pb.Peer) {
+	srv.leader = leader
 }
 
 func (srv *server) SetLogLevel(level string) {

@@ -3,8 +3,12 @@ package server
 import (
 	"context"
 	"errors"
+	"log"
+
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -87,16 +91,31 @@ func (srv *server) CreateStoreOnPeer(ctx context.Context, request *pb.StoreCreat
 
 func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
 	reply := &pb.StoreCreateReply{}
-	for _, peer := range srv.Peers() {
-		_, err := srv.Send(peer, "RPC.CreateStoreOnPeer", request)
+
+	if srv.IsLeader() {
+		requestBytes, err := proto.Marshal(request)
 		if err != nil {
-			srv.logger.Errorf("failed to send CreateStore to %s, Error = %v", peer.Name, err)
-			return reply, err
+			return nil, err
+		}
+		err = srv.Raft().Submit(requestBytes)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		peerConn, rpcClient, err := GetPeerConn(srv.leader.Address, srv.leader.Port)
+		if err != nil {
+			return reply, nil
+		}
+		defer func(peerConn *grpc.ClientConn) {
+			err := peerConn.Close()
+			if err != nil {
+				log.Printf("failed to close the connection, error = %v\n", err)
+			}
+		}(peerConn)
+		_, err = rpcClient.CreateStore(context.Background(), request)
+		if err != nil {
+			return reply, nil
 		}
 	}
-	_, err := srv.CreateStoreOnPeer(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-	return reply, nil
+	return nil, nil
 }

@@ -10,19 +10,7 @@ func (suite *YadosTestSuite) TestServerStartStop() {
 }
 
 func (suite *YadosTestSuite) TestServerLeaderElection() {
-	foundLeader := false
-	for {
-		for _, m := range suite.cluster.members {
-			if m.State() == server.Leader {
-				foundLeader = true
-				break
-			}
-		}
-		if foundLeader {
-			break
-		}
-		time.Sleep(150 * time.Millisecond)
-	}
+	suite.WaitForLeaderElection()
 }
 
 func (suite *YadosTestSuite) TestServerLeaderElectionWithWait() {

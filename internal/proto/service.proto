@@ -16,20 +16,17 @@ message VoteReply {
   int64 Term = 4;
 }
 
-message Command {
-
-}
 
 message LogEntry {
   int64 Term = 1;
   int64 Index = 2;
-  Command Command = 3;
+  bytes Command = 3;
 }
 
 message AppendEntryRequest {
   string Id = 1;
   int64 Term = 2;
-  string LeaderName = 3;
+  Peer Leader = 3;
   int64 PrevLogIndex = 4;
   int64 PrevLogTerm = 5;
   repeated LogEntry Entries = 6;

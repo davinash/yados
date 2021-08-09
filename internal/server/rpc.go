@@ -121,7 +121,7 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 
 		rpc.Server().Logger().Debugf("[%s] AppendEntries ( -> %s ) : nextIndex = %d Term = %v; LeaderName = "+
 			"%v; PrevLogTerm = %v; PrevLogIndex = %v; LeaderCommit = %v", request.Id,
-			peer.Name, request.NextIndex, request.Term, request.LeaderName, request.PrevLogTerm,
+			peer.Name, request.NextIndex, request.Term, request.Leader.Name, request.PrevLogTerm,
 			request.PrevLogIndex, request.LeaderCommit)
 
 		reply, err := rpcClient.AppendEntries(context.Background(), request)

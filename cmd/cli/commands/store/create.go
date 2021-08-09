@@ -35,7 +35,7 @@ func CreateCommand(rootCmd *cobra.Command) {
 				}
 			}(peerConn)
 
-			arg := &pb.StoreCreateRequest{}
+			arg := &pb.StoreCreateRequest{Name: arg.name}
 			_, err = rpcClient.CreateStore(context.Background(), arg)
 			if err != nil {
 				return err

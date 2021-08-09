@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
@@ -131,6 +132,22 @@ func (suite *YadosTestSuite) SetupTest() {
 	err = suite.CreateNewCluster(3)
 	if err != nil {
 		suite.T().Error(err)
+	}
+}
+
+func (suite *YadosTestSuite) WaitForLeaderElection() {
+	foundLeader := false
+	for {
+		for _, m := range suite.cluster.members {
+			if m.State() == server.Leader {
+				foundLeader = true
+				break
+			}
+		}
+		if foundLeader {
+			break
+		}
+		time.Sleep(150 * time.Millisecond)
 	}
 }
 
