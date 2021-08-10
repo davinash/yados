@@ -93,15 +93,18 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 	reply := &pb.StoreCreateReply{}
 
 	if srv.IsLeader() {
+		srv.Logger().Debug("yay this is leader")
 		requestBytes, err := proto.Marshal(request)
 		if err != nil {
-			return nil, err
+			return reply, err
 		}
+		srv.logger.Debug("submitting request to raft engine")
 		err = srv.Raft().Submit(requestBytes)
 		if err != nil {
-			return nil, err
+			return reply, err
 		}
 	} else {
+		srv.Logger().Debugf("not a leader, hoping request to %s:%d", srv.leader.Address, srv.leader.Port)
 		peerConn, rpcClient, err := GetPeerConn(srv.leader.Address, srv.leader.Port)
 		if err != nil {
 			return reply, nil
@@ -117,5 +120,5 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 			return reply, nil
 		}
 	}
-	return nil, nil
+	return reply, nil
 }

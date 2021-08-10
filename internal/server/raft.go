@@ -229,6 +229,7 @@ func (r *raft) electionTimeout() time.Duration {
 var ErrorNotALeader = errors.New("now a leader")
 
 func (r *raft) Submit(command []byte) error {
+	r.logger.Debug("Entering Submit")
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -238,6 +239,7 @@ func (r *raft) Submit(command []byte) error {
 	r.log = append(r.log, &pb.LogEntry{Command: command, Term: r.currentTerm})
 	r.persistToStorage()
 	r.triggerAEChan <- struct{}{}
+	r.logger.Debug("Exiting Submit")
 	return nil
 }
 
@@ -344,7 +346,6 @@ func (r *raft) startElection() {
 			r.logger.Debugf("[%s] received RequestVoteReply (%+v, %v)", reply.Id, reply.Term, reply.VoteGranted)
 
 			r.processVotingReply(reply, &votesReceived, &savedCurrentTerm)
-
 		}(peer)
 	}
 	// Run another election timer, in case this election is not successful.
@@ -455,6 +456,90 @@ func (r *raft) startLeader() {
 	}(50 * time.Millisecond)
 }
 
+func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb.Peer, ni int64, entries []*pb.LogEntry) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	reply := resp.(*pb.AppendEntryReply)
+	if reply.Term > savedCurrentTerm {
+		r.logger.Debugf("[%s] Reply.Term = %v; SavedCurrentTerm = %v; term out of date in heartbeat reply",
+			reply.Id, reply.Term, savedCurrentTerm)
+		r.becomeFollower(reply.Term)
+		return
+	}
+	if r.state == Leader && savedCurrentTerm == reply.Term {
+		if reply.Success {
+			r.nextIndex[peer.Name] = ni + int64(len(entries))
+			r.matchIndex[peer.Name] = r.nextIndex[peer.Name] - 1
+			savedCommitIndex := r.commitIndex
+			for i := r.commitIndex + 1; i < int64(len(r.log)); i++ {
+				if r.log[i].Term == r.currentTerm {
+					matchCount := 1
+					for _, p := range r.Peers() {
+						if r.matchIndex[p.Name] >= i {
+							matchCount++
+						}
+					}
+					if matchCount*2 > len(r.Peers())+1 {
+						r.commitIndex = i
+					}
+				}
+			}
+			r.logger.Debugf("[%s] AppendEntries reply from %s success: nextIndex := %v, "+
+				"matchIndex := %v; commitIndex := %d", reply.Id, peer.Name, r.nextIndex, r.matchIndex, r.commitIndex)
+			if r.commitIndex != savedCommitIndex {
+				r.logger.Debugf("[%s] leader sets commitIndex := %d", reply.Id, r.commitIndex)
+				r.newCommitReadyChan <- struct{}{}
+				r.triggerAEChan <- struct{}{}
+			}
+		} else {
+			if reply.ConflictTerm >= 0 {
+				var lastIndexOfTerm int64
+				lastIndexOfTerm = -1
+				for i := len(r.log) - 1; i >= 0; i-- {
+					if r.log[i].Term == reply.ConflictTerm {
+						lastIndexOfTerm = int64(i)
+						break
+					}
+				}
+				if lastIndexOfTerm >= 0 {
+					r.nextIndex[peer.Name] = lastIndexOfTerm + 1
+				} else {
+					r.nextIndex[peer.Name] = reply.ConflictIndex
+				}
+			} else {
+				r.nextIndex[peer.Name] = reply.ConflictIndex
+			}
+			r.logger.Debugf("[%s] AppendEntries reply from %s !success: nextIndex := %d",
+				reply.Id, peer.Name, ni-1)
+		}
+	}
+}
+
+func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64) (*pb.AppendEntryRequest, int64, []*pb.LogEntry) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	nextIndex := r.nextIndex[peer.Name]
+	var prevLogTerm, prevLogIndex int64
+	prevLogIndex = nextIndex - 1
+	prevLogTerm = -1
+	if prevLogIndex >= 0 {
+		prevLogTerm = r.log[prevLogIndex].Term
+	}
+	entries := r.log[nextIndex:]
+
+	request := pb.AppendEntryRequest{
+		Term:         savedCurrentTerm,
+		Leader:       r.Server().Self(),
+		PrevLogIndex: prevLogIndex,
+		PrevLogTerm:  prevLogTerm,
+		Entries:      entries,
+		LeaderCommit: r.commitIndex,
+		NextIndex:    nextIndex,
+	}
+	return &request, nextIndex, entries
+}
+
 func (r *raft) leaderSendAEs() {
 	r.mutex.Lock()
 	savedCurrentTerm := r.currentTerm
@@ -465,89 +550,14 @@ func (r *raft) leaderSendAEs() {
 		go func(peer *pb.Peer) {
 			defer r.wg.Done()
 
-			r.mutex.Lock()
-			ni := r.nextIndex[peer.Name]
+			request, nextIndex, entries := r.createAERequest(peer, savedCurrentTerm)
 
-			var prevLogTerm, prevLogIndex int64
-			prevLogIndex = ni - 1
-
-			prevLogTerm = -1
-			if prevLogIndex >= 0 {
-				prevLogTerm = r.log[prevLogIndex].Term
-			}
-			entries := r.log[ni:]
-
-			request := pb.AppendEntryRequest{
-				Term:         savedCurrentTerm,
-				Leader:       r.Server().Self(),
-				PrevLogIndex: prevLogIndex,
-				PrevLogTerm:  prevLogTerm,
-				Entries:      entries,
-				LeaderCommit: r.commitIndex,
-				NextIndex:    ni,
-			}
-			r.mutex.Unlock()
-			resp, err := r.Server().Send(peer, "RPC.AppendEntries", &request)
+			resp, err := r.Server().Send(peer, "RPC.AppendEntries", request)
 			if err != nil {
 				r.logger.Errorf("[%s] Sending AppendEntries failed, Error = %v", request.Id, err)
 				return
 			}
-			r.mutex.Lock()
-			defer r.mutex.Unlock()
-			reply := resp.(*pb.AppendEntryReply)
-			if reply.Term > savedCurrentTerm {
-				r.logger.Debugf("[%s] Reply.Term = %v; SavedCurrentTerm = %v; term out of date in heartbeat reply",
-					reply.Id, reply.Term, savedCurrentTerm)
-				r.becomeFollower(reply.Term)
-				return
-			}
-			if r.state == Leader && savedCurrentTerm == reply.Term {
-				if reply.Success {
-					r.nextIndex[peer.Name] = ni + int64(len(entries))
-					r.matchIndex[peer.Name] = r.nextIndex[peer.Name] - 1
-					savedCommitIndex := r.commitIndex
-					for i := r.commitIndex + 1; i < int64(len(r.log)); i++ {
-						if r.log[i].Term == r.currentTerm {
-							matchCount := 1
-							for _, p := range r.Peers() {
-								if r.matchIndex[p.Name] >= i {
-									matchCount++
-								}
-							}
-							if matchCount*2 > len(r.Peers())+1 {
-								r.commitIndex = i
-							}
-						}
-					}
-					r.logger.Debugf("[%s] AppendEntries reply from %s success: nextIndex := %v, "+
-						"matchIndex := %v; commitIndex := %d", reply.Id, peer.Name, r.nextIndex, r.matchIndex, r.commitIndex)
-					if r.commitIndex != savedCommitIndex {
-						r.logger.Debugf("[%s] leader sets commitIndex := %d", reply.Id, r.commitIndex)
-						r.newCommitReadyChan <- struct{}{}
-						r.triggerAEChan <- struct{}{}
-					}
-				} else {
-					if reply.ConflictTerm >= 0 {
-						var lastIndexOfTerm int64
-						lastIndexOfTerm = -1
-						for i := len(r.log) - 1; i >= 0; i-- {
-							if r.log[i].Term == reply.ConflictTerm {
-								lastIndexOfTerm = int64(i)
-								break
-							}
-						}
-						if lastIndexOfTerm >= 0 {
-							r.nextIndex[peer.Name] = lastIndexOfTerm + 1
-						} else {
-							r.nextIndex[peer.Name] = reply.ConflictIndex
-						}
-					} else {
-						r.nextIndex[peer.Name] = reply.ConflictIndex
-					}
-					r.logger.Debugf("[%s] AppendEntries reply from %s !success: nextIndex := %d",
-						reply.Id, peer.Name, ni-1)
-				}
-			}
+			r.processAEReply(resp, savedCurrentTerm, peer, nextIndex, entries)
 		}(peer)
 	}
 }

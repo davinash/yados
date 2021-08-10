@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"log"
+	"time"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
@@ -29,4 +30,5 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 	if err != nil {
 		suite.T().Error(err)
 	}
+	time.Sleep(10 * time.Second)
 }
