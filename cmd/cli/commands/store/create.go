@@ -4,6 +4,9 @@ import (
 	"context"
 	"log"
 
+	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
@@ -12,9 +15,39 @@ import (
 
 //CreateCommandArgs argument structure for this command
 type CreateCommandArgs struct {
-	address string
-	port    int32
-	name    string
+	Address string
+	Port    int32
+	Name    string
+}
+
+//CreateCommandExecute helper function to executed create store command
+func CreateCommandExecute(arg *CreateCommandArgs) error {
+	peerConn, rpcClient, err := server.GetPeerConn(arg.Address, arg.Port)
+	if err != nil {
+		return err
+	}
+	defer func(peerConn *grpc.ClientConn) {
+		err := peerConn.Close()
+		if err != nil {
+			log.Printf("failed to close the connection, error = %v\n", err)
+		}
+	}(peerConn)
+
+	args := &pb.StoreCreateRequest{Name: arg.Name}
+	marshal, err := proto.Marshal(args)
+	if err != nil {
+		return err
+	}
+
+	_, err = rpcClient.RunCommand(context.Background(), &pb.CommandRequest{
+		Id:      uuid.New().String(),
+		Args:    marshal,
+		CmdType: pb.CommandRequest_CreateStore,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 //CreateCommand PLog create command
@@ -24,29 +57,13 @@ func CreateCommand(rootCmd *cobra.Command) {
 		Use:   "create",
 		Short: "create new store",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			peerConn, rpcClient, err := server.GetPeerConn(arg.address, arg.port)
-			if err != nil {
-				return err
-			}
-			defer func(peerConn *grpc.ClientConn) {
-				err := peerConn.Close()
-				if err != nil {
-					log.Printf("failed to close the connection, error = %v\n", err)
-				}
-			}(peerConn)
-
-			arg := &pb.StoreCreateRequest{Name: arg.name}
-			_, err = rpcClient.CreateStore(context.Background(), arg)
-			if err != nil {
-				return err
-			}
-			return nil
+			return CreateCommandExecute(&arg)
 		},
 	}
-	cmd.Flags().StringVar(&arg.address, "address", "127.0.0.1", "Server to connect in the cluster")
-	cmd.Flags().Int32Var(&arg.port, "port", 9191, "Port to use for communication")
+	cmd.Flags().StringVar(&arg.Address, "Address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().Int32Var(&arg.Port, "port", 9191, "Port to use for communication")
 
-	cmd.Flags().StringVar(&arg.name, "name", "", "Name of the store to create")
+	cmd.Flags().StringVar(&arg.Name, "name", "", "Name of the store to create")
 	err := cmd.MarkFlagRequired("name")
 	if err != nil {
 		panic(err)

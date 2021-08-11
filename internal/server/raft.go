@@ -50,7 +50,9 @@ type Raft interface {
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.LogEntry
-	Submit([]byte) error
+	Submit([]byte, string) error
+	AddCommandListener(string) error
+	WaitForCommandCompletion(string)
 }
 
 type raft struct {
@@ -74,7 +76,8 @@ type raft struct {
 	nextIndex  map[string]int64
 	matchIndex map[string]int64
 
-	triggerAEChan chan struct{}
+	triggerAEChan  chan struct{}
+	commitsChanMap map[string]chan struct{}
 
 	quit chan interface{}
 	wg   sync.WaitGroup
@@ -122,6 +125,7 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 	r.nextIndex = make(map[string]int64)
 	r.matchIndex = make(map[string]int64)
 	r.newCommitReadyChan = make(chan struct{}, 16)
+	r.commitsChanMap = make(map[string]chan struct{})
 
 	for _, p := range peers {
 		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
@@ -151,6 +155,7 @@ func (r *raft) Start() {
 		r.runElectionTimer()
 		r.logger.Debug("runElectionTimer::NewRaft")
 	}()
+	go r.commitChanSender()
 }
 
 func (s RaftState) String() string {
@@ -178,6 +183,19 @@ func (r *raft) Server() Server {
 
 func (r *raft) Peers() map[string]*pb.Peer {
 	return r.peers
+}
+
+func (r *raft) AddCommandListener(id string) error {
+	r.logger.Debugf("adding command listener for %s", id)
+	r.commitsChanMap[id] = make(chan struct{})
+	return nil
+}
+
+func (r *raft) WaitForCommandCompletion(id string) {
+	r.logger.Debugf("WaitForCommandCompletion for %s", id)
+	if v, ok := r.commitsChanMap[id]; ok {
+		<-v
+	}
 }
 
 func (r *raft) AddPeer(newPeer *pb.Peer) error {
@@ -228,7 +246,7 @@ func (r *raft) electionTimeout() time.Duration {
 //ErrorNotALeader error returned where no server leader
 var ErrorNotALeader = errors.New("now a leader")
 
-func (r *raft) Submit(command []byte) error {
+func (r *raft) Submit(command []byte, commandID string) error {
 	r.logger.Debug("Entering Submit")
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -236,7 +254,11 @@ func (r *raft) Submit(command []byte) error {
 	if r.state != Leader {
 		return ErrorNotALeader
 	}
-	r.log = append(r.log, &pb.LogEntry{Command: command, Term: r.currentTerm})
+	r.log = append(r.log, &pb.LogEntry{
+		Command:   command,
+		Term:      r.currentTerm,
+		CommandId: commandID,
+	})
 	r.persistToStorage()
 	r.triggerAEChan <- struct{}{}
 	r.logger.Debug("Exiting Submit")
@@ -656,6 +678,29 @@ func (r *raft) becomeFollower(term int64) {
 		r.runElectionTimer()
 		r.logger.Debug("runElectionTimer::becomeFollower")
 	}()
+}
+
+func (r *raft) commitChanSender() {
+	for range r.newCommitReadyChan {
+		// Find which entries we have to apply.
+		r.mutex.Lock()
+		//savedTerm := r.currentTerm
+		savedLastApplied := r.lastApplied
+		var entries []*pb.LogEntry
+		if r.commitIndex > r.lastApplied {
+			entries = r.log[r.lastApplied+1 : r.commitIndex+1]
+			r.lastApplied = r.commitIndex
+		}
+		r.mutex.Unlock()
+		r.logger.Debugf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
+
+		for _, entry := range entries {
+			if c, ok := r.commitsChanMap[entry.CommandId]; ok {
+				close(c)
+			}
+		}
+	}
+	r.logger.Debug("commitChanSender done")
 }
 
 func (r *raft) lastLogIndexAndTerm() (int64, int64) {

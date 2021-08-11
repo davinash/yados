@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"log"
-
-	"google.golang.org/protobuf/proto"
+	"sync"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -99,10 +99,25 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 			return reply, err
 		}
 		srv.logger.Debug("submitting request to raft engine")
-		err = srv.Raft().Submit(requestBytes)
+
+		err = srv.Raft().AddCommandListener(request.Id)
 		if err != nil {
 			return reply, err
 		}
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			srv.Raft().WaitForCommandCompletion(request.Id)
+		}()
+
+		err = srv.Raft().Submit(requestBytes, request.Id)
+		if err != nil {
+			return reply, err
+		}
+		wg.Wait()
+
 	} else {
 		srv.Logger().Debugf("not a leader, hoping request to %s:%d", srv.leader.Address, srv.leader.Port)
 		peerConn, rpcClient, err := GetPeerConn(srv.leader.Address, srv.leader.Port)
@@ -119,6 +134,38 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 		if err != nil {
 			return reply, nil
 		}
+	}
+	return reply, nil
+}
+
+func (srv *server) RunCommand(ctx context.Context, command *pb.CommandRequest) (*pb.CommandReply, error) {
+	reply := &pb.CommandReply{}
+	switch command.CmdType {
+	case pb.CommandRequest_CreateStore:
+		var request pb.StoreCreateRequest
+		err := proto.Unmarshal(command.Args, &request)
+		if err != nil {
+			return reply, err
+		}
+		request.Id = command.Id
+
+		//err = srv.Raft().AddCommandListener(command.Id)
+		//if err != nil {
+		//	return nil, err
+		//}
+		//
+		//wg := sync.WaitGroup{}
+		//wg.Add(1)
+		//go func() {
+		//	defer wg.Done()
+		//	srv.Raft().WaitForCommandCompletion(command.Id)
+		//}()
+
+		_, err = srv.CreateStore(ctx, &request)
+		if err != nil {
+			return reply, err
+		}
+		//wg.Wait()
 	}
 	return reply, nil
 }

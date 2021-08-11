@@ -21,6 +21,7 @@ message LogEntry {
   int64 Term = 1;
   int64 Index = 2;
   bytes Command = 3;
+  string CommandId = 4;
 }
 
 message AppendEntryRequest {
@@ -102,6 +103,19 @@ message StoreCreateReply {
   string Id = 1;
 }
 
+message CommandRequest {
+  string Id = 1;
+  bytes Args = 2;
+  enum CommandTypes {
+    CreateStore = 0;
+  }
+  CommandTypes CmdType = 3;
+}
+
+message CommandReply {
+  string Id = 1;
+}
+
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
   rpc AppendEntries(AppendEntryRequest) returns (AppendEntryReply) {}
@@ -111,4 +125,5 @@ service YadosService {
   rpc ClusterStatus(ClusterStatusRequest) returns (ClusterStatusReply) {}
   rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
   rpc CreateStoreOnPeer(StoreCreateRequest) returns (StoreCreateReply) {}
+  rpc RunCommand(CommandRequest) returns ( CommandReply){}
 }

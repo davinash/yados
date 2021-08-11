@@ -27,6 +27,7 @@ type YadosServiceClient interface {
 	ClusterStatus(ctx context.Context, in *ClusterStatusRequest, opts ...grpc.CallOption) (*ClusterStatusReply, error)
 	CreateStore(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error)
 	CreateStoreOnPeer(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error)
+	RunCommand(ctx context.Context, in *CommandRequest, opts ...grpc.CallOption) (*CommandReply, error)
 }
 
 type yadosServiceClient struct {
@@ -109,6 +110,15 @@ func (c *yadosServiceClient) CreateStoreOnPeer(ctx context.Context, in *StoreCre
 	return out, nil
 }
 
+func (c *yadosServiceClient) RunCommand(ctx context.Context, in *CommandRequest, opts ...grpc.CallOption) (*CommandReply, error) {
+	out := new(CommandReply)
+	err := c.cc.Invoke(ctx, "/YadosService/RunCommand", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
@@ -121,6 +131,7 @@ type YadosServiceServer interface {
 	ClusterStatus(context.Context, *ClusterStatusRequest) (*ClusterStatusReply, error)
 	CreateStore(context.Context, *StoreCreateRequest) (*StoreCreateReply, error)
 	CreateStoreOnPeer(context.Context, *StoreCreateRequest) (*StoreCreateReply, error)
+	RunCommand(context.Context, *CommandRequest) (*CommandReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -151,6 +162,9 @@ func (UnimplementedYadosServiceServer) CreateStore(context.Context, *StoreCreate
 }
 func (UnimplementedYadosServiceServer) CreateStoreOnPeer(context.Context, *StoreCreateRequest) (*StoreCreateReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStoreOnPeer not implemented")
+}
+func (UnimplementedYadosServiceServer) RunCommand(context.Context, *CommandRequest) (*CommandReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RunCommand not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -309,6 +323,24 @@ func _YadosService_CreateStoreOnPeer_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_RunCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).RunCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/RunCommand",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).RunCommand(ctx, req.(*CommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -347,6 +379,10 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateStoreOnPeer",
 			Handler:    _YadosService_CreateStoreOnPeer_Handler,
+		},
+		{
+			MethodName: "RunCommand",
+			Handler:    _YadosService_RunCommand_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
