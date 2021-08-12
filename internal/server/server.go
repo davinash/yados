@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/sirupsen/logrus"
 	easy "github.com/t-tomalak/logrus-easy-formatter"
 
@@ -37,6 +39,8 @@ type Server interface {
 	IsLeader() bool
 	Leader() *pb.Peer
 	SetLeader(leader *pb.Peer)
+	Apply(entry *pb.LogEntry) error
+	Stores() map[string]Store
 }
 
 type server struct {
@@ -134,7 +138,29 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 	return nil
 }
 
+//ErrorStoreAlreadyExists error if store with this name already exists
+var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
+
 func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
+	if _, ok := srv.Stores()[request.Name]; ok {
+		return ErrorStoreAlreadyExists
+	}
+	return nil
+}
+
+func (srv *server) Apply(entry *pb.LogEntry) error {
+	switch entry.CmdType {
+	case pb.CommandType_CreateStore:
+		var scr pb.StoreCreateRequest
+		err := proto.Unmarshal(entry.Command, &scr)
+		if err != nil {
+			return err
+		}
+		err = srv.StoreCreate(&scr)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -200,6 +226,10 @@ func (srv *server) Leader() *pb.Peer {
 
 func (srv *server) SetLeader(leader *pb.Peer) {
 	srv.leader = leader
+}
+
+func (srv *server) Stores() map[string]Store {
+	return srv.stores
 }
 
 func (srv *server) SetLogLevel(level string) {

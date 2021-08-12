@@ -1,6 +1,11 @@
 syntax = "proto3";
 option go_package = "/gen";
 
+
+enum CommandType {
+  CreateStore = 0;
+}
+
 message VoteRequest {
   string Id = 1;
   int64 Term = 2;
@@ -22,6 +27,7 @@ message LogEntry {
   int64 Index = 2;
   bytes Command = 3;
   string CommandId = 4;
+  CommandType CmdType = 5;
 }
 
 message AppendEntryRequest {
@@ -106,10 +112,7 @@ message StoreCreateReply {
 message CommandRequest {
   string Id = 1;
   bytes Args = 2;
-  enum CommandTypes {
-    CreateStore = 0;
-  }
-  CommandTypes CmdType = 3;
+  CommandType CmdType = 3;
 }
 
 message CommandReply {
@@ -124,6 +127,5 @@ service YadosService {
   rpc PeerStatus(StatusRequest) returns (StatusReply) {}
   rpc ClusterStatus(ClusterStatusRequest) returns (ClusterStatusReply) {}
   rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
-  rpc CreateStoreOnPeer(StoreCreateRequest) returns (StoreCreateReply) {}
-  rpc RunCommand(CommandRequest) returns ( CommandReply){}
+  rpc RunCommand(CommandRequest) returns (CommandReply){}
 }

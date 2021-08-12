@@ -42,7 +42,7 @@ func CreateCommandExecute(arg *CreateCommandArgs) error {
 	_, err = rpcClient.RunCommand(context.Background(), &pb.CommandRequest{
 		Id:      uuid.New().String(),
 		Args:    marshal,
-		CmdType: pb.CommandRequest_CreateStore,
+		CmdType: pb.CommandType_CreateStore,
 	})
 	if err != nil {
 		return err

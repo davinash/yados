@@ -50,9 +50,9 @@ type Raft interface {
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.LogEntry
-	Submit([]byte, string) error
+	Submit([]byte, string, pb.CommandType) error
 	AddCommandListener(string) error
-	WaitForCommandCompletion(string)
+	WaitForCommandCompletion([]byte, string, pb.CommandType)
 }
 
 type raft struct {
@@ -191,7 +191,7 @@ func (r *raft) AddCommandListener(id string) error {
 	return nil
 }
 
-func (r *raft) WaitForCommandCompletion(id string) {
+func (r *raft) WaitForCommandCompletion(requestBytes []byte, id string, cmdType pb.CommandType) {
 	r.logger.Debugf("WaitForCommandCompletion for %s", id)
 	if v, ok := r.commitsChanMap[id]; ok {
 		<-v
@@ -246,8 +246,9 @@ func (r *raft) electionTimeout() time.Duration {
 //ErrorNotALeader error returned where no server leader
 var ErrorNotALeader = errors.New("now a leader")
 
-func (r *raft) Submit(command []byte, commandID string) error {
+func (r *raft) Submit(command []byte, commandID string, cmdType pb.CommandType) error {
 	r.logger.Debug("Entering Submit")
+
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -258,8 +259,10 @@ func (r *raft) Submit(command []byte, commandID string) error {
 		Command:   command,
 		Term:      r.currentTerm,
 		CommandId: commandID,
+		CmdType:   cmdType,
 	})
 	r.persistToStorage()
+
 	r.triggerAEChan <- struct{}{}
 	r.logger.Debug("Exiting Submit")
 	return nil
@@ -680,11 +683,21 @@ func (r *raft) becomeFollower(term int64) {
 	}()
 }
 
+func (r *raft) postProcessCommittedEntry(entry *pb.LogEntry) error {
+	err := r.Server().Apply(entry)
+	if err != nil {
+		return err
+	}
+	if c, ok := r.commitsChanMap[entry.CommandId]; ok {
+		close(c)
+	}
+	return nil
+}
+
 func (r *raft) commitChanSender() {
 	for range r.newCommitReadyChan {
 		// Find which entries we have to apply.
 		r.mutex.Lock()
-		//savedTerm := r.currentTerm
 		savedLastApplied := r.lastApplied
 		var entries []*pb.LogEntry
 		if r.commitIndex > r.lastApplied {
@@ -692,11 +705,13 @@ func (r *raft) commitChanSender() {
 			r.lastApplied = r.commitIndex
 		}
 		r.mutex.Unlock()
+
 		r.logger.Debugf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
 
 		for _, entry := range entries {
-			if c, ok := r.commitsChanMap[entry.CommandId]; ok {
-				close(c)
+			err := r.postProcessCommittedEntry(entry)
+			if err != nil {
+				return
 			}
 		}
 	}
