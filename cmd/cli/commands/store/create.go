@@ -21,8 +21,8 @@ type CreateCommandArgs struct {
 }
 
 //CreateCommandExecute helper function to executed create store command
-func CreateCommandExecute(arg *CreateCommandArgs) error {
-	peerConn, rpcClient, err := server.GetPeerConn(arg.Address, arg.Port)
+func CreateCommandExecute(args *CreateCommandArgs) error {
+	peerConn, rpcClient, err := server.GetPeerConn(args.Address, args.Port)
 	if err != nil {
 		return err
 	}
@@ -33,8 +33,8 @@ func CreateCommandExecute(arg *CreateCommandArgs) error {
 		}
 	}(peerConn)
 
-	args := &pb.StoreCreateRequest{Name: arg.Name}
-	marshal, err := proto.Marshal(args)
+	req := &pb.StoreCreateRequest{Name: args.Name}
+	marshal, err := proto.Marshal(req)
 	if err != nil {
 		return err
 	}

@@ -147,6 +147,80 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 	return reply, nil
 }
 
+//ErrorStoreDoesExists error if store does not exists
+var ErrorStoreDoesExists = errors.New("store does not exists")
+
+func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutReply, error) {
+	reply := &pb.PutReply{}
+	// Check if store with name exists
+	if _, ok := srv.Stores()[request.StoreName]; !ok {
+		reply.Error = ErrorStoreDoesExists.Error()
+		return reply, ErrorStoreDoesExists
+	}
+
+	if srv.IsLeader() {
+		srv.Logger().Debug("yay this is leader")
+		requestBytes, err := proto.Marshal(request)
+		if err != nil {
+			return reply, err
+		}
+		srv.logger.Debug("submitting request to raft engine")
+		err = srv.SubmitToRaft(requestBytes, request.Id, pb.CommandType_Put)
+		if err != nil {
+			return reply, err
+		}
+	} else {
+		srv.Logger().Debugf("not a leader, hoping request to %s:%d", srv.leader.Address, srv.leader.Port)
+		peerConn, rpcClient, err := GetPeerConn(srv.leader.Address, srv.leader.Port)
+		if err != nil {
+			return reply, nil
+		}
+		defer func(peerConn *grpc.ClientConn) {
+			err := peerConn.Close()
+			if err != nil {
+				log.Printf("failed to close the connection, error = %v\n", err)
+			}
+		}(peerConn)
+		_, err = rpcClient.Put(context.Background(), request)
+		if err != nil {
+			return reply, nil
+		}
+	}
+	return reply, nil
+}
+
+func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetReply, error) {
+	reply := &pb.GetReply{}
+	// Check if store with name exists
+	if _, ok := srv.Stores()[request.StoreName]; !ok {
+		reply.Value = ErrorStoreDoesExists.Error()
+		return reply, ErrorStoreDoesExists
+	}
+
+	if srv.IsLeader() {
+		srv.Logger().Debug("yay this is leader")
+		value := srv.Stores()[request.StoreName].Get(request)
+		reply.Value = value
+	} else {
+		srv.Logger().Debugf("not a leader, hoping request to %s:%d", srv.leader.Address, srv.leader.Port)
+		peerConn, rpcClient, err := GetPeerConn(srv.leader.Address, srv.leader.Port)
+		if err != nil {
+			return reply, nil
+		}
+		defer func(peerConn *grpc.ClientConn) {
+			err := peerConn.Close()
+			if err != nil {
+				log.Printf("failed to close the connection, error = %v\n", err)
+			}
+		}(peerConn)
+		reply, err = rpcClient.Get(context.Background(), request)
+		if err != nil {
+			return reply, nil
+		}
+	}
+	return reply, nil
+}
+
 func (srv *server) RunCommand(ctx context.Context, command *pb.CommandRequest) (*pb.CommandReply, error) {
 	reply := &pb.CommandReply{}
 	switch command.CmdType {
@@ -159,6 +233,30 @@ func (srv *server) RunCommand(ctx context.Context, command *pb.CommandRequest) (
 		request.Id = command.Id
 
 		_, err = srv.CreateStore(ctx, &request)
+		if err != nil {
+			return reply, err
+		}
+	case pb.CommandType_Put:
+		var request pb.PutRequest
+		err := proto.Unmarshal(command.Args, &request)
+		if err != nil {
+			return reply, err
+		}
+		request.Id = command.Id
+
+		_, err = srv.Put(ctx, &request)
+		if err != nil {
+			return reply, err
+		}
+	case pb.CommandType_Get:
+		var request pb.GetRequest
+		err := proto.Unmarshal(command.Args, &request)
+		if err != nil {
+			return reply, err
+		}
+		request.Id = command.Id
+
+		_, err = srv.Get(ctx, &request)
 		if err != nil {
 			return reply, err
 		}

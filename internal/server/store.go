@@ -1,38 +1,56 @@
 package server
 
+import (
+	"sync"
+
+	pb "github.com/davinash/yados/internal/proto/gen"
+)
+
 //Store Interface for store
 type Store interface {
-	Open() error
-	Close() error
-	Put() error
-	Get() error
+	Put(*pb.PutRequest) error
+	Get(*pb.GetRequest) string
+	Name() string
+	Delete() error
 }
 
 //StoreArgs arguments for creating new store
 type StoreArgs struct {
+	name string
+}
+
+type store struct {
+	mutex sync.RWMutex
+	name  string
+	kv    map[string]string
 }
 
 //NewStore creates a new store
 func NewStore(args *StoreArgs) Store {
-	s := &store{}
+	s := &store{
+		name: args.name,
+		kv:   make(map[string]string),
+	}
 	return s
 }
 
-type store struct {
+func (s *store) Name() string {
+	return s.name
 }
 
-func (s *store) Open() error {
-	panic("implement me")
+func (s *store) Put(putRequest *pb.PutRequest) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.kv[putRequest.Key] = putRequest.Value
+	return nil
 }
 
-func (s *store) Close() error {
-	panic("implement me")
+func (s *store) Get(getRequest *pb.GetRequest) string {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.kv[getRequest.Key]
 }
 
-func (s *store) Put() error {
-	panic("implement me")
-}
-
-func (s *store) Get() error {
+func (s *store) Delete() error {
 	panic("implement me")
 }

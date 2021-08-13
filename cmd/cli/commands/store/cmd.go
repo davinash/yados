@@ -10,6 +10,8 @@ func AddCommands(rootCmd *cobra.Command) {
 	}
 	CreateCommand(cmd)
 	CreateListCommand(cmd)
+	CreatePutCommand(cmd)
+	CreateGetCommand(cmd)
 
 	rootCmd.AddCommand(cmd)
 }
