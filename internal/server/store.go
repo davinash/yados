@@ -13,9 +13,9 @@ type StoreArgs struct {
 }
 
 //NewStore creates a new store
-func NewStore(args *StoreArgs) (Store, error) {
+func NewStore(args *StoreArgs) Store {
 	s := &store{}
-	return s, nil
+	return s
 }
 
 type store struct {

@@ -41,20 +41,22 @@ type Server interface {
 	SetLeader(leader *pb.Peer)
 	Apply(entry *pb.LogEntry) error
 	Stores() map[string]Store
+	EnableTestMode()
 }
 
 type server struct {
 	pb.UnimplementedYadosServiceServer
-	mutex     sync.Mutex
-	raft      Raft
-	quit      chan interface{}
-	rpcServer RPCServer
-	self      *pb.Peer
-	logger    *logrus.Entry
-	logDir    string
-	pLog      PLog
-	stores    map[string]Store
-	leader    *pb.Peer
+	mutex      sync.Mutex
+	raft       Raft
+	quit       chan interface{}
+	rpcServer  RPCServer
+	self       *pb.Peer
+	logger     *logrus.Entry
+	logDir     string
+	pLog       PLog
+	stores     map[string]Store
+	leader     *pb.Peer
+	isTestMode bool
 }
 
 //NewServerArgs argument structure for new server
@@ -68,7 +70,9 @@ type NewServerArgs struct {
 
 //NewServer creates new instance of a server
 func NewServer(args *NewServerArgs) (Server, error) {
-	srv := &server{}
+	srv := &server{
+		isTestMode: false,
+	}
 	srv.self = &pb.Peer{
 		Name:    args.Name,
 		Address: args.Address,
@@ -111,6 +115,14 @@ func (srv *server) GetOrCreateStorage() error {
 	if err != nil {
 		return err
 	}
+
+	if srv.isTestMode {
+		d := filepath.Join(srv.logDir, "testdata")
+		err := os.MkdirAll(d, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -129,7 +141,12 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		srv.logger.Fatalf("failed to start the rpc, error = %v", err)
 	}
 
-	srv.raft, err = NewRaft(srv, peers)
+	args := RaftArgs{
+		srv:        srv,
+		peers:      peers,
+		isTestMode: srv.isTestMode,
+	}
+	srv.raft, err = NewRaft(&args)
 	if err != nil {
 		return err
 	}
@@ -138,13 +155,13 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 	return nil
 }
 
-//ErrorStoreAlreadyExists error if store with this name already exists
-var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
-
 func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
-	if _, ok := srv.Stores()[request.Name]; ok {
-		return ErrorStoreAlreadyExists
-	}
+	srv.mutex.Lock()
+	defer srv.mutex.Unlock()
+	s := NewStore(&StoreArgs{})
+
+	srv.Stores()[request.Name] = s
+
 	return nil
 }
 
@@ -159,6 +176,20 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		err = srv.StoreCreate(&scr)
 		if err != nil {
 			return err
+		}
+
+		if srv.isTestMode {
+			testFile := filepath.Join(srv.logDir, "testdata", "store.create")
+			file, err := os.OpenFile(testFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
+			if err != nil {
+				panic(err)
+			}
+			defer func(file *os.File) {
+				err := file.Close()
+				if err != nil {
+					panic(err)
+				}
+			}(file)
 		}
 	}
 	return nil
@@ -230,6 +261,10 @@ func (srv *server) SetLeader(leader *pb.Peer) {
 
 func (srv *server) Stores() map[string]Store {
 	return srv.stores
+}
+
+func (srv *server) EnableTestMode() {
+	srv.isTestMode = true
 }
 
 func (srv *server) SetLogLevel(level string) {

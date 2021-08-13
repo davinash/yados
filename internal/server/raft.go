@@ -86,36 +86,20 @@ type raft struct {
 	logger             *logrus.Entry
 }
 
-func (r *raft) Log() []*pb.LogEntry {
-	return r.log
-}
-
-func (r *raft) Stop() {
-	r.logger.Debug("Stopping Raft Instance")
-	if r.state == Dead {
-		return
-	}
-	close(r.quit)
-
-	err := r.RemoveSelf()
-	if err != nil {
-		return
-	}
-	r.wg.Wait()
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.state = Dead
-
-	r.logger.Debug("Stopped Raft Instance")
+//RaftArgs argument structure for Raft Instance
+type RaftArgs struct {
+	srv        Server
+	peers      []*pb.Peer
+	isTestMode bool
 }
 
 //NewRaft creates new instance of Raft
-func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
+func NewRaft(args *RaftArgs) (Raft, error) {
 	r := &raft{
-		server:        srv,
+		server:        args.srv,
 		quit:          make(chan interface{}),
 		triggerAEChan: make(chan struct{}, 1),
-		logger:        srv.Logger(),
+		logger:        args.srv.Logger(),
 	}
 	r.peers = make(map[string]*pb.Peer)
 	r.state = Follower
@@ -127,12 +111,12 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 	r.newCommitReadyChan = make(chan struct{}, 16)
 	r.commitsChanMap = make(map[string]chan struct{})
 
-	for _, p := range peers {
-		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
+	for _, p := range args.peers {
+		_, err := args.srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
 			NewPeer: &pb.Peer{
-				Name:    srv.Name(),
-				Address: srv.Address(),
-				Port:    srv.Port(),
+				Name:    args.srv.Name(),
+				Address: args.srv.Address(),
+				Port:    args.srv.Port(),
 			},
 		})
 		if err != nil {
@@ -158,6 +142,25 @@ func (r *raft) Start() {
 	go r.commitChanSender()
 }
 
+func (r *raft) Stop() {
+	r.logger.Debug("Stopping Raft Instance")
+	if r.state == Dead {
+		return
+	}
+	close(r.quit)
+
+	err := r.RemoveSelf()
+	if err != nil {
+		return
+	}
+	r.wg.Wait()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.state = Dead
+
+	r.logger.Debug("Stopped Raft Instance")
+}
+
 func (s RaftState) String() string {
 	switch s {
 	case Follower:
@@ -171,6 +174,10 @@ func (s RaftState) String() string {
 	default:
 		panic("unreachable")
 	}
+}
+
+func (r *raft) Log() []*pb.LogEntry {
+	return r.log
 }
 
 func (r *raft) State() RaftState {

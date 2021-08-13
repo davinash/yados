@@ -107,6 +107,7 @@ message StoreCreateRequest {
 
 message StoreCreateReply {
   string Id = 1;
+  string error = 2;
 }
 
 message CommandRequest {

@@ -105,8 +105,16 @@ func (srv *server) SubmitToRaft(requestBytes []byte, ID string, cmdType pb.Comma
 	return nil
 }
 
+//ErrorStoreAlreadyExists error if store with this name already exists
+var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
+
 func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
 	reply := &pb.StoreCreateReply{}
+	// Check if store with name already exists
+	if _, ok := srv.Stores()[request.Name]; ok {
+		reply.Error = ErrorStoreAlreadyExists.Error()
+		return reply, ErrorStoreAlreadyExists
+	}
 
 	if srv.IsLeader() {
 		srv.Logger().Debug("yay this is leader")
