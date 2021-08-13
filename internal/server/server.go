@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -43,6 +42,9 @@ type Server interface {
 	Apply(entry *pb.LogEntry) error
 	Stores() map[string]Store
 	EnableTestMode()
+
+	SetTestArgs(args *TestArgs)
+	TestArgs() *TestArgs
 }
 
 type server struct {
@@ -58,6 +60,7 @@ type server struct {
 	stores     map[string]Store
 	leader     *pb.Peer
 	isTestMode bool
+	testArgs   *TestArgs
 }
 
 //NewServerArgs argument structure for new server
@@ -67,6 +70,11 @@ type NewServerArgs struct {
 	Port     int32
 	Loglevel string
 	LogDir   string
+}
+
+//TestArgs Test argument structure to be used from tests
+type TestArgs struct {
+	CommitEntryChan chan *pb.LogEntry
 }
 
 //NewServer creates new instance of a server
@@ -117,13 +125,6 @@ func (srv *server) GetOrCreateStorage() error {
 		return err
 	}
 
-	if srv.isTestMode {
-		d := filepath.Join(srv.logDir, "testdata")
-		err := os.MkdirAll(d, os.ModePerm)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -146,6 +147,7 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		srv:        srv,
 		peers:      peers,
 		isTestMode: srv.isTestMode,
+		testArgs:   srv.testArgs,
 	}
 	srv.raft, err = NewRaft(&args)
 	if err != nil {
@@ -177,19 +179,6 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		err = srv.StoreCreate(&scr)
 		if err != nil {
 			return err
-		}
-		if srv.isTestMode {
-			testFile := filepath.Join(srv.logDir, "testdata", fmt.Sprintf("store.create.%s", scr.Name))
-			file, err := os.OpenFile(testFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
-			if err != nil {
-				panic(err)
-			}
-			defer func(file *os.File) {
-				err := file.Close()
-				if err != nil {
-					panic(err)
-				}
-			}(file)
 		}
 	case pb.CommandType_Put:
 		var putRequest pb.PutRequest
@@ -272,6 +261,15 @@ func (srv *server) Stores() map[string]Store {
 
 func (srv *server) EnableTestMode() {
 	srv.isTestMode = true
+}
+
+func (srv *server) SetTestArgs(args *TestArgs) {
+	srv.testArgs = args
+	srv.Raft().SetTestArgs(args)
+}
+
+func (srv *server) TestArgs() *TestArgs {
+	return srv.testArgs
 }
 
 func (srv *server) SetLogLevel(level string) {

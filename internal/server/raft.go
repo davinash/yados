@@ -53,6 +53,9 @@ type Raft interface {
 	Submit([]byte, string, pb.CommandType) error
 	AddCommandListener(string) error
 	WaitForCommandCompletion([]byte, string, pb.CommandType)
+
+	TestArgs() *TestArgs
+	SetTestArgs(*TestArgs)
 }
 
 type raft struct {
@@ -84,6 +87,8 @@ type raft struct {
 
 	newCommitReadyChan chan struct{}
 	logger             *logrus.Entry
+	testArgs           *TestArgs
+	isTestMode         bool
 }
 
 //RaftArgs argument structure for Raft Instance
@@ -91,6 +96,7 @@ type RaftArgs struct {
 	srv        Server
 	peers      []*pb.Peer
 	isTestMode bool
+	testArgs   *TestArgs
 }
 
 //NewRaft creates new instance of Raft
@@ -100,6 +106,8 @@ func NewRaft(args *RaftArgs) (Raft, error) {
 		quit:          make(chan interface{}),
 		triggerAEChan: make(chan struct{}, 1),
 		logger:        args.srv.Logger(),
+		testArgs:      args.testArgs,
+		isTestMode:    args.isTestMode,
 	}
 	r.peers = make(map[string]*pb.Peer)
 	r.state = Follower
@@ -190,6 +198,14 @@ func (r *raft) Server() Server {
 
 func (r *raft) Peers() map[string]*pb.Peer {
 	return r.peers
+}
+
+func (r *raft) SetTestArgs(args *TestArgs) {
+	r.testArgs = args
+}
+
+func (r *raft) TestArgs() *TestArgs {
+	return r.testArgs
 }
 
 func (r *raft) AddCommandListener(id string) error {
@@ -691,6 +707,11 @@ func (r *raft) becomeFollower(term int64) {
 }
 
 func (r *raft) postProcessCommittedEntry(entry *pb.LogEntry) error {
+
+	if r.isTestMode && r.TestArgs() != nil {
+		r.testArgs.CommitEntryChan <- entry
+	}
+
 	err := r.Server().Apply(entry)
 	if err != nil {
 		return err

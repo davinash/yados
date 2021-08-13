@@ -248,18 +248,6 @@ func (srv *server) RunCommand(ctx context.Context, command *pb.CommandRequest) (
 		if err != nil {
 			return reply, err
 		}
-	case pb.CommandType_Get:
-		var request pb.GetRequest
-		err := proto.Unmarshal(command.Args, &request)
-		if err != nil {
-			return reply, err
-		}
-		request.Id = command.Id
-
-		_, err = srv.Get(ctx, &request)
-		if err != nil {
-			return reply, err
-		}
 	}
 	return reply, nil
 }

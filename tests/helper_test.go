@@ -75,7 +75,9 @@ func (suite *YadosTestSuite) AddNewServer(suffix int) error {
 	if err != nil {
 		return err
 	}
+
 	srv.EnableTestMode()
+
 	err = srv.Serve(peers)
 	if err != nil {
 		return err
