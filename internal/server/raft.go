@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"sync"
 	"time"
@@ -49,6 +50,9 @@ type Raft interface {
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.LogEntry
+	Submit([]byte, string, pb.CommandType) error
+	AddCommandListener(string) error
+	WaitForCommandCompletion([]byte, string, pb.CommandType)
 }
 
 type raft struct {
@@ -72,7 +76,8 @@ type raft struct {
 	nextIndex  map[string]int64
 	matchIndex map[string]int64
 
-	triggerAEChan chan struct{}
+	triggerAEChan  chan struct{}
+	commitsChanMap map[string]chan struct{}
 
 	quit chan interface{}
 	wg   sync.WaitGroup
@@ -81,37 +86,20 @@ type raft struct {
 	logger             *logrus.Entry
 }
 
-func (r *raft) Log() []*pb.LogEntry {
-	return r.log
-}
-
-func (r *raft) Stop() {
-	r.logger.Debug("Stopping Raft Instance")
-	if r.state == Dead {
-		return
-	}
-	close(r.quit)
-
-	err := r.RemoveSelf()
-	if err != nil {
-		return
-	}
-	r.wg.Wait()
-
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.state = Dead
-
-	r.logger.Debug("Stopped Raft Instance")
+//RaftArgs argument structure for Raft Instance
+type RaftArgs struct {
+	srv        Server
+	peers      []*pb.Peer
+	isTestMode bool
 }
 
 //NewRaft creates new instance of Raft
-func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
+func NewRaft(args *RaftArgs) (Raft, error) {
 	r := &raft{
-		server:        srv,
+		server:        args.srv,
 		quit:          make(chan interface{}),
 		triggerAEChan: make(chan struct{}, 1),
-		logger:        srv.Logger(),
+		logger:        args.srv.Logger(),
 	}
 	r.peers = make(map[string]*pb.Peer)
 	r.state = Follower
@@ -121,13 +109,14 @@ func NewRaft(srv Server, peers []*pb.Peer) (Raft, error) {
 	r.nextIndex = make(map[string]int64)
 	r.matchIndex = make(map[string]int64)
 	r.newCommitReadyChan = make(chan struct{}, 16)
+	r.commitsChanMap = make(map[string]chan struct{})
 
-	for _, p := range peers {
-		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
+	for _, p := range args.peers {
+		_, err := args.srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
 			NewPeer: &pb.Peer{
-				Name:    srv.Name(),
-				Address: srv.Address(),
-				Port:    srv.Port(),
+				Name:    args.srv.Name(),
+				Address: args.srv.Address(),
+				Port:    args.srv.Port(),
 			},
 		})
 		if err != nil {
@@ -150,6 +139,26 @@ func (r *raft) Start() {
 		r.runElectionTimer()
 		r.logger.Debug("runElectionTimer::NewRaft")
 	}()
+	go r.commitChanSender()
+}
+
+func (r *raft) Stop() {
+	r.logger.Debug("Stopping Raft Instance")
+	if r.state == Dead {
+		return
+	}
+	close(r.quit)
+
+	err := r.RemoveSelf()
+	if err != nil {
+		return
+	}
+	r.wg.Wait()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.state = Dead
+
+	r.logger.Debug("Stopped Raft Instance")
 }
 
 func (s RaftState) String() string {
@@ -167,6 +176,10 @@ func (s RaftState) String() string {
 	}
 }
 
+func (r *raft) Log() []*pb.LogEntry {
+	return r.log
+}
+
 func (r *raft) State() RaftState {
 	return r.state
 }
@@ -177,6 +190,19 @@ func (r *raft) Server() Server {
 
 func (r *raft) Peers() map[string]*pb.Peer {
 	return r.peers
+}
+
+func (r *raft) AddCommandListener(id string) error {
+	r.logger.Debugf("adding command listener for %s", id)
+	r.commitsChanMap[id] = make(chan struct{})
+	return nil
+}
+
+func (r *raft) WaitForCommandCompletion(requestBytes []byte, id string, cmdType pb.CommandType) {
+	r.logger.Debugf("WaitForCommandCompletion for %s", id)
+	if v, ok := r.commitsChanMap[id]; ok {
+		<-v
+	}
 }
 
 func (r *raft) AddPeer(newPeer *pb.Peer) error {
@@ -222,6 +248,31 @@ func (r *raft) RemoveSelf() error {
 
 func (r *raft) electionTimeout() time.Duration {
 	return time.Duration(150+rand.Intn(150)) * time.Millisecond
+}
+
+//ErrorNotALeader error returned where no server leader
+var ErrorNotALeader = errors.New("now a leader")
+
+func (r *raft) Submit(command []byte, commandID string, cmdType pb.CommandType) error {
+	r.logger.Debug("Entering Submit")
+
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if r.state != Leader {
+		return ErrorNotALeader
+	}
+	r.log = append(r.log, &pb.LogEntry{
+		Command:   command,
+		Term:      r.currentTerm,
+		CommandId: commandID,
+		CmdType:   cmdType,
+	})
+	r.persistToStorage()
+
+	r.triggerAEChan <- struct{}{}
+	r.logger.Debug("Exiting Submit")
+	return nil
 }
 
 func (r *raft) runElectionTimer() {
@@ -327,7 +378,6 @@ func (r *raft) startElection() {
 			r.logger.Debugf("[%s] received RequestVoteReply (%+v, %v)", reply.Id, reply.Term, reply.VoteGranted)
 
 			r.processVotingReply(reply, &votesReceived, &savedCurrentTerm)
-
 		}(peer)
 	}
 	// Run another election timer, in case this election is not successful.
@@ -385,6 +435,9 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 
 func (r *raft) startLeader() {
 	r.state = Leader
+
+	r.Server().SetLeader(r.Server().Self())
+
 	for _, peer := range r.Peers() {
 		r.nextIndex[peer.Name] = int64(len(r.Log()))
 		r.matchIndex[peer.Name] = -1
@@ -435,6 +488,90 @@ func (r *raft) startLeader() {
 	}(50 * time.Millisecond)
 }
 
+func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb.Peer, ni int64, entries []*pb.LogEntry) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	reply := resp.(*pb.AppendEntryReply)
+	if reply.Term > savedCurrentTerm {
+		r.logger.Debugf("[%s] Reply.Term = %v; SavedCurrentTerm = %v; term out of date in heartbeat reply",
+			reply.Id, reply.Term, savedCurrentTerm)
+		r.becomeFollower(reply.Term)
+		return
+	}
+	if r.state == Leader && savedCurrentTerm == reply.Term {
+		if reply.Success {
+			r.nextIndex[peer.Name] = ni + int64(len(entries))
+			r.matchIndex[peer.Name] = r.nextIndex[peer.Name] - 1
+			savedCommitIndex := r.commitIndex
+			for i := r.commitIndex + 1; i < int64(len(r.log)); i++ {
+				if r.log[i].Term == r.currentTerm {
+					matchCount := 1
+					for _, p := range r.Peers() {
+						if r.matchIndex[p.Name] >= i {
+							matchCount++
+						}
+					}
+					if matchCount*2 > len(r.Peers())+1 {
+						r.commitIndex = i
+					}
+				}
+			}
+			r.logger.Debugf("[%s] AppendEntries reply from %s success: nextIndex := %v, "+
+				"matchIndex := %v; commitIndex := %d", reply.Id, peer.Name, r.nextIndex, r.matchIndex, r.commitIndex)
+			if r.commitIndex != savedCommitIndex {
+				r.logger.Debugf("[%s] leader sets commitIndex := %d", reply.Id, r.commitIndex)
+				r.newCommitReadyChan <- struct{}{}
+				r.triggerAEChan <- struct{}{}
+			}
+		} else {
+			if reply.ConflictTerm >= 0 {
+				var lastIndexOfTerm int64
+				lastIndexOfTerm = -1
+				for i := len(r.log) - 1; i >= 0; i-- {
+					if r.log[i].Term == reply.ConflictTerm {
+						lastIndexOfTerm = int64(i)
+						break
+					}
+				}
+				if lastIndexOfTerm >= 0 {
+					r.nextIndex[peer.Name] = lastIndexOfTerm + 1
+				} else {
+					r.nextIndex[peer.Name] = reply.ConflictIndex
+				}
+			} else {
+				r.nextIndex[peer.Name] = reply.ConflictIndex
+			}
+			r.logger.Debugf("[%s] AppendEntries reply from %s !success: nextIndex := %d",
+				reply.Id, peer.Name, ni-1)
+		}
+	}
+}
+
+func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64) (*pb.AppendEntryRequest, int64, []*pb.LogEntry) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	nextIndex := r.nextIndex[peer.Name]
+	var prevLogTerm, prevLogIndex int64
+	prevLogIndex = nextIndex - 1
+	prevLogTerm = -1
+	if prevLogIndex >= 0 {
+		prevLogTerm = r.log[prevLogIndex].Term
+	}
+	entries := r.log[nextIndex:]
+
+	request := pb.AppendEntryRequest{
+		Term:         savedCurrentTerm,
+		Leader:       r.Server().Self(),
+		PrevLogIndex: prevLogIndex,
+		PrevLogTerm:  prevLogTerm,
+		Entries:      entries,
+		LeaderCommit: r.commitIndex,
+		NextIndex:    nextIndex,
+	}
+	return &request, nextIndex, entries
+}
+
 func (r *raft) leaderSendAEs() {
 	r.mutex.Lock()
 	savedCurrentTerm := r.currentTerm
@@ -445,89 +582,14 @@ func (r *raft) leaderSendAEs() {
 		go func(peer *pb.Peer) {
 			defer r.wg.Done()
 
-			r.mutex.Lock()
-			ni := r.nextIndex[peer.Name]
+			request, nextIndex, entries := r.createAERequest(peer, savedCurrentTerm)
 
-			var prevLogTerm, prevLogIndex int64
-			prevLogIndex = ni - 1
-
-			prevLogTerm = -1
-			if prevLogIndex >= 0 {
-				prevLogTerm = r.log[prevLogIndex].Term
-			}
-			entries := r.log[ni:]
-
-			request := pb.AppendEntryRequest{
-				Term:         savedCurrentTerm,
-				LeaderName:   r.Server().Name(),
-				PrevLogIndex: prevLogIndex,
-				PrevLogTerm:  prevLogTerm,
-				Entries:      entries,
-				LeaderCommit: r.commitIndex,
-				NextIndex:    ni,
-			}
-			r.mutex.Unlock()
-			resp, err := r.Server().Send(peer, "RPC.AppendEntries", &request)
+			resp, err := r.Server().Send(peer, "RPC.AppendEntries", request)
 			if err != nil {
 				r.logger.Errorf("[%s] Sending AppendEntries failed, Error = %v", request.Id, err)
 				return
 			}
-			r.mutex.Lock()
-			defer r.mutex.Unlock()
-			reply := resp.(*pb.AppendEntryReply)
-			if reply.Term > savedCurrentTerm {
-				r.logger.Debugf("[%s] Reply.Term = %v; SavedCurrentTerm = %v; term out of date in heartbeat reply",
-					reply.Id, reply.Term, savedCurrentTerm)
-				r.becomeFollower(reply.Term)
-				return
-			}
-			if r.state == Leader && savedCurrentTerm == reply.Term {
-				if reply.Success {
-					r.nextIndex[peer.Name] = ni + int64(len(entries))
-					r.matchIndex[peer.Name] = r.nextIndex[peer.Name] - 1
-					savedCommitIndex := r.commitIndex
-					for i := r.commitIndex + 1; i < int64(len(r.log)); i++ {
-						if r.log[i].Term == r.currentTerm {
-							matchCount := 1
-							for _, p := range r.Peers() {
-								if r.matchIndex[p.Name] >= i {
-									matchCount++
-								}
-							}
-							if matchCount*2 > len(r.Peers())+1 {
-								r.commitIndex = i
-							}
-						}
-					}
-					r.logger.Debugf("[%s] AppendEntries reply from %s success: nextIndex := %v, "+
-						"matchIndex := %v; commitIndex := %d", reply.Id, peer.Name, r.nextIndex, r.matchIndex, r.commitIndex)
-					if r.commitIndex != savedCommitIndex {
-						r.logger.Debugf("[%s] leader sets commitIndex := %d", reply.Id, r.commitIndex)
-						r.newCommitReadyChan <- struct{}{}
-						r.triggerAEChan <- struct{}{}
-					}
-				} else {
-					if reply.ConflictTerm >= 0 {
-						var lastIndexOfTerm int64
-						lastIndexOfTerm = -1
-						for i := len(r.log) - 1; i >= 0; i-- {
-							if r.log[i].Term == reply.ConflictTerm {
-								lastIndexOfTerm = int64(i)
-								break
-							}
-						}
-						if lastIndexOfTerm >= 0 {
-							r.nextIndex[peer.Name] = lastIndexOfTerm + 1
-						} else {
-							r.nextIndex[peer.Name] = reply.ConflictIndex
-						}
-					} else {
-						r.nextIndex[peer.Name] = reply.ConflictIndex
-					}
-					r.logger.Debugf("[%s] AppendEntries reply from %s !success: nextIndex := %d",
-						reply.Id, peer.Name, ni-1)
-				}
-			}
+			r.processAEReply(resp, savedCurrentTerm, peer, nextIndex, entries)
 		}(peer)
 	}
 }
@@ -539,6 +601,8 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	if r.state == Dead {
 		return reply, nil
 	}
+	r.Server().SetLeader(request.Leader)
+
 	r.logger.Debugf("[%s] [%s]  Received AppendEntries, current Term = %v", r.state,
 		request.Id, r.currentTerm)
 
@@ -616,12 +680,49 @@ func (r *raft) becomeFollower(term int64) {
 	r.votedFor = ""
 	r.electionResetEvent = time.Now()
 
+	r.Server().SetLeader(nil)
+
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
 		r.runElectionTimer()
 		r.logger.Debug("runElectionTimer::becomeFollower")
 	}()
+}
+
+func (r *raft) postProcessCommittedEntry(entry *pb.LogEntry) error {
+	err := r.Server().Apply(entry)
+	if err != nil {
+		return err
+	}
+	if c, ok := r.commitsChanMap[entry.CommandId]; ok {
+		close(c)
+	}
+	return nil
+}
+
+func (r *raft) commitChanSender() {
+	for range r.newCommitReadyChan {
+		// Find which entries we have to apply.
+		r.mutex.Lock()
+		savedLastApplied := r.lastApplied
+		var entries []*pb.LogEntry
+		if r.commitIndex > r.lastApplied {
+			entries = r.log[r.lastApplied+1 : r.commitIndex+1]
+			r.lastApplied = r.commitIndex
+		}
+		r.mutex.Unlock()
+
+		r.logger.Debugf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
+
+		for _, entry := range entries {
+			err := r.postProcessCommittedEntry(entry)
+			if err != nil {
+				return
+			}
+		}
+	}
+	r.logger.Debug("commitChanSender done")
 }
 
 func (r *raft) lastLogIndexAndTerm() (int64, int64) {
@@ -637,7 +738,6 @@ func (r *raft) lastLogIndexAndTerm() (int64, int64) {
 }
 
 func (r *raft) persistToStorage() {
-
 }
 
 func intMin(a, b int64) int64 {

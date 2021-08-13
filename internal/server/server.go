@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/sirupsen/logrus"
 	easy "github.com/t-tomalak/logrus-easy-formatter"
 
@@ -32,19 +34,29 @@ type Server interface {
 	Self() *pb.Peer
 	State() RaftState
 	LogDir() string
-	Store() Store
+	PLog() PLog
+	StoreCreate(request *pb.StoreCreateRequest) error
+	IsLeader() bool
+	Leader() *pb.Peer
+	SetLeader(leader *pb.Peer)
+	Apply(entry *pb.LogEntry) error
+	Stores() map[string]Store
+	EnableTestMode()
 }
 
 type server struct {
 	pb.UnimplementedYadosServiceServer
-	mutex     sync.Mutex
-	raft      Raft
-	quit      chan interface{}
-	rpcServer RPCServer
-	self      *pb.Peer
-	logger    *logrus.Entry
-	logDir    string
-	store     Store
+	mutex      sync.Mutex
+	raft       Raft
+	quit       chan interface{}
+	rpcServer  RPCServer
+	self       *pb.Peer
+	logger     *logrus.Entry
+	logDir     string
+	pLog       PLog
+	stores     map[string]Store
+	leader     *pb.Peer
+	isTestMode bool
 }
 
 //NewServerArgs argument structure for new server
@@ -58,7 +70,9 @@ type NewServerArgs struct {
 
 //NewServer creates new instance of a server
 func NewServer(args *NewServerArgs) (Server, error) {
-	srv := &server{}
+	srv := &server{
+		isTestMode: false,
+	}
 	srv.self = &pb.Peer{
 		Name:    args.Name,
 		Address: args.Address,
@@ -79,6 +93,7 @@ func NewServer(args *NewServerArgs) (Server, error) {
 
 	srv.SetLogLevel(args.Loglevel)
 	srv.quit = make(chan interface{})
+	srv.stores = make(map[string]Store)
 
 	return srv, nil
 }
@@ -91,14 +106,22 @@ func (srv *server) GetOrCreateStorage() error {
 	}
 	srv.logDir = d
 
-	store, err := NewStorage(srv.LogDir(), srv.Logger())
+	store, err := NewPLog(srv.LogDir(), srv.Logger())
 	if err != nil {
 		return err
 	}
-	srv.store = store
-	err = srv.store.Open()
+	srv.pLog = store
+	err = srv.pLog.Open()
 	if err != nil {
 		return err
+	}
+
+	if srv.isTestMode {
+		d := filepath.Join(srv.logDir, "testdata")
+		err := os.MkdirAll(d, os.ModePerm)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -118,12 +141,57 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		srv.logger.Fatalf("failed to start the rpc, error = %v", err)
 	}
 
-	srv.raft, err = NewRaft(srv, peers)
+	args := RaftArgs{
+		srv:        srv,
+		peers:      peers,
+		isTestMode: srv.isTestMode,
+	}
+	srv.raft, err = NewRaft(&args)
 	if err != nil {
 		return err
 	}
 	srv.raft.Start()
 
+	return nil
+}
+
+func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
+	srv.mutex.Lock()
+	defer srv.mutex.Unlock()
+	s := NewStore(&StoreArgs{})
+
+	srv.Stores()[request.Name] = s
+
+	return nil
+}
+
+func (srv *server) Apply(entry *pb.LogEntry) error {
+	switch entry.CmdType {
+	case pb.CommandType_CreateStore:
+		var scr pb.StoreCreateRequest
+		err := proto.Unmarshal(entry.Command, &scr)
+		if err != nil {
+			return err
+		}
+		err = srv.StoreCreate(&scr)
+		if err != nil {
+			return err
+		}
+
+		if srv.isTestMode {
+			testFile := filepath.Join(srv.logDir, "testdata", "store.create")
+			file, err := os.OpenFile(testFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
+			if err != nil {
+				panic(err)
+			}
+			defer func(file *os.File) {
+				err := file.Close()
+				if err != nil {
+					panic(err)
+				}
+			}(file)
+		}
+	}
 	return nil
 }
 
@@ -175,8 +243,28 @@ func (srv *server) State() RaftState {
 	return srv.Raft().State()
 }
 
-func (srv *server) Store() Store {
-	return srv.store
+func (srv *server) PLog() PLog {
+	return srv.pLog
+}
+
+func (srv *server) IsLeader() bool {
+	return srv.State() == Leader
+}
+
+func (srv *server) Leader() *pb.Peer {
+	return srv.leader
+}
+
+func (srv *server) SetLeader(leader *pb.Peer) {
+	srv.leader = leader
+}
+
+func (srv *server) Stores() map[string]Store {
+	return srv.stores
+}
+
+func (srv *server) EnableTestMode() {
+	srv.isTestMode = true
 }
 
 func (srv *server) SetLogLevel(level string) {
@@ -204,9 +292,9 @@ func (srv *server) Stop() error {
 		srv.logger.Errorf("failed to stop grpc server, Error = %v", err)
 		return err
 	}
-	err = srv.Store().Close()
+	err = srv.PLog().Close()
 	if err != nil {
-		srv.logger.Errorf("failed to close the store, Error = %v", err)
+		srv.logger.Errorf("failed to close the pLog, Error = %v", err)
 		return err
 	}
 	srv.logger.Infof("Stopped Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())

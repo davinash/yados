@@ -1,6 +1,11 @@
 syntax = "proto3";
 option go_package = "/gen";
 
+
+enum CommandType {
+  CreateStore = 0;
+}
+
 message VoteRequest {
   string Id = 1;
   int64 Term = 2;
@@ -16,20 +21,19 @@ message VoteReply {
   int64 Term = 4;
 }
 
-message Command {
-
-}
 
 message LogEntry {
   int64 Term = 1;
   int64 Index = 2;
-  Command Command = 3;
+  bytes Command = 3;
+  string CommandId = 4;
+  CommandType CmdType = 5;
 }
 
 message AppendEntryRequest {
   string Id = 1;
   int64 Term = 2;
-  string LeaderName = 3;
+  Peer Leader = 3;
   int64 PrevLogIndex = 4;
   int64 PrevLogTerm = 5;
   repeated LogEntry Entries = 6;
@@ -84,17 +88,36 @@ message StatusRequest {
 message StatusReply {
   string Id = 1;
   Peer server = 2;
-  string Status= 3;
+  string Status = 3;
 }
 
 message ClusterStatusRequest {
   string Id = 1;
 }
 
-
 message ClusterStatusReply {
   string Id = 1;
   repeated StatusReply PeerStatus = 2;
+}
+
+message StoreCreateRequest {
+  string Id = 1;
+  string name = 2;
+}
+
+message StoreCreateReply {
+  string Id = 1;
+  string error = 2;
+}
+
+message CommandRequest {
+  string Id = 1;
+  bytes Args = 2;
+  CommandType CmdType = 3;
+}
+
+message CommandReply {
+  string Id = 1;
 }
 
 service YadosService {
@@ -104,4 +127,6 @@ service YadosService {
   rpc RemovePeer(RemovePeerRequest) returns(RemovePeerReply) {}
   rpc PeerStatus(StatusRequest) returns (StatusReply) {}
   rpc ClusterStatus(ClusterStatusRequest) returns (ClusterStatusReply) {}
+  rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
+  rpc RunCommand(CommandRequest) returns (CommandReply){}
 }
