@@ -165,3 +165,11 @@ func (srv *server) RunCommand(ctx context.Context, command *pb.CommandRequest) (
 	}
 	return reply, nil
 }
+
+func (srv *server) ListStores(ctx context.Context, request *pb.ListStoreRequest) (*pb.ListStoreReply, error) {
+	reply := &pb.ListStoreReply{}
+	for k := range srv.Stores() {
+		reply.Name = append(reply.Name, k)
+	}
+	return reply, nil
+}
