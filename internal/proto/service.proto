@@ -120,6 +120,14 @@ message CommandReply {
   string Id = 1;
 }
 
+message ListStoreRequest {
+
+}
+
+message ListStoreReply {
+  repeated string name = 1;
+}
+
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
   rpc AppendEntries(AppendEntryRequest) returns (AppendEntryReply) {}
@@ -129,4 +137,5 @@ service YadosService {
   rpc ClusterStatus(ClusterStatusRequest) returns (ClusterStatusReply) {}
   rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
   rpc RunCommand(CommandRequest) returns (CommandReply){}
+  rpc ListStores(ListStoreRequest) returns (ListStoreReply) {}
 }

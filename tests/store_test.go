@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -30,7 +31,7 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 				storeCreated := false
 				for i := 0; i < 5; i++ {
 					suite.T().Log("Checking if file exists")
-					fileName := filepath.Join(suite.logDir, s.Name(), "log", "testdata", "store.create")
+					fileName := filepath.Join(suite.logDir, s.Name(), "log", "testdata", "store.create.TestStoreCreate")
 					if _, err := os.Stat(fileName); os.IsNotExist(err) {
 						time.Sleep(5 * time.Second)
 					} else {
@@ -51,5 +52,30 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 			suite.T().Errorf("store not created on %s", p.Name())
 		}
 	}
+}
 
+func (suite *YadosTestSuite) TestStoreList() {
+	suite.WaitForLeaderElection()
+	for i := 0; i < 5; i++ {
+		err := store.CreateCommandExecute(&store.CreateCommandArgs{
+			Address: suite.cluster.members[0].Address(),
+			Port:    suite.cluster.members[0].Port(),
+			Name:    fmt.Sprintf("TestStoreList-%d", i),
+		})
+		if err != nil {
+			suite.T().Error(err)
+		}
+	}
+	time.Sleep(10 * time.Second)
+
+	storeList, err := store.ExecuteStoreListCommand(&store.ListArgs{
+		Address: suite.cluster.members[0].Address(),
+		Port:    suite.cluster.members[0].Port(),
+	})
+	if err != nil {
+		suite.T().Error(err)
+	}
+	if len(storeList.Name) != 5 {
+		suite.T().Error(err)
+	}
 }

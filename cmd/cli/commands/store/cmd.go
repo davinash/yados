@@ -9,6 +9,7 @@ func AddCommands(rootCmd *cobra.Command) {
 		Short: "manage and monitor store",
 	}
 	CreateCommand(cmd)
+	CreateListCommand(cmd)
 
 	rootCmd.AddCommand(cmd)
 }

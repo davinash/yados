@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -179,7 +180,7 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		}
 
 		if srv.isTestMode {
-			testFile := filepath.Join(srv.logDir, "testdata", "store.create")
+			testFile := filepath.Join(srv.logDir, "testdata", fmt.Sprintf("store.create.%s", scr.Name))
 			file, err := os.OpenFile(testFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 			if err != nil {
 				panic(err)
