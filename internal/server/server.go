@@ -159,8 +159,8 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
 	srv.mutex.Lock()
 	defer srv.mutex.Unlock()
-	s := NewStore(&StoreArgs{})
 
+	s := NewStore(&StoreArgs{})
 	srv.Stores()[request.Name] = s
 
 	return nil
@@ -178,7 +178,6 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		if err != nil {
 			return err
 		}
-
 		if srv.isTestMode {
 			testFile := filepath.Join(srv.logDir, "testdata", fmt.Sprintf("store.create.%s", scr.Name))
 			file, err := os.OpenFile(testFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
@@ -192,6 +191,13 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 				}
 			}(file)
 		}
+	case pb.CommandType_Put:
+		var putRequest pb.PutRequest
+		err := proto.Unmarshal(entry.Command, &putRequest)
+		if err != nil {
+			return err
+		}
+		return srv.Stores()[putRequest.StoreName].Put(&putRequest)
 	}
 	return nil
 }

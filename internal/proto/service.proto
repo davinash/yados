@@ -4,6 +4,9 @@ option go_package = "/gen";
 
 enum CommandType {
   CreateStore = 0;
+  Put = 1;
+  Get = 2;
+  Delete = 3;
 }
 
 message VoteRequest {
@@ -128,6 +131,29 @@ message ListStoreReply {
   repeated string name = 1;
 }
 
+message PutRequest {
+  string Id = 1;
+  string StoreName = 2;
+  string Key = 3;
+  string Value = 4;
+}
+
+message PutReply {
+  string Id = 1;
+  string error = 2;
+}
+
+message GetRequest {
+  string Id = 1;
+  string StoreName = 2;
+  string Key = 3;
+}
+
+message GetReply {
+  string Id = 1;
+  string value = 2;
+}
+
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
   rpc AppendEntries(AppendEntryRequest) returns (AppendEntryReply) {}
@@ -138,4 +164,6 @@ service YadosService {
   rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
   rpc RunCommand(CommandRequest) returns (CommandReply){}
   rpc ListStores(ListStoreRequest) returns (ListStoreReply) {}
+  rpc Put(PutRequest) returns (PutReply) {}
+  rpc Get(GetRequest) returns(GetReply) {}
 }
