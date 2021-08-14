@@ -5,24 +5,28 @@ import (
 	"sync"
 
 	"github.com/davinash/yados/cmd/cli/commands/store"
-	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 )
 
 func (suite *YadosTestSuite) TestStoreCreate() {
 	suite.WaitForLeaderElection()
+
 	for _, s := range suite.cluster.members {
-		s.SetTestArgs(&server.TestArgs{
-			CommitEntryChan: make(chan *pb.LogEntry),
-		})
+		s.EventHandler().Subscribe(server.CommitEntryEvents)
 	}
+
+	defer func() {
+		for _, s := range suite.cluster.members {
+			s.EventHandler().UnSubscribe(server.CommitEntryEvents)
+		}
+	}()
 
 	wg := sync.WaitGroup{}
 	for _, member := range suite.cluster.members {
 		wg.Add(1)
 		go func(s server.Server) {
 			defer wg.Done()
-			<-s.TestArgs().CommitEntryChan
+			<-s.EventHandler().CommitEntryEvent()
 		}(member)
 	}
 
@@ -34,18 +38,21 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 	if err != nil {
 		suite.T().Error(err)
 	}
-
 	wg.Wait()
-
 }
 
 func (suite *YadosTestSuite) TestStoreList() {
 	suite.WaitForLeaderElection()
+
 	for _, s := range suite.cluster.members {
-		s.SetTestArgs(&server.TestArgs{
-			CommitEntryChan: make(chan *pb.LogEntry),
-		})
+		s.EventHandler().Subscribe(server.CommitEntryEvents)
 	}
+
+	defer func() {
+		for _, s := range suite.cluster.members {
+			s.EventHandler().UnSubscribe(server.CommitEntryEvents)
+		}
+	}()
 
 	for i := 0; i < 5; i++ {
 		wg := sync.WaitGroup{}
@@ -53,7 +60,7 @@ func (suite *YadosTestSuite) TestStoreList() {
 			wg.Add(1)
 			go func(s server.Server) {
 				defer wg.Done()
-				<-s.TestArgs().CommitEntryChan
+				<-s.EventHandler().CommitEntryEvent()
 			}(member)
 		}
 

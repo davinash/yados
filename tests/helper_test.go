@@ -65,18 +65,17 @@ func (suite *YadosTestSuite) AddNewServer(suffix int) error {
 		peers = append(peers, p.Self())
 	}
 	srvArgs := &server.NewServerArgs{
-		Name:     fmt.Sprintf("Server-%d", suffix),
-		Address:  "127.0.0.1",
-		Port:     int32(freePorts[0]),
-		Loglevel: "debug",
-		LogDir:   suite.logDir,
+		Name:       fmt.Sprintf("Server-%d", suffix),
+		Address:    "127.0.0.1",
+		Port:       int32(freePorts[0]),
+		Loglevel:   "debug",
+		LogDir:     suite.logDir,
+		IsTestMode: true,
 	}
 	srv, err := server.NewServer(srvArgs)
 	if err != nil {
 		return err
 	}
-
-	srv.EnableTestMode()
 
 	err = srv.Serve(peers)
 	if err != nil {

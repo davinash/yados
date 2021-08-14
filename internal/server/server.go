@@ -41,10 +41,11 @@ type Server interface {
 	SetLeader(leader *pb.Peer)
 	Apply(entry *pb.LogEntry) error
 	Stores() map[string]Store
-	EnableTestMode()
 
-	SetTestArgs(args *TestArgs)
-	TestArgs() *TestArgs
+	// SetEventHandler For Test Purpose
+	SetEventHandler(Events)
+	// EventHandler for test purpose
+	EventHandler() Events
 }
 
 type server struct {
@@ -60,21 +61,18 @@ type server struct {
 	stores     map[string]Store
 	leader     *pb.Peer
 	isTestMode bool
-	testArgs   *TestArgs
+	//testArgs   *TestArgs
+	ev Events
 }
 
 //NewServerArgs argument structure for new server
 type NewServerArgs struct {
-	Name     string
-	Address  string
-	Port     int32
-	Loglevel string
-	LogDir   string
-}
-
-//TestArgs Test argument structure to be used from tests
-type TestArgs struct {
-	CommitEntryChan chan *pb.LogEntry
+	Name       string
+	Address    string
+	Port       int32
+	Loglevel   string
+	LogDir     string
+	IsTestMode bool
 }
 
 //NewServer creates new instance of a server
@@ -103,6 +101,11 @@ func NewServer(args *NewServerArgs) (Server, error) {
 	srv.SetLogLevel(args.Loglevel)
 	srv.quit = make(chan interface{})
 	srv.stores = make(map[string]Store)
+
+	if args.IsTestMode {
+		srv.isTestMode = true
+		srv.ev = NewEvents()
+	}
 
 	return srv, nil
 }
@@ -147,7 +150,7 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		srv:        srv,
 		peers:      peers,
 		isTestMode: srv.isTestMode,
-		testArgs:   srv.testArgs,
+		//testArgs:   srv.testArgs,
 	}
 	srv.raft, err = NewRaft(&args)
 	if err != nil {
@@ -259,17 +262,11 @@ func (srv *server) Stores() map[string]Store {
 	return srv.stores
 }
 
-func (srv *server) EnableTestMode() {
-	srv.isTestMode = true
+func (srv *server) SetEventHandler(ev Events) {
+	srv.ev = ev
 }
-
-func (srv *server) SetTestArgs(args *TestArgs) {
-	srv.testArgs = args
-	srv.Raft().SetTestArgs(args)
-}
-
-func (srv *server) TestArgs() *TestArgs {
-	return srv.testArgs
+func (srv *server) EventHandler() Events {
+	return srv.ev
 }
 
 func (srv *server) SetLogLevel(level string) {
