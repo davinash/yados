@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -42,7 +41,11 @@ type Server interface {
 	SetLeader(leader *pb.Peer)
 	Apply(entry *pb.LogEntry) error
 	Stores() map[string]Store
-	EnableTestMode()
+
+	// SetEventHandler For Test Purpose
+	SetEventHandler(Events)
+	// EventHandler for test purpose
+	EventHandler() Events
 }
 
 type server struct {
@@ -58,15 +61,18 @@ type server struct {
 	stores     map[string]Store
 	leader     *pb.Peer
 	isTestMode bool
+	//testArgs   *TestArgs
+	ev Events
 }
 
 //NewServerArgs argument structure for new server
 type NewServerArgs struct {
-	Name     string
-	Address  string
-	Port     int32
-	Loglevel string
-	LogDir   string
+	Name       string
+	Address    string
+	Port       int32
+	Loglevel   string
+	LogDir     string
+	IsTestMode bool
 }
 
 //NewServer creates new instance of a server
@@ -96,6 +102,11 @@ func NewServer(args *NewServerArgs) (Server, error) {
 	srv.quit = make(chan interface{})
 	srv.stores = make(map[string]Store)
 
+	if args.IsTestMode {
+		srv.isTestMode = true
+		srv.ev = NewEvents()
+	}
+
 	return srv, nil
 }
 
@@ -117,13 +128,6 @@ func (srv *server) GetOrCreateStorage() error {
 		return err
 	}
 
-	if srv.isTestMode {
-		d := filepath.Join(srv.logDir, "testdata")
-		err := os.MkdirAll(d, os.ModePerm)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -146,6 +150,7 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		srv:        srv,
 		peers:      peers,
 		isTestMode: srv.isTestMode,
+		//testArgs:   srv.testArgs,
 	}
 	srv.raft, err = NewRaft(&args)
 	if err != nil {
@@ -177,19 +182,6 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		err = srv.StoreCreate(&scr)
 		if err != nil {
 			return err
-		}
-		if srv.isTestMode {
-			testFile := filepath.Join(srv.logDir, "testdata", fmt.Sprintf("store.create.%s", scr.Name))
-			file, err := os.OpenFile(testFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
-			if err != nil {
-				panic(err)
-			}
-			defer func(file *os.File) {
-				err := file.Close()
-				if err != nil {
-					panic(err)
-				}
-			}(file)
 		}
 	case pb.CommandType_Put:
 		var putRequest pb.PutRequest
@@ -270,8 +262,11 @@ func (srv *server) Stores() map[string]Store {
 	return srv.stores
 }
 
-func (srv *server) EnableTestMode() {
-	srv.isTestMode = true
+func (srv *server) SetEventHandler(ev Events) {
+	srv.ev = ev
+}
+func (srv *server) EventHandler() Events {
+	return srv.ev
 }
 
 func (srv *server) SetLogLevel(level string) {

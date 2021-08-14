@@ -690,7 +690,13 @@ func (r *raft) becomeFollower(term int64) {
 	}()
 }
 
-func (r *raft) postProcessCommittedEntry(entry *pb.LogEntry) error {
+func (r *raft) applyCommittedEntry(entry *pb.LogEntry) error {
+
+	// For Tests
+	if r.Server().EventHandler() != nil {
+		r.Server().EventHandler().SendEvent(entry)
+	}
+
 	err := r.Server().Apply(entry)
 	if err != nil {
 		return err
@@ -716,7 +722,7 @@ func (r *raft) commitChanSender() {
 		r.logger.Debugf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
 
 		for _, entry := range entries {
-			err := r.postProcessCommittedEntry(entry)
+			err := r.applyCommittedEntry(entry)
 			if err != nil {
 				return
 			}
