@@ -20,7 +20,12 @@ type ListArgs struct {
 
 //ExecuteStoreListCommand executes the list command for a store
 func ExecuteStoreListCommand(args *ListArgs) (*pb.ListStoreReply, error) {
-	peerConn, rpcClient, err := server.GetPeerConn(args.Address, args.Port)
+	leader, err := server.GetLeader(args.Address, args.Port)
+	if err != nil {
+		return nil, err
+	}
+
+	peerConn, rpcClient, err := server.GetPeerConn(leader.Address, leader.Port)
 	if err != nil {
 		return nil, err
 	}

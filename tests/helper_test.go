@@ -6,9 +6,9 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
-	"time"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
@@ -135,22 +135,30 @@ func (suite *YadosTestSuite) SetupTest() {
 	if err != nil {
 		suite.T().Error(err)
 	}
+
 }
 
-func (suite *YadosTestSuite) WaitForLeaderElection() {
-	foundLeader := false
-	for {
-		for _, m := range suite.cluster.members {
-			if m.State() == server.Leader {
-				foundLeader = true
-				break
-			}
-		}
-		if foundLeader {
-			break
-		}
-		time.Sleep(150 * time.Millisecond)
+func (suite *YadosTestSuite) WaitForLeaderElection() server.Server {
+	for _, s := range suite.cluster.members {
+		s.EventHandler().Subscribe(server.LeaderChangeEvents)
 	}
+
+	defer func() {
+		for _, s := range suite.cluster.members {
+			s.EventHandler().UnSubscribe(server.LeaderChangeEvents)
+		}
+	}()
+
+	var set []reflect.SelectCase
+	for _, s := range suite.cluster.members {
+		set = append(set, reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(s.EventHandler().LeaderChangeEvent()),
+		})
+	}
+	_, valValue, _ := reflect.Select(set)
+	peer := valValue.Interface().(server.Server)
+	return peer
 }
 
 func (suite *YadosTestSuite) Cleanup() {

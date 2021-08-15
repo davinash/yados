@@ -21,7 +21,7 @@ type Events interface {
 	SendEvent(interface{})
 
 	CommitEntryEvent() chan *pb.LogEntry
-	LeaderChangeEvent() chan *pb.Peer
+	LeaderChangeEvent() chan Server
 
 	Subscribe(EventType)
 	UnSubscribe(EventType)
@@ -30,7 +30,7 @@ type Events interface {
 type events struct {
 	mutex             sync.Mutex
 	commitEntryChan   chan *pb.LogEntry
-	leaderChangeChan  chan *pb.Peer
+	leaderChangeChan  chan Server
 	eventSubscription map[EventType]bool
 }
 
@@ -39,7 +39,7 @@ func NewEvents() Events {
 	e := &events{
 		eventSubscription: make(map[EventType]bool),
 		commitEntryChan:   make(chan *pb.LogEntry),
-		leaderChangeChan:  make(chan *pb.Peer),
+		leaderChangeChan:  make(chan Server),
 	}
 	return e
 }
@@ -60,7 +60,7 @@ func (ev *events) CommitEntryEvent() chan *pb.LogEntry {
 	return ev.commitEntryChan
 }
 
-func (ev *events) LeaderChangeEvent() chan *pb.Peer {
+func (ev *events) LeaderChangeEvent() chan Server {
 	return ev.leaderChangeChan
 }
 
@@ -69,7 +69,7 @@ func (ev *events) SendEvent(obj interface{}) {
 	defer ev.mutex.Unlock()
 
 	switch event := obj.(type) {
-	case *pb.Peer:
+	case Server:
 		if v, ok := ev.eventSubscription[LeaderChangeEvents]; ok {
 			if v {
 				ev.leaderChangeChan <- event

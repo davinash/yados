@@ -3,11 +3,9 @@ package server
 import (
 	"context"
 	"errors"
-	"log"
 	"sync"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -60,9 +58,15 @@ func (srv *server) RemovePeer(ctx context.Context, request *pb.RemovePeerRequest
 }
 
 func (srv *server) PeerStatus(ctx context.Context, request *pb.StatusRequest) (*pb.StatusReply, error) {
-	reply := &pb.StatusReply{Id: request.Id}
+	reply := &pb.StatusReply{
+		Id:       request.Id,
+		IsLeader: false,
+	}
 	reply.Server = srv.Self()
 	reply.Status = srv.State().String()
+	if srv.State() == Leader {
+		reply.IsLeader = true
+	}
 	return reply, nil
 }
 
@@ -116,33 +120,15 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 		return reply, ErrorStoreAlreadyExists
 	}
 
-	if srv.IsLeader() {
-		srv.Logger().Debug("yay this is leader")
-		requestBytes, err := proto.Marshal(request)
-		if err != nil {
-			return reply, err
-		}
-		srv.logger.Debug("submitting request to raft engine")
-		err = srv.SubmitToRaft(requestBytes, request.Id, pb.CommandType_CreateStore)
-		if err != nil {
-			return reply, err
-		}
-	} else {
-		srv.Logger().Debugf("not a leader, hoping request to %s:%d", srv.leader.Address, srv.leader.Port)
-		peerConn, rpcClient, err := GetPeerConn(srv.leader.Address, srv.leader.Port)
-		if err != nil {
-			return reply, nil
-		}
-		defer func(peerConn *grpc.ClientConn) {
-			err := peerConn.Close()
-			if err != nil {
-				log.Printf("failed to close the connection, error = %v\n", err)
-			}
-		}(peerConn)
-		_, err = rpcClient.CreateStore(context.Background(), request)
-		if err != nil {
-			return reply, nil
-		}
+	srv.Logger().Debug("yay this is leader")
+	requestBytes, err := proto.Marshal(request)
+	if err != nil {
+		return reply, err
+	}
+	srv.logger.Debug("submitting request to raft engine")
+	err = srv.SubmitToRaft(requestBytes, request.Id, pb.CommandType_CreateStore)
+	if err != nil {
+		return reply, err
 	}
 	return reply, nil
 }
@@ -158,34 +144,17 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 		return reply, ErrorStoreDoesExists
 	}
 
-	if srv.IsLeader() {
-		srv.Logger().Debug("yay this is leader")
-		requestBytes, err := proto.Marshal(request)
-		if err != nil {
-			return reply, err
-		}
-		srv.logger.Debug("submitting request to raft engine")
-		err = srv.SubmitToRaft(requestBytes, request.Id, pb.CommandType_Put)
-		if err != nil {
-			return reply, err
-		}
-	} else {
-		srv.Logger().Debugf("not a leader, hoping request to %s:%d", srv.leader.Address, srv.leader.Port)
-		peerConn, rpcClient, err := GetPeerConn(srv.leader.Address, srv.leader.Port)
-		if err != nil {
-			return reply, nil
-		}
-		defer func(peerConn *grpc.ClientConn) {
-			err := peerConn.Close()
-			if err != nil {
-				log.Printf("failed to close the connection, error = %v\n", err)
-			}
-		}(peerConn)
-		_, err = rpcClient.Put(context.Background(), request)
-		if err != nil {
-			return reply, nil
-		}
+	srv.Logger().Debug("yay this is leader")
+	requestBytes, err := proto.Marshal(request)
+	if err != nil {
+		return reply, err
 	}
+	srv.logger.Debug("submitting request to raft engine")
+	err = srv.SubmitToRaft(requestBytes, request.Id, pb.CommandType_Put)
+	if err != nil {
+		return reply, err
+	}
+
 	return reply, nil
 }
 
@@ -197,27 +166,10 @@ func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRepl
 		return reply, ErrorStoreDoesExists
 	}
 
-	if srv.IsLeader() {
-		srv.Logger().Debug("yay this is leader")
-		value := srv.Stores()[request.StoreName].Get(request)
-		reply.Value = value
-	} else {
-		srv.Logger().Debugf("not a leader, hoping request to %s:%d", srv.leader.Address, srv.leader.Port)
-		peerConn, rpcClient, err := GetPeerConn(srv.leader.Address, srv.leader.Port)
-		if err != nil {
-			return reply, nil
-		}
-		defer func(peerConn *grpc.ClientConn) {
-			err := peerConn.Close()
-			if err != nil {
-				log.Printf("failed to close the connection, error = %v\n", err)
-			}
-		}(peerConn)
-		reply, err = rpcClient.Get(context.Background(), request)
-		if err != nil {
-			return reply, nil
-		}
-	}
+	srv.Logger().Debug("yay this is leader")
+	value := srv.Stores()[request.StoreName].Get(request)
+	reply.Value = value
+
 	return reply, nil
 }
 
