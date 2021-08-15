@@ -436,7 +436,9 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 func (r *raft) startLeader() {
 	r.state = Leader
 
-	r.Server().SetLeader(r.Server().Self())
+	if r.Server().EventHandler() != nil {
+		r.Server().EventHandler().SendEvent(r.Server())
+	}
 
 	for _, peer := range r.Peers() {
 		r.nextIndex[peer.Name] = int64(len(r.Log()))
@@ -601,7 +603,6 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	if r.state == Dead {
 		return reply, nil
 	}
-	r.Server().SetLeader(request.Leader)
 
 	r.logger.Debugf("[%s] [%s]  Received AppendEntries, current Term = %v", r.state,
 		request.Id, r.currentTerm)
@@ -679,8 +680,6 @@ func (r *raft) becomeFollower(term int64) {
 	r.currentTerm = term
 	r.votedFor = ""
 	r.electionResetEvent = time.Now()
-
-	r.Server().SetLeader(nil)
 
 	r.wg.Add(1)
 	go func() {

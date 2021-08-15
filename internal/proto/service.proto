@@ -92,6 +92,7 @@ message StatusReply {
   string Id = 1;
   Peer server = 2;
   string Status = 3;
+  bool isLeader = 4;
 }
 
 message ClusterStatusRequest {
@@ -153,6 +154,7 @@ message GetReply {
   string Id = 1;
   string value = 2;
 }
+
 
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}

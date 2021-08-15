@@ -21,7 +21,11 @@ type GetArgs struct {
 
 //ExecuteGetCommand helper function to perform put command
 func ExecuteGetCommand(args *GetArgs) (*pb.GetReply, error) {
-	peerConn, rpcClient, err := server.GetPeerConn(args.Address, args.Port)
+	leader, err := server.GetLeader(args.Address, args.Port)
+	if err != nil {
+		return nil, err
+	}
+	peerConn, rpcClient, err := server.GetPeerConn(leader.Address, leader.Port)
 	if err != nil {
 		return nil, err
 	}

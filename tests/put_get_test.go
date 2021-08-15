@@ -44,6 +44,7 @@ func (suite *YadosTestSuite) TestPutGet() {
 
 func (suite *YadosTestSuite) TestPutGetMultiple() {
 	suite.WaitForLeaderElection()
+
 	err := store.CreateCommandExecute(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),

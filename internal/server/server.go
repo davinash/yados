@@ -36,9 +36,6 @@ type Server interface {
 	LogDir() string
 	PLog() PLog
 	StoreCreate(request *pb.StoreCreateRequest) error
-	IsLeader() bool
-	Leader() *pb.Peer
-	SetLeader(leader *pb.Peer)
 	Apply(entry *pb.LogEntry) error
 	Stores() map[string]Store
 
@@ -59,10 +56,8 @@ type server struct {
 	logDir     string
 	pLog       PLog
 	stores     map[string]Store
-	leader     *pb.Peer
 	isTestMode bool
-	//testArgs   *TestArgs
-	ev Events
+	ev         Events
 }
 
 //NewServerArgs argument structure for new server
@@ -150,7 +145,6 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		srv:        srv,
 		peers:      peers,
 		isTestMode: srv.isTestMode,
-		//testArgs:   srv.testArgs,
 	}
 	srv.raft, err = NewRaft(&args)
 	if err != nil {
@@ -244,18 +238,6 @@ func (srv *server) State() RaftState {
 
 func (srv *server) PLog() PLog {
 	return srv.pLog
-}
-
-func (srv *server) IsLeader() bool {
-	return srv.State() == Leader
-}
-
-func (srv *server) Leader() *pb.Peer {
-	return srv.leader
-}
-
-func (srv *server) SetLeader(leader *pb.Peer) {
-	srv.leader = leader
 }
 
 func (srv *server) Stores() map[string]Store {
