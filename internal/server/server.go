@@ -113,7 +113,7 @@ func (srv *server) GetOrCreateStorage() error {
 	}
 	srv.logDir = d
 
-	store, err := NewPLog(srv.LogDir(), srv.Logger())
+	store, err := NewPLog(srv)
 	if err != nil {
 		return err
 	}

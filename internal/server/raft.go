@@ -262,13 +262,17 @@ func (r *raft) Submit(command []byte, commandID string, cmdType pb.CommandType) 
 	if r.state != Leader {
 		return ErrorNotALeader
 	}
-	r.log = append(r.log, &pb.LogEntry{
+	entry := &pb.LogEntry{
 		Command:   command,
 		Term:      r.currentTerm,
 		CommandId: commandID,
 		CmdType:   cmdType,
-	})
-	r.persistToStorage()
+	}
+	r.log = append(r.log, entry)
+	err := r.persistToStorage([]*pb.LogEntry{entry})
+	if err != nil {
+		return err
+	}
 
 	r.triggerAEChan <- struct{}{}
 	r.logger.Debug("Exiting Submit")
@@ -425,7 +429,10 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 	reply.Term = r.currentTerm
 	reply.CandidateName = r.Server().Name()
 
-	r.persistToStorage()
+	err := r.persistToStorage(nil)
+	if err != nil {
+		return nil, err
+	}
 
 	r.logger.Debugf("[%s] RequestVote: Reply Term = %v; VoteGranted = %v; CandidateName = %s",
 		reply.Id, reply.Term, reply.VoteGranted, reply.CandidateName)
@@ -668,7 +675,10 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	}
 
 	reply.Term = r.currentTerm
-	r.persistToStorage()
+	err := r.persistToStorage(request.Entries)
+	if err != nil {
+		return nil, err
+	}
 	r.logger.Debugf("[%s] [%s] AppendEntries reply: Term = %v; ConflictTerm =%v; ConflictIndex =%v; Success =%v;",
 		r.state, request.Id, reply.Term, reply.ConflictTerm, reply.ConflictIndex, reply.Success)
 	return reply, nil
@@ -742,7 +752,14 @@ func (r *raft) lastLogIndexAndTerm() (int64, int64) {
 	return -1, -1
 }
 
-func (r *raft) persistToStorage() {
+func (r *raft) persistToStorage(entries []*pb.LogEntry) error {
+	for _, entry := range entries {
+		err := r.Server().PLog().Append(entry)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func intMin(a, b int64) int64 {

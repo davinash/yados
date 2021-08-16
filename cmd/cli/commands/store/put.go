@@ -23,7 +23,12 @@ type PutArgs struct {
 
 //ExecutePutCommand helper function to perform put command
 func ExecutePutCommand(args *PutArgs) error {
-	peerConn, rpcClient, err := server.GetPeerConn(args.Address, args.Port)
+	leader, err := server.GetLeader(args.Address, args.Port)
+	if err != nil {
+		return err
+	}
+
+	peerConn, rpcClient, err := server.GetPeerConn(leader.Address, leader.Port)
 	if err != nil {
 		return err
 	}

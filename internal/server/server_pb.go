@@ -120,7 +120,6 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 		return reply, ErrorStoreAlreadyExists
 	}
 
-	srv.Logger().Debug("yay this is leader")
 	requestBytes, err := proto.Marshal(request)
 	if err != nil {
 		return reply, err
@@ -144,7 +143,6 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 		return reply, ErrorStoreDoesExists
 	}
 
-	srv.Logger().Debug("yay this is leader")
 	requestBytes, err := proto.Marshal(request)
 	if err != nil {
 		return reply, err
@@ -166,7 +164,6 @@ func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRepl
 		return reply, ErrorStoreDoesExists
 	}
 
-	srv.Logger().Debug("yay this is leader")
 	value := srv.Stores()[request.StoreName].Get(request)
 	reply.Value = value
 
