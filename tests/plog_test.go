@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -58,4 +59,38 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 	// Wait for replication to happen
 	wg.Wait()
 
+	for _, member := range suite.cluster.members {
+		iterator, err := member.PLog().Iterator()
+		if err != nil {
+			suite.T().Error(err)
+		}
+		entry, err := iterator.Next()
+		if err != nil {
+			suite.T().Error(err)
+		}
+		count := 0
+		for entry != nil {
+			entry, err = iterator.Next()
+			if err != nil {
+				suite.T().Error(err)
+			}
+
+			if entry != nil {
+				marshal, err := json.Marshal(entry)
+				if err != nil {
+					suite.T().Error(err)
+				}
+				suite.T().Log(string(marshal))
+
+				count++
+			}
+		}
+		err = iterator.Close()
+		if err != nil {
+			suite.T().Error(err)
+		}
+		//if count != numOfPuts {
+		//	suite.T().Errorf("Expected entries = %d Actual = %d", numOfPuts, count)
+		//}
+	}
 }
