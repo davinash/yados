@@ -25,9 +25,9 @@ func CreateCommandExecute(args *CreateCommandArgs) error {
 		return err
 	}
 
-	peerConn, rpcClient, err := server.GetPeerConn(leader.Address, leader.Port)
-	if err != nil {
-		return err
+	peerConn, rpcClient, err1 := server.GetPeerConn(leader.Address, leader.Port)
+	if err1 != nil {
+		return err1
 	}
 	defer func(peerConn *grpc.ClientConn) {
 		err := peerConn.Close()
@@ -40,11 +40,6 @@ func CreateCommandExecute(args *CreateCommandArgs) error {
 		Name: args.Name,
 		Id:   uuid.New().String(),
 	}
-
-	//marshal, err := proto.Marshal(req)
-	//if err != nil {
-	//	return err
-	//}
 
 	_, err = rpcClient.CreateStore(context.Background(), req)
 	if err != nil {

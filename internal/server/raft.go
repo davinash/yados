@@ -258,16 +258,12 @@ func (r *raft) electionTimeout() time.Duration {
 var ErrorNotALeader = errors.New("now a leader")
 
 func (r *raft) Submit(command interface{}, commandID string, cmdType pb.CommandType) error {
-	r.logger.Debug("Entering Submit")
-
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	if r.state != Leader {
 		return ErrorNotALeader
 	}
-
-	r.logger.Debugf("Command ----> %+v", command)
 
 	pv, ok := command.(proto.Message)
 	if !ok {
@@ -286,13 +282,13 @@ func (r *raft) Submit(command interface{}, commandID string, cmdType pb.CommandT
 		CmdType:   cmdType,
 	}
 	r.log = append(r.log, entry)
+
 	err = r.persistToStorage([]*pb.LogEntry{entry})
 	if err != nil {
 		return err
 	}
 
 	r.triggerAEChan <- struct{}{}
-	r.logger.Debug("Exiting Submit")
 	return nil
 }
 

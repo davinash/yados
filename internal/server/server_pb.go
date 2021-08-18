@@ -2,8 +2,11 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
@@ -119,11 +122,14 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 		return reply, ErrorStoreAlreadyExists
 	}
 
-	//requestBytes, err := proto.Marshal(request)
-	//if err != nil {
-	//	return reply, err
-	//}
-	srv.logger.Debug("submitting request to raft engine")
+	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		marshal, err := json.Marshal(request)
+		if err != nil {
+			return nil, err
+		}
+		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
+	}
+
 	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_CreateStore)
 	if err != nil {
 		return reply, err
@@ -141,8 +147,14 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 		reply.Error = ErrorStoreDoesExists.Error()
 		return reply, ErrorStoreDoesExists
 	}
+	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		marshal, err := json.Marshal(request)
+		if err != nil {
+			return nil, err
+		}
+		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
+	}
 
-	srv.logger.Debug("submitting request to raft engine")
 	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_Put)
 	if err != nil {
 		return reply, err

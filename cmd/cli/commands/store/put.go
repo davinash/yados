@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 
+	"github.com/google/uuid"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
@@ -41,6 +43,7 @@ func ExecutePutCommand(args *PutArgs) error {
 		StoreName: args.StoreName,
 		Key:       args.Key,
 		Value:     args.Value,
+		Id:        uuid.New().String(),
 	}
 
 	_, err = rpcClient.Put(context.Background(), req)

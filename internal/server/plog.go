@@ -2,11 +2,14 @@ package server
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"google.golang.org/protobuf/proto"
 
@@ -93,6 +96,32 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 		return err
 	}
 	m.size++
+
+	if m.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		var commandStr []byte
+
+		switch entry.CmdType {
+		case pb.CommandType_CreateStore:
+			var command pb.StoreCreateRequest
+			err = anypb.UnmarshalTo(entry.Command, &command, proto.UnmarshalOptions{})
+			if err != nil {
+			}
+			commandStr, err = json.Marshal(&command)
+			if err != nil {
+			}
+
+		case pb.CommandType_Put:
+			var command pb.PutRequest
+			err = anypb.UnmarshalTo(entry.Command, &command, proto.UnmarshalOptions{})
+			if err != nil {
+			}
+			commandStr, err = json.MarshalIndent(&command, "", "   ")
+			if err != nil {
+			}
+		}
+		m.logger.Debugf("[%s] Entry Appended (Term = %v, Index = %v ) \nValue = %s",
+			entry.CommandId, entry.Term, entry.Index, string(commandStr))
+	}
 
 	if m.server.EventHandler() != nil {
 		if m.size == m.server.EventHandler().PersistEntryEventThreshold() {
