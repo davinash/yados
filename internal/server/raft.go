@@ -3,9 +3,13 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
+
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/sirupsen/logrus"
 
@@ -50,9 +54,9 @@ type Raft interface {
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.LogEntry
-	Submit([]byte, string, pb.CommandType) error
+	Submit(interface{}, string, pb.CommandType) error
 	AddCommandListener(string) error
-	WaitForCommandCompletion([]byte, string, pb.CommandType)
+	WaitForCommandCompletion(string)
 }
 
 type raft struct {
@@ -198,7 +202,7 @@ func (r *raft) AddCommandListener(id string) error {
 	return nil
 }
 
-func (r *raft) WaitForCommandCompletion(requestBytes []byte, id string, cmdType pb.CommandType) {
+func (r *raft) WaitForCommandCompletion(id string) {
 	r.logger.Debugf("WaitForCommandCompletion for %s", id)
 	if v, ok := r.commitsChanMap[id]; ok {
 		<-v
@@ -253,7 +257,7 @@ func (r *raft) electionTimeout() time.Duration {
 //ErrorNotALeader error returned where no server leader
 var ErrorNotALeader = errors.New("now a leader")
 
-func (r *raft) Submit(command []byte, commandID string, cmdType pb.CommandType) error {
+func (r *raft) Submit(command interface{}, commandID string, cmdType pb.CommandType) error {
 	r.logger.Debug("Entering Submit")
 
 	r.mutex.Lock()
@@ -262,14 +266,27 @@ func (r *raft) Submit(command []byte, commandID string, cmdType pb.CommandType) 
 	if r.state != Leader {
 		return ErrorNotALeader
 	}
+
+	r.logger.Debugf("Command ----> %+v", command)
+
+	pv, ok := command.(proto.Message)
+	if !ok {
+		panic(fmt.Sprintf("%v is not proto.Message", pv))
+	}
+
+	any, err := anypb.New(pv)
+	if err != nil {
+		return err
+	}
+
 	entry := &pb.LogEntry{
-		Command:   command,
+		Command:   any,
 		Term:      r.currentTerm,
 		CommandId: commandID,
 		CmdType:   cmdType,
 	}
 	r.log = append(r.log, entry)
-	err := r.persistToStorage([]*pb.LogEntry{entry})
+	err = r.persistToStorage([]*pb.LogEntry{entry})
 	if err != nil {
 		return err
 	}

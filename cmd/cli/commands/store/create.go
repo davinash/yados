@@ -4,11 +4,9 @@ import (
 	"context"
 	"log"
 
-	"github.com/google/uuid"
-	"google.golang.org/protobuf/proto"
-
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 )
@@ -38,17 +36,17 @@ func CreateCommandExecute(args *CreateCommandArgs) error {
 		}
 	}(peerConn)
 
-	req := &pb.StoreCreateRequest{Name: args.Name}
-	marshal, err := proto.Marshal(req)
-	if err != nil {
-		return err
+	req := &pb.StoreCreateRequest{
+		Name: args.Name,
+		Id:   uuid.New().String(),
 	}
 
-	_, err = rpcClient.RunCommand(context.Background(), &pb.CommandRequest{
-		Id:      uuid.New().String(),
-		Args:    marshal,
-		CmdType: pb.CommandType_CreateStore,
-	})
+	//marshal, err := proto.Marshal(req)
+	//if err != nil {
+	//	return err
+	//}
+
+	_, err = rpcClient.CreateStore(context.Background(), req)
 	if err != nil {
 		return err
 	}

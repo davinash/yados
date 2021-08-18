@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/sirupsen/logrus"
@@ -169,7 +171,7 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 	switch entry.CmdType {
 	case pb.CommandType_CreateStore:
 		var scr pb.StoreCreateRequest
-		err := proto.Unmarshal(entry.Command, &scr)
+		err := anypb.UnmarshalTo(entry.Command, &scr, proto.UnmarshalOptions{})
 		if err != nil {
 			return err
 		}
@@ -179,7 +181,7 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		}
 	case pb.CommandType_Put:
 		var putRequest pb.PutRequest
-		err := proto.Unmarshal(entry.Command, &putRequest)
+		err := anypb.UnmarshalTo(entry.Command, &putRequest, proto.UnmarshalOptions{})
 		if err != nil {
 			return err
 		}

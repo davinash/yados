@@ -6,10 +6,8 @@ import (
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 )
 
 //PutArgs argument structure for this command
@@ -44,16 +42,8 @@ func ExecutePutCommand(args *PutArgs) error {
 		Key:       args.Key,
 		Value:     args.Value,
 	}
-	marshal, err := proto.Marshal(req)
-	if err != nil {
-		return err
-	}
 
-	_, err = rpcClient.RunCommand(context.Background(), &pb.CommandRequest{
-		Id:      uuid.New().String(),
-		Args:    marshal,
-		CmdType: pb.CommandType_Put,
-	})
+	_, err = rpcClient.Put(context.Background(), req)
 	if err != nil {
 		return err
 	}

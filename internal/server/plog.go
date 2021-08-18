@@ -92,16 +92,6 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 	if err != nil {
 		return err
 	}
-
-	//length := len(entryBytes)
-	//_, err = m.storeFh.WriteString(fmt.Sprintf("%d", length))
-	//if err != nil {
-	//	return err
-	//}
-	//_, err = m.storeFh.Write(entryBytes)
-	//if err != nil {
-	//	return err
-	//}
 	m.size++
 
 	if m.server.EventHandler() != nil {
