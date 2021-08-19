@@ -8,6 +8,7 @@ import (
 
 func (suite *YadosTestSuite) TestPutGet() {
 	suite.WaitForLeaderElection()
+
 	err := store.CreateCommandExecute(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),

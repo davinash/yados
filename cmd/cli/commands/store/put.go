@@ -4,12 +4,12 @@ import (
 	"context"
 	"log"
 
+	"github.com/google/uuid"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 )
 
 //PutArgs argument structure for this command
@@ -23,9 +23,14 @@ type PutArgs struct {
 
 //ExecutePutCommand helper function to perform put command
 func ExecutePutCommand(args *PutArgs) error {
-	peerConn, rpcClient, err := server.GetPeerConn(args.Address, args.Port)
+	leader, err := server.GetLeader(args.Address, args.Port)
 	if err != nil {
 		return err
+	}
+
+	peerConn, rpcClient, err1 := server.GetPeerConn(leader.Address, leader.Port)
+	if err1 != nil {
+		return err1
 	}
 	defer func(peerConn *grpc.ClientConn) {
 		err := peerConn.Close()
@@ -38,17 +43,10 @@ func ExecutePutCommand(args *PutArgs) error {
 		StoreName: args.StoreName,
 		Key:       args.Key,
 		Value:     args.Value,
-	}
-	marshal, err := proto.Marshal(req)
-	if err != nil {
-		return err
+		Id:        uuid.New().String(),
 	}
 
-	_, err = rpcClient.RunCommand(context.Background(), &pb.CommandRequest{
-		Id:      uuid.New().String(),
-		Args:    marshal,
-		CmdType: pb.CommandType_Put,
-	})
+	_, err = rpcClient.Put(context.Background(), req)
 	if err != nil {
 		return err
 	}

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/google/uuid"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
@@ -95,7 +97,6 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 	switch serviceMethod {
 	case "RPC.RequestVote":
 		request := args.(*pb.VoteRequest)
-		request.Id = uuid.New().String()
 		rpc.Server().Logger().Debugf("[%s] Type = RequestVotes %s -----> %s  "+
 			"Request : {Term = %v Candidate Name = %v }", request.Id, rpc.Server().Name(), peer.Name,
 			request.Term, request.CandidateName)
@@ -107,7 +108,6 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 		return reply, nil
 	case "server.AddNewMember":
 		request := args.(*pb.NewPeerRequest)
-		request.Id = uuid.New().String()
 		rpc.Server().Logger().Debugf("[%s] Type = AddNewMember %s -----> %s  ",
 			request.Id, rpc.Server().Name(), peer.Name)
 
@@ -118,17 +118,18 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 		return reply, nil
 	case "RPC.AppendEntries":
 		request := args.(*pb.AppendEntryRequest)
-		request.Id = uuid.New().String()
 
-		marshal, err := json.MarshalIndent(request, "", "   ")
-		if err != nil {
-			return nil, err
+		if rpc.Server().Logger().Logger.IsLevelEnabled(logrus.DebugLevel) {
+			marshal, err := json.MarshalIndent(request, "", "   ")
+			if err != nil {
+				return nil, err
+			}
+
+			rpc.Server().Logger().Debugf("[%s] AppendEntries ( -> %s ) : nextIndex = %d Term = %v; LeaderName = "+
+				"%v; PrevLogTerm = %v; PrevLogIndex = %v; LeaderCommit = %v \nrequest = %s", request.Id,
+				peer.Name, request.NextIndex, request.Term, request.Leader.Name, request.PrevLogTerm,
+				request.PrevLogIndex, request.LeaderCommit, string(marshal))
 		}
-
-		rpc.Server().Logger().Debugf("[%s] AppendEntries ( -> %s ) : nextIndex = %d Term = %v; LeaderName = "+
-			"%v; PrevLogTerm = %v; PrevLogIndex = %v; LeaderCommit = %v \nrequest = %s", request.Id,
-			peer.Name, request.NextIndex, request.Term, request.Leader.Name, request.PrevLogTerm,
-			request.PrevLogIndex, request.LeaderCommit, string(marshal))
 
 		reply, err := rpcClient.AppendEntries(context.Background(), request)
 		if err != nil {

@@ -1,6 +1,7 @@
 syntax = "proto3";
 option go_package = "/gen";
 
+import "google/protobuf/any.proto";
 
 enum CommandType {
   CreateStore = 0;
@@ -28,8 +29,8 @@ message VoteReply {
 message LogEntry {
   int64 Term = 1;
   int64 Index = 2;
-  bytes Command = 3;
-  string CommandId = 4;
+  google.protobuf.Any Command = 3;
+  string Id = 4;
   CommandType CmdType = 5;
 }
 
@@ -164,7 +165,6 @@ service YadosService {
   rpc PeerStatus(StatusRequest) returns (StatusReply) {}
   rpc ClusterStatus(ClusterStatusRequest) returns (ClusterStatusReply) {}
   rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
-  rpc RunCommand(CommandRequest) returns (CommandReply){}
   rpc ListStores(ListStoreRequest) returns (ListStoreReply) {}
   rpc Put(PutRequest) returns (PutReply) {}
   rpc Get(GetRequest) returns(GetReply) {}

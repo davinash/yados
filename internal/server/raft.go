@@ -3,9 +3,15 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/sirupsen/logrus"
 
@@ -50,9 +56,9 @@ type Raft interface {
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.LogEntry
-	Submit([]byte, string, pb.CommandType) error
+	Submit(interface{}, string, pb.CommandType) error
 	AddCommandListener(string) error
-	WaitForCommandCompletion([]byte, string, pb.CommandType)
+	WaitForCommandCompletion(string)
 }
 
 type raft struct {
@@ -113,6 +119,7 @@ func NewRaft(args *RaftArgs) (Raft, error) {
 
 	for _, p := range args.peers {
 		_, err := args.srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
+			Id: uuid.New().String(),
 			NewPeer: &pb.Peer{
 				Name:    args.srv.Name(),
 				Address: args.srv.Address(),
@@ -193,13 +200,13 @@ func (r *raft) Peers() map[string]*pb.Peer {
 }
 
 func (r *raft) AddCommandListener(id string) error {
-	r.logger.Debugf("adding command listener for %s", id)
+	r.logger.Debugf("[%s] Adding command listener for %s", r.Server().Name(), id)
 	r.commitsChanMap[id] = make(chan struct{})
 	return nil
 }
 
-func (r *raft) WaitForCommandCompletion(requestBytes []byte, id string, cmdType pb.CommandType) {
-	r.logger.Debugf("WaitForCommandCompletion for %s", id)
+func (r *raft) WaitForCommandCompletion(id string) {
+	r.logger.Debugf("[%s] WaitForCommandCompletion for %s", r.Server().Name(), id)
 	if v, ok := r.commitsChanMap[id]; ok {
 		<-v
 	}
@@ -253,25 +260,38 @@ func (r *raft) electionTimeout() time.Duration {
 //ErrorNotALeader error returned where no server leader
 var ErrorNotALeader = errors.New("now a leader")
 
-func (r *raft) Submit(command []byte, commandID string, cmdType pb.CommandType) error {
-	r.logger.Debug("Entering Submit")
-
+func (r *raft) Submit(command interface{}, commandID string, cmdType pb.CommandType) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	if r.state != Leader {
 		return ErrorNotALeader
 	}
-	r.log = append(r.log, &pb.LogEntry{
-		Command:   command,
-		Term:      r.currentTerm,
-		CommandId: commandID,
-		CmdType:   cmdType,
-	})
-	r.persistToStorage()
+
+	pv, ok := command.(proto.Message)
+	if !ok {
+		panic(fmt.Sprintf("%v is not proto.Message", pv))
+	}
+
+	any, err := anypb.New(pv)
+	if err != nil {
+		return err
+	}
+
+	entry := &pb.LogEntry{
+		Command: any,
+		Term:    r.currentTerm,
+		Id:      commandID,
+		CmdType: cmdType,
+	}
+	r.log = append(r.log, entry)
+
+	err = r.persistToStorage([]*pb.LogEntry{entry})
+	if err != nil {
+		return err
+	}
 
 	r.triggerAEChan <- struct{}{}
-	r.logger.Debug("Exiting Submit")
 	return nil
 }
 
@@ -367,6 +387,7 @@ func (r *raft) startElection() {
 				CandidateName: r.Server().Name(),
 				LastLogIndex:  savedLastLogIndex,
 				LastLogTerm:   savedLastLogTerm,
+				Id:            uuid.New().String(),
 			}
 			// Send request vote to all peer
 			resp, err := r.Server().Send(peer, "RPC.RequestVote", &args)
@@ -425,7 +446,10 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 	reply.Term = r.currentTerm
 	reply.CandidateName = r.Server().Name()
 
-	r.persistToStorage()
+	err := r.persistToStorage(nil)
+	if err != nil {
+		return nil, err
+	}
 
 	r.logger.Debugf("[%s] RequestVote: Reply Term = %v; VoteGranted = %v; CandidateName = %s",
 		reply.Id, reply.Term, reply.VoteGranted, reply.CandidateName)
@@ -549,7 +573,7 @@ func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb
 	}
 }
 
-func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64) (*pb.AppendEntryRequest, int64, []*pb.LogEntry) {
+func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string) (*pb.AppendEntryRequest, int64, []*pb.LogEntry) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -570,6 +594,7 @@ func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64) (*pb.Appen
 		Entries:      entries,
 		LeaderCommit: r.commitIndex,
 		NextIndex:    nextIndex,
+		Id:           id,
 	}
 	return &request, nextIndex, entries
 }
@@ -579,12 +604,14 @@ func (r *raft) leaderSendAEs() {
 	savedCurrentTerm := r.currentTerm
 	r.mutex.Unlock()
 
+	id := uuid.New().String()
+
 	for _, peer := range r.Peers() {
 		r.wg.Add(1)
 		go func(peer *pb.Peer) {
 			defer r.wg.Done()
 
-			request, nextIndex, entries := r.createAERequest(peer, savedCurrentTerm)
+			request, nextIndex, entries := r.createAERequest(peer, savedCurrentTerm, id)
 
 			resp, err := r.Server().Send(peer, "RPC.AppendEntries", request)
 			if err != nil {
@@ -639,8 +666,20 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 			if newEntriesIndex < len(request.Entries) {
 				r.logger.Debugf("[%s] [%s] inserting entries %v from index %d", r.state,
 					request.Id, request.Entries[newEntriesIndex:], logInsertIndex)
+
 				r.log = append(r.log[:logInsertIndex], request.Entries[newEntriesIndex:]...)
-				r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, r.log)
+
+				if r.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+					ids := make([]string, 0)
+					for _, l := range r.log {
+						ids = append(ids, l.Id)
+					}
+					//r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, ids)
+				}
+				err := r.persistToStorage(request.Entries[newEntriesIndex:])
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			if request.LeaderCommit > r.commitIndex {
@@ -666,9 +705,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 			}
 		}
 	}
-
 	reply.Term = r.currentTerm
-	r.persistToStorage()
 	r.logger.Debugf("[%s] [%s] AppendEntries reply: Term = %v; ConflictTerm =%v; ConflictIndex =%v; Success =%v;",
 		r.state, request.Id, reply.Term, reply.ConflictTerm, reply.ConflictIndex, reply.Success)
 	return reply, nil
@@ -700,7 +737,7 @@ func (r *raft) applyCommittedEntry(entry *pb.LogEntry) error {
 	if err != nil {
 		return err
 	}
-	if c, ok := r.commitsChanMap[entry.CommandId]; ok {
+	if c, ok := r.commitsChanMap[entry.Id]; ok {
 		close(c)
 	}
 	return nil
@@ -742,7 +779,14 @@ func (r *raft) lastLogIndexAndTerm() (int64, int64) {
 	return -1, -1
 }
 
-func (r *raft) persistToStorage() {
+func (r *raft) persistToStorage(entries []*pb.LogEntry) error {
+	for _, entry := range entries {
+		err := r.Server().PLog().Append(entry)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func intMin(a, b int64) int64 {

@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
-	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -89,7 +91,7 @@ func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusR
 	return reply, nil
 }
 
-func (srv *server) SubmitToRaft(requestBytes []byte, ID string, cmdType pb.CommandType) error {
+func (srv *server) SubmitToRaft(request interface{}, ID string, cmdType pb.CommandType) error {
 	err := srv.Raft().AddCommandListener(ID)
 	if err != nil {
 		return err
@@ -98,10 +100,10 @@ func (srv *server) SubmitToRaft(requestBytes []byte, ID string, cmdType pb.Comma
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		srv.Raft().WaitForCommandCompletion(requestBytes, ID, cmdType)
+		srv.Raft().WaitForCommandCompletion(ID)
 	}()
 
-	err = srv.Raft().Submit(requestBytes, ID, cmdType)
+	err = srv.Raft().Submit(request, ID, cmdType)
 	if err != nil {
 		return err
 	}
@@ -120,13 +122,15 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 		return reply, ErrorStoreAlreadyExists
 	}
 
-	srv.Logger().Debug("yay this is leader")
-	requestBytes, err := proto.Marshal(request)
-	if err != nil {
-		return reply, err
+	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		marshal, err := json.Marshal(request)
+		if err != nil {
+			return nil, err
+		}
+		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
 	}
-	srv.logger.Debug("submitting request to raft engine")
-	err = srv.SubmitToRaft(requestBytes, request.Id, pb.CommandType_CreateStore)
+
+	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_CreateStore)
 	if err != nil {
 		return reply, err
 	}
@@ -143,14 +147,15 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 		reply.Error = ErrorStoreDoesExists.Error()
 		return reply, ErrorStoreDoesExists
 	}
-
-	srv.Logger().Debug("yay this is leader")
-	requestBytes, err := proto.Marshal(request)
-	if err != nil {
-		return reply, err
+	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		marshal, err := json.Marshal(request)
+		if err != nil {
+			return nil, err
+		}
+		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
 	}
-	srv.logger.Debug("submitting request to raft engine")
-	err = srv.SubmitToRaft(requestBytes, request.Id, pb.CommandType_Put)
+
+	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_Put)
 	if err != nil {
 		return reply, err
 	}
@@ -166,41 +171,9 @@ func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRepl
 		return reply, ErrorStoreDoesExists
 	}
 
-	srv.Logger().Debug("yay this is leader")
 	value := srv.Stores()[request.StoreName].Get(request)
 	reply.Value = value
 
-	return reply, nil
-}
-
-func (srv *server) RunCommand(ctx context.Context, command *pb.CommandRequest) (*pb.CommandReply, error) {
-	reply := &pb.CommandReply{}
-	switch command.CmdType {
-	case pb.CommandType_CreateStore:
-		var request pb.StoreCreateRequest
-		err := proto.Unmarshal(command.Args, &request)
-		if err != nil {
-			return reply, err
-		}
-		request.Id = command.Id
-
-		_, err = srv.CreateStore(ctx, &request)
-		if err != nil {
-			return reply, err
-		}
-	case pb.CommandType_Put:
-		var request pb.PutRequest
-		err := proto.Unmarshal(command.Args, &request)
-		if err != nil {
-			return reply, err
-		}
-		request.Id = command.Id
-
-		_, err = srv.Put(ctx, &request)
-		if err != nil {
-			return reply, err
-		}
-	}
 	return reply, nil
 }
 

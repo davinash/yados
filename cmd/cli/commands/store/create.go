@@ -4,11 +4,9 @@ import (
 	"context"
 	"log"
 
-	"github.com/google/uuid"
-	"google.golang.org/protobuf/proto"
-
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 )
@@ -27,9 +25,9 @@ func CreateCommandExecute(args *CreateCommandArgs) error {
 		return err
 	}
 
-	peerConn, rpcClient, err := server.GetPeerConn(leader.Address, leader.Port)
-	if err != nil {
-		return err
+	peerConn, rpcClient, err1 := server.GetPeerConn(leader.Address, leader.Port)
+	if err1 != nil {
+		return err1
 	}
 	defer func(peerConn *grpc.ClientConn) {
 		err := peerConn.Close()
@@ -38,17 +36,12 @@ func CreateCommandExecute(args *CreateCommandArgs) error {
 		}
 	}(peerConn)
 
-	req := &pb.StoreCreateRequest{Name: args.Name}
-	marshal, err := proto.Marshal(req)
-	if err != nil {
-		return err
+	req := &pb.StoreCreateRequest{
+		Name: args.Name,
+		Id:   uuid.New().String(),
 	}
 
-	_, err = rpcClient.RunCommand(context.Background(), &pb.CommandRequest{
-		Id:      uuid.New().String(),
-		Args:    marshal,
-		CmdType: pb.CommandType_CreateStore,
-	})
+	_, err = rpcClient.CreateStore(context.Background(), req)
 	if err != nil {
 		return err
 	}

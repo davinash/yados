@@ -12,6 +12,7 @@ type Store interface {
 	Get(*pb.GetRequest) string
 	Name() string
 	Delete() error
+	InternalMap() map[string]string
 }
 
 //StoreArgs arguments for creating new store
@@ -36,6 +37,10 @@ func NewStore(args *StoreArgs) Store {
 
 func (s *store) Name() string {
 	return s.name
+}
+
+func (s *store) InternalMap() map[string]string {
+	return s.kv
 }
 
 func (s *store) Put(putRequest *pb.PutRequest) error {
