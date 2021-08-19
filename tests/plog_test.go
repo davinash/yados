@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -16,10 +15,9 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 	numOfPuts := 10
 
 	for _, s := range suite.cluster.members {
-		s.EventHandler().Subscribe(server.EntryPersistEvents)
 		s.EventHandler().SetPersistEntryEventThreshold(numOfPuts)
+		s.EventHandler().Subscribe(server.EntryPersistEvents)
 	}
-
 	defer func() {
 		for _, s := range suite.cluster.members {
 			s.EventHandler().UnSubscribe(server.EntryPersistEvents)
@@ -64,33 +62,25 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 		if err != nil {
 			suite.T().Error(err)
 		}
-		entry, err := iterator.Next()
-		if err != nil {
-			suite.T().Error(err)
+		entry, err1 := iterator.Next()
+		if err1 != nil {
+			suite.T().Error(err1)
 		}
 		count := 0
 		for entry != nil {
+			count++
 			entry, err = iterator.Next()
 			if err != nil {
 				suite.T().Error(err)
-			}
-
-			if entry != nil {
-				marshal, err := json.Marshal(entry)
-				if err != nil {
-					suite.T().Error(err)
-				}
-				suite.T().Log(string(marshal))
-
-				count++
 			}
 		}
 		err = iterator.Close()
 		if err != nil {
 			suite.T().Error(err)
 		}
-		//if count != numOfPuts {
-		//	suite.T().Errorf("Expected entries = %d Actual = %d", numOfPuts, count)
-		//}
+
+		if count != numOfPuts+1 {
+			suite.T().Errorf("[%s] Expected entries = %d Actual = %d", member.Name(), numOfPuts, count)
+		}
 	}
 }

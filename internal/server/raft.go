@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -117,6 +119,7 @@ func NewRaft(args *RaftArgs) (Raft, error) {
 
 	for _, p := range args.peers {
 		_, err := args.srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
+			Id: uuid.New().String(),
 			NewPeer: &pb.Peer{
 				Name:    args.srv.Name(),
 				Address: args.srv.Address(),
@@ -197,13 +200,13 @@ func (r *raft) Peers() map[string]*pb.Peer {
 }
 
 func (r *raft) AddCommandListener(id string) error {
-	r.logger.Debugf("adding command listener for %s", id)
+	r.logger.Debugf("[%s] Adding command listener for %s", r.Server().Name(), id)
 	r.commitsChanMap[id] = make(chan struct{})
 	return nil
 }
 
 func (r *raft) WaitForCommandCompletion(id string) {
-	r.logger.Debugf("WaitForCommandCompletion for %s", id)
+	r.logger.Debugf("[%s] WaitForCommandCompletion for %s", r.Server().Name(), id)
 	if v, ok := r.commitsChanMap[id]; ok {
 		<-v
 	}
@@ -276,10 +279,10 @@ func (r *raft) Submit(command interface{}, commandID string, cmdType pb.CommandT
 	}
 
 	entry := &pb.LogEntry{
-		Command:   any,
-		Term:      r.currentTerm,
-		CommandId: commandID,
-		CmdType:   cmdType,
+		Command: any,
+		Term:    r.currentTerm,
+		Id:      commandID,
+		CmdType: cmdType,
 	}
 	r.log = append(r.log, entry)
 
@@ -384,6 +387,7 @@ func (r *raft) startElection() {
 				CandidateName: r.Server().Name(),
 				LastLogIndex:  savedLastLogIndex,
 				LastLogTerm:   savedLastLogTerm,
+				Id:            uuid.New().String(),
 			}
 			// Send request vote to all peer
 			resp, err := r.Server().Send(peer, "RPC.RequestVote", &args)
@@ -569,7 +573,7 @@ func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb
 	}
 }
 
-func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64) (*pb.AppendEntryRequest, int64, []*pb.LogEntry) {
+func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string) (*pb.AppendEntryRequest, int64, []*pb.LogEntry) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -590,6 +594,7 @@ func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64) (*pb.Appen
 		Entries:      entries,
 		LeaderCommit: r.commitIndex,
 		NextIndex:    nextIndex,
+		Id:           id,
 	}
 	return &request, nextIndex, entries
 }
@@ -599,12 +604,14 @@ func (r *raft) leaderSendAEs() {
 	savedCurrentTerm := r.currentTerm
 	r.mutex.Unlock()
 
+	id := uuid.New().String()
+
 	for _, peer := range r.Peers() {
 		r.wg.Add(1)
 		go func(peer *pb.Peer) {
 			defer r.wg.Done()
 
-			request, nextIndex, entries := r.createAERequest(peer, savedCurrentTerm)
+			request, nextIndex, entries := r.createAERequest(peer, savedCurrentTerm, id)
 
 			resp, err := r.Server().Send(peer, "RPC.AppendEntries", request)
 			if err != nil {
@@ -659,8 +666,20 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 			if newEntriesIndex < len(request.Entries) {
 				r.logger.Debugf("[%s] [%s] inserting entries %v from index %d", r.state,
 					request.Id, request.Entries[newEntriesIndex:], logInsertIndex)
+
 				r.log = append(r.log[:logInsertIndex], request.Entries[newEntriesIndex:]...)
-				r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, r.log)
+
+				if r.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+					ids := make([]string, 0)
+					for _, l := range r.log {
+						ids = append(ids, l.Id)
+					}
+					r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, ids)
+				}
+				err := r.persistToStorage(request.Entries[newEntriesIndex:])
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			if request.LeaderCommit > r.commitIndex {
@@ -686,12 +705,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 			}
 		}
 	}
-
 	reply.Term = r.currentTerm
-	err := r.persistToStorage(request.Entries)
-	if err != nil {
-		return nil, err
-	}
 	r.logger.Debugf("[%s] [%s] AppendEntries reply: Term = %v; ConflictTerm =%v; ConflictIndex =%v; Success =%v;",
 		r.state, request.Id, reply.Term, reply.ConflictTerm, reply.ConflictIndex, reply.Success)
 	return reply, nil
@@ -723,7 +737,7 @@ func (r *raft) applyCommittedEntry(entry *pb.LogEntry) error {
 	if err != nil {
 		return err
 	}
-	if c, ok := r.commitsChanMap[entry.CommandId]; ok {
+	if c, ok := r.commitsChanMap[entry.Id]; ok {
 		close(c)
 	}
 	return nil

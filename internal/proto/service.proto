@@ -30,7 +30,7 @@ message LogEntry {
   int64 Term = 1;
   int64 Index = 2;
   google.protobuf.Any Command = 3;
-  string CommandId = 4;
+  string Id = 4;
   CommandType CmdType = 5;
 }
 

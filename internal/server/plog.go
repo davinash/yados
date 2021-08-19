@@ -115,12 +115,12 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 			err = anypb.UnmarshalTo(entry.Command, &command, proto.UnmarshalOptions{})
 			if err != nil {
 			}
-			commandStr, err = json.MarshalIndent(&command, "", "   ")
+			commandStr, err = json.Marshal(&command)
 			if err != nil {
 			}
 		}
-		m.logger.Debugf("[%s] Entry Appended (Term = %v, Index = %v ) \nValue = %s",
-			entry.CommandId, entry.Term, entry.Index, string(commandStr))
+		m.logger.Debugf("[%s] Entry Appended (Term = %v, Index = %v ) Value = %s",
+			entry.Id, entry.Term, entry.Index, string(commandStr))
 	}
 
 	if m.server.EventHandler() != nil {
@@ -128,7 +128,6 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 			m.server.EventHandler().SendEvent(m.size)
 		}
 	}
-
 	return nil
 }
 
@@ -172,6 +171,7 @@ func (p *pLogIterator) Next() (*pb.LogEntry, error) {
 		if bytesRead >= len(headerBuf) {
 			return nil, ErrInvalidVarint
 		}
+
 		newBytesRead, err := p.storeRH.Read(headerBuf[bytesRead : bytesRead+1])
 		if newBytesRead == 0 {
 			if err != nil {
@@ -187,7 +187,6 @@ func (p *pLogIterator) Next() (*pb.LogEntry, error) {
 	}
 	messageBuf := make([]byte, messageLength)
 	_, err := io.ReadFull(p.storeRH, messageBuf)
-	//bytesRead += newBytesRead
 	if err != nil {
 		return nil, err
 	}

@@ -28,9 +28,9 @@ func ExecutePutCommand(args *PutArgs) error {
 		return err
 	}
 
-	peerConn, rpcClient, err := server.GetPeerConn(leader.Address, leader.Port)
-	if err != nil {
-		return err
+	peerConn, rpcClient, err1 := server.GetPeerConn(leader.Address, leader.Port)
+	if err1 != nil {
+		return err1
 	}
 	defer func(peerConn *grpc.ClientConn) {
 		err := peerConn.Close()
