@@ -674,7 +674,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 					for _, l := range r.log {
 						ids = append(ids, l.Id)
 					}
-					r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, ids)
+					//r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, ids)
 				}
 				err := r.persistToStorage(request.Entries[newEntriesIndex:])
 				if err != nil {
