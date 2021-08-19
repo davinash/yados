@@ -132,6 +132,9 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 }
 
 func (m *plog) Size() int {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	return m.size
 }
 

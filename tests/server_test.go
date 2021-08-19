@@ -4,10 +4,11 @@ func (suite *YadosTestSuite) TestServerNewLeader() {
 	leader := suite.WaitForLeaderElection()
 
 	for i := 4; i < 7; i++ {
-		err := suite.AddNewServer(i)
+		srv, err := AddNewServer(i, suite.cluster.members, suite.logDir)
 		if err != nil {
 			suite.T().Fail()
 		}
+		suite.cluster.members = append(suite.cluster.members, srv)
 	}
 	// let us stop the leader
 	err := leader.Stop()
