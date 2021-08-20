@@ -31,16 +31,20 @@ func benchmarkPut(numOfPuts int, b *testing.B, cluster *TestCluster, storeName s
 	}
 
 	for i := 0; i < numOfPuts; i++ {
+		key := fmt.Sprintf("Key-%d", i)
+		val := fmt.Sprintf("Value-%d", i)
+
 		err := store.ExecuteCmdPut(&store.PutArgs{
 			Address:   cluster.members[0].Address(),
 			Port:      cluster.members[0].Port(),
-			Key:       fmt.Sprintf("Key-%d", i),
-			Value:     fmt.Sprintf("Value-%d", i),
+			Key:       key,
+			Value:     val,
 			StoreName: storeName,
 		})
 		if err != nil {
 			b.Error(err)
 		}
+		b.Logf("Put Success  Key = %s Value = %s", key, val)
 	}
 	// Wait for replication to happen
 	wg.Wait()
@@ -61,17 +65,29 @@ func BenchmarkPut(b *testing.B) {
 		Cleanup(logDir)
 	}()
 
-	storeName := "BenchmarkPut"
-	err = store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
-		Address: cluster.members[0].Address(),
-		Port:    cluster.members[0].Port(),
-		Name:    storeName,
-	})
-	if err != nil {
-		b.Error(err)
-	}
-
 	b.Run("ABC", func(b *testing.B) {
-		benchmarkPut(100, b, cluster, storeName)
+		storeName := "BenchmarkPut"
+		b.Log("Creating a store")
+		err = store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
+			Address: cluster.members[0].Address(),
+			Port:    cluster.members[0].Port(),
+			Name:    storeName,
+		})
+		if err != nil {
+			b.Error(err)
+		}
+
+		benchmarkPut(100000, b, cluster, storeName)
+
+		b.Log("Deleting a store")
+
+		err := store.ExecuteCmdDeleteStore(&store.DeleteArgs{
+			Address:   cluster.members[0].Address(),
+			Port:      cluster.members[0].Port(),
+			StoreName: storeName,
+		})
+		if err != nil {
+			b.Error(err)
+		}
 	})
 }
