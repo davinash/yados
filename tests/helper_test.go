@@ -55,7 +55,7 @@ func GetFreePorts(n int) ([]int, error) {
 	return ports, nil
 }
 
-func AddNewServer(suffix int, members []server.Server, logDir string) (server.Server, error) {
+func AddNewServer(suffix int, members []server.Server, logDir string, logLevel string) (server.Server, error) {
 	freePorts, err := GetFreePorts(1)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func AddNewServer(suffix int, members []server.Server, logDir string) (server.Se
 		Name:       fmt.Sprintf("Server-%d", suffix),
 		Address:    "127.0.0.1",
 		Port:       int32(freePorts[0]),
-		Loglevel:   "debug",
+		Loglevel:   logLevel,
 		LogDir:     logDir,
 		IsTestMode: true,
 	}
@@ -85,15 +85,15 @@ func AddNewServer(suffix int, members []server.Server, logDir string) (server.Se
 	return srv, nil
 }
 
-func CreateNewClusterEx(numOfServers int, cluster *TestCluster, logDir string) error {
-	srv, err := AddNewServer(0, cluster.members, logDir)
+func CreateNewClusterEx(numOfServers int, cluster *TestCluster, logDir string, logLevel string) error {
+	srv, err := AddNewServer(0, cluster.members, logDir, logLevel)
 	if err != nil {
 		panic(err)
 	}
 	cluster.members = append(cluster.members, srv)
 
 	for i := 1; i < numOfServers; i++ {
-		srv, err := AddNewServer(i, cluster.members, logDir)
+		srv, err := AddNewServer(i, cluster.members, logDir, logLevel)
 		if err != nil {
 			panic(err)
 		}
@@ -108,7 +108,7 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 		members:      make([]server.Server, 0),
 		numOfServers: numOfServers,
 	}
-	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.logDir)
+	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.logDir, "debug")
 	if err != nil {
 		return err
 	}
@@ -159,19 +159,19 @@ func (suite *YadosTestSuite) SetupTest() {
 
 }
 
-func (suite *YadosTestSuite) WaitForLeaderElection() server.Server {
-	for _, s := range suite.cluster.members {
+func WaitForLeaderElection(cluster *TestCluster) server.Server {
+	for _, s := range cluster.members {
 		s.EventHandler().Subscribe(server.LeaderChangeEvents)
 	}
 
 	defer func() {
-		for _, s := range suite.cluster.members {
+		for _, s := range cluster.members {
 			s.EventHandler().UnSubscribe(server.LeaderChangeEvents)
 		}
 	}()
 
 	var set []reflect.SelectCase
-	for _, s := range suite.cluster.members {
+	for _, s := range cluster.members {
 		set = append(set, reflect.SelectCase{
 			Dir:  reflect.SelectRecv,
 			Chan: reflect.ValueOf(s.EventHandler().LeaderChangeEvent()),

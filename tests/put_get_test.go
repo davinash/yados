@@ -7,7 +7,7 @@ import (
 )
 
 func (suite *YadosTestSuite) TestPutGet() {
-	suite.WaitForLeaderElection()
+	WaitForLeaderElection(suite.cluster)
 
 	err := store.CreateCommandExecute(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
@@ -44,7 +44,7 @@ func (suite *YadosTestSuite) TestPutGet() {
 }
 
 func (suite *YadosTestSuite) TestPutGetMultiple() {
-	suite.WaitForLeaderElection()
+	WaitForLeaderElection(suite.cluster)
 
 	err := store.CreateCommandExecute(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
