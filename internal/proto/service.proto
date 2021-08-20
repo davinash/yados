@@ -7,7 +7,7 @@ enum CommandType {
   CreateStore = 0;
   Put = 1;
   Get = 2;
-  Delete = 3;
+  DeleteStore = 3;
 }
 
 message VoteRequest {
@@ -156,6 +156,16 @@ message GetReply {
   string value = 2;
 }
 
+message StoreDeleteRequest {
+  string Id = 1;
+  string StoreName = 2;
+}
+
+message StoreDeleteReply {
+  string Id = 1;
+  string Error = 2;
+}
+
 
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
@@ -168,4 +178,5 @@ service YadosService {
   rpc ListStores(ListStoreRequest) returns (ListStoreReply) {}
   rpc Put(PutRequest) returns (PutReply) {}
   rpc Get(GetRequest) returns(GetReply) {}
+  rpc DeleteStore(StoreDeleteRequest) returns (StoreDeleteReply) {}
 }

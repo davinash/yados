@@ -9,7 +9,7 @@ import (
 func (suite *YadosTestSuite) TestPutGet() {
 	WaitForLeaderElection(suite.cluster)
 
-	err := store.CreateCommandExecute(&store.CreateCommandArgs{
+	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    "TestPut",
@@ -18,7 +18,7 @@ func (suite *YadosTestSuite) TestPutGet() {
 		suite.T().Error(err)
 	}
 
-	err = store.ExecutePutCommand(&store.PutArgs{
+	err = store.ExecuteCmdPut(&store.PutArgs{
 		Address:   suite.cluster.members[0].Address(),
 		Port:      suite.cluster.members[0].Port(),
 		Key:       "Key-1",
@@ -29,7 +29,7 @@ func (suite *YadosTestSuite) TestPutGet() {
 		suite.T().Error(err)
 	}
 
-	reply, err := store.ExecuteGetCommand(&store.GetArgs{
+	reply, err := store.ExecuteCmdGet(&store.GetArgs{
 		Address:   suite.cluster.members[0].Address(),
 		Port:      suite.cluster.members[0].Port(),
 		Key:       "Key-1",
@@ -46,7 +46,7 @@ func (suite *YadosTestSuite) TestPutGet() {
 func (suite *YadosTestSuite) TestPutGetMultiple() {
 	WaitForLeaderElection(suite.cluster)
 
-	err := store.CreateCommandExecute(&store.CreateCommandArgs{
+	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    "TestPut",
@@ -55,7 +55,7 @@ func (suite *YadosTestSuite) TestPutGetMultiple() {
 		suite.T().Error(err)
 	}
 	for i := 0; i < 10; i++ {
-		err = store.ExecutePutCommand(&store.PutArgs{
+		err = store.ExecuteCmdPut(&store.PutArgs{
 			Address:   suite.cluster.members[0].Address(),
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
@@ -68,7 +68,7 @@ func (suite *YadosTestSuite) TestPutGetMultiple() {
 	}
 
 	for i := 0; i < 10; i++ {
-		reply, err := store.ExecuteGetCommand(&store.GetArgs{
+		reply, err := store.ExecuteCmdGet(&store.GetArgs{
 			Address:   suite.cluster.members[0].Address(),
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),

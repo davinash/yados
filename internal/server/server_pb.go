@@ -140,6 +140,26 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 //ErrorStoreDoesExists error if store does not exists
 var ErrorStoreDoesExists = errors.New("store does not exists")
 
+func (srv *server) DeleteStore(ctx context.Context, request *pb.StoreDeleteRequest) (*pb.StoreDeleteReply, error) {
+	reply := &pb.StoreDeleteReply{}
+	if _, ok := srv.Stores()[request.StoreName]; !ok {
+		reply.Error = ErrorStoreDoesExists.Error()
+		return reply, ErrorStoreDoesExists
+	}
+	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+		marshal, err := json.Marshal(request)
+		if err != nil {
+			return nil, err
+		}
+		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
+	}
+	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_DeleteStore)
+	if err != nil {
+		return reply, err
+	}
+	return reply, nil
+}
+
 func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutReply, error) {
 	reply := &pb.PutReply{}
 	// Check if store with name exists

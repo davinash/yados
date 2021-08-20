@@ -19,8 +19,8 @@ type GetArgs struct {
 	StoreName string
 }
 
-//ExecuteGetCommand helper function to perform put command
-func ExecuteGetCommand(args *GetArgs) (*pb.GetReply, error) {
+//ExecuteCmdGet helper function to perform put command
+func ExecuteCmdGet(args *GetArgs) (*pb.GetReply, error) {
 	leader, err := server.GetLeader(args.Address, args.Port)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func CreateGetCommand(rootCmd *cobra.Command) {
 		Use:   "get",
 		Short: "get a value for a key from a store ",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			reply, err := ExecuteGetCommand(&getArg)
+			reply, err := ExecuteCmdGet(&getArg)
 			if err != nil {
 				return err
 			}
@@ -62,7 +62,7 @@ func CreateGetCommand(rootCmd *cobra.Command) {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&getArg.Address, "Address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().StringVar(&getArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
 	cmd.Flags().Int32Var(&getArg.Port, "port", 9191, "Port to use for communication")
 
 	cmd.Flags().StringVar(&getArg.Key, "key", "", "Key name")

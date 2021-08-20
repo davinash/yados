@@ -29,6 +29,7 @@ type YadosServiceClient interface {
 	ListStores(ctx context.Context, in *ListStoreRequest, opts ...grpc.CallOption) (*ListStoreReply, error)
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutReply, error)
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetReply, error)
+	DeleteStore(ctx context.Context, in *StoreDeleteRequest, opts ...grpc.CallOption) (*StoreDeleteReply, error)
 }
 
 type yadosServiceClient struct {
@@ -129,6 +130,15 @@ func (c *yadosServiceClient) Get(ctx context.Context, in *GetRequest, opts ...gr
 	return out, nil
 }
 
+func (c *yadosServiceClient) DeleteStore(ctx context.Context, in *StoreDeleteRequest, opts ...grpc.CallOption) (*StoreDeleteReply, error) {
+	out := new(StoreDeleteReply)
+	err := c.cc.Invoke(ctx, "/YadosService/DeleteStore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
@@ -143,6 +153,7 @@ type YadosServiceServer interface {
 	ListStores(context.Context, *ListStoreRequest) (*ListStoreReply, error)
 	Put(context.Context, *PutRequest) (*PutReply, error)
 	Get(context.Context, *GetRequest) (*GetReply, error)
+	DeleteStore(context.Context, *StoreDeleteRequest) (*StoreDeleteReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -179,6 +190,9 @@ func (UnimplementedYadosServiceServer) Put(context.Context, *PutRequest) (*PutRe
 }
 func (UnimplementedYadosServiceServer) Get(context.Context, *GetRequest) (*GetReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedYadosServiceServer) DeleteStore(context.Context, *StoreDeleteRequest) (*StoreDeleteReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteStore not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -373,6 +387,24 @@ func _YadosService_Get_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_DeleteStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreDeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).DeleteStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/DeleteStore",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).DeleteStore(ctx, req.(*StoreDeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -419,6 +451,10 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Get",
 			Handler:    _YadosService_Get_Handler,
+		},
+		{
+			MethodName: "DeleteStore",
+			Handler:    _YadosService_DeleteStore_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

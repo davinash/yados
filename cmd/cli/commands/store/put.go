@@ -21,8 +21,8 @@ type PutArgs struct {
 	StoreName string
 }
 
-//ExecutePutCommand helper function to perform put command
-func ExecutePutCommand(args *PutArgs) error {
+//ExecuteCmdPut helper function to perform put command
+func ExecuteCmdPut(args *PutArgs) error {
 	leader, err := server.GetLeader(args.Address, args.Port)
 	if err != nil {
 		return err
@@ -60,10 +60,10 @@ func CreatePutCommand(rootCmd *cobra.Command) {
 		Use:   "put",
 		Short: "put a key/value in a store",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return ExecutePutCommand(&putArg)
+			return ExecuteCmdPut(&putArg)
 		},
 	}
-	cmd.Flags().StringVar(&putArg.Address, "Address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().StringVar(&putArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
 	cmd.Flags().Int32Var(&putArg.Port, "port", 9191, "Port to use for communication")
 
 	cmd.Flags().StringVar(&putArg.Key, "key", "", "Key name")

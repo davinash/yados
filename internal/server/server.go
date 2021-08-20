@@ -38,6 +38,7 @@ type Server interface {
 	LogDir() string
 	PLog() PLog
 	StoreCreate(request *pb.StoreCreateRequest) error
+	StoreDelete(request *pb.StoreDeleteRequest) error
 	Apply(entry *pb.LogEntry) error
 	Stores() map[string]Store
 
@@ -167,25 +168,46 @@ func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
 	return nil
 }
 
+func (srv *server) StoreDelete(request *pb.StoreDeleteRequest) error {
+	srv.mutex.Lock()
+	defer srv.mutex.Unlock()
+
+	delete(srv.Stores(), request.StoreName)
+
+	return nil
+}
+
 func (srv *server) Apply(entry *pb.LogEntry) error {
 	switch entry.CmdType {
 	case pb.CommandType_CreateStore:
-		var scr pb.StoreCreateRequest
-		err := anypb.UnmarshalTo(entry.Command, &scr, proto.UnmarshalOptions{})
+		var req pb.StoreCreateRequest
+		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
 		if err != nil {
 			return err
 		}
-		err = srv.StoreCreate(&scr)
+		err = srv.StoreCreate(&req)
 		if err != nil {
 			return err
 		}
+
 	case pb.CommandType_Put:
-		var putRequest pb.PutRequest
-		err := anypb.UnmarshalTo(entry.Command, &putRequest, proto.UnmarshalOptions{})
+		var req pb.PutRequest
+		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
 		if err != nil {
 			return err
 		}
-		return srv.Stores()[putRequest.StoreName].Put(&putRequest)
+		return srv.Stores()[req.StoreName].Put(&req)
+
+	case pb.CommandType_DeleteStore:
+		var req pb.StoreDeleteRequest
+		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
+		if err != nil {
+			return err
+		}
+		err = srv.StoreDelete(&req)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
