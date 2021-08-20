@@ -25,6 +25,22 @@ Starting a server and joining the cluster with multiple peers
 ```shell
 ./yadosctl  server list --server 127.0.0.1 --port 9191
 ```
+### Creating a store
+```shell
+./yadosctl store create --name store1
+```
+### Listing stores
+```shell
+./yadosctl store list
+```
+### Insert Object in Store
+```shell
+./yadosctl store put --key key3 --value value3 --store-name store1
+```
+### Get Object from a store
+```shell
+./yadosctl store get --store-name store1 --key key3
+```
 
 ## Developer Notes
 ### How to build
