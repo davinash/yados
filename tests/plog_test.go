@@ -37,7 +37,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 		}(member)
 	}
 
-	err := store.CreateCommandExecute(&store.CreateCommandArgs{
+	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    storeName,
@@ -47,7 +47,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 	}
 
 	for i := 0; i < numOfPuts; i++ {
-		err := store.ExecutePutCommand(&store.PutArgs{
+		err := store.ExecuteCmdPut(&store.PutArgs{
 			Address:   suite.cluster.members[0].Address(),
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
@@ -114,7 +114,7 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 		}(member)
 	}
 
-	err := store.CreateCommandExecute(&store.CreateCommandArgs{
+	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    storeName,
@@ -124,7 +124,7 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 	}
 
 	for i := 0; i < numOfPuts; i++ {
-		err := store.ExecutePutCommand(&store.PutArgs{
+		err := store.ExecuteCmdPut(&store.PutArgs{
 			Address:   suite.cluster.members[0].Address(),
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),

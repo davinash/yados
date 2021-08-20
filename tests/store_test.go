@@ -30,7 +30,7 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 		}(member)
 	}
 
-	err := store.CreateCommandExecute(&store.CreateCommandArgs{
+	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    "TestStoreCreate",
@@ -64,7 +64,7 @@ func (suite *YadosTestSuite) TestStoreList() {
 			}(member)
 		}
 
-		err := store.CreateCommandExecute(&store.CreateCommandArgs{
+		err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
 			Address: suite.cluster.members[0].Address(),
 			Port:    suite.cluster.members[0].Port(),
 			Name:    fmt.Sprintf("TestStoreList-%d", i),
@@ -75,7 +75,7 @@ func (suite *YadosTestSuite) TestStoreList() {
 		wg.Wait()
 	}
 
-	storeList, err := store.ExecuteStoreListCommand(&store.ListArgs{
+	storeList, err := store.ExecuteCmdListStore(&store.ListArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 	})

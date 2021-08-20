@@ -18,8 +18,8 @@ type CreateCommandArgs struct {
 	Name    string
 }
 
-//CreateCommandExecute helper function to executed create store command
-func CreateCommandExecute(args *CreateCommandArgs) error {
+//ExecuteCmdCreateStore helper function to executed create store command
+func ExecuteCmdCreateStore(args *CreateCommandArgs) error {
 	leader, err := server.GetLeader(args.Address, args.Port)
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func CreateCommand(rootCmd *cobra.Command) {
 		Use:   "create",
 		Short: "create new store",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return CreateCommandExecute(&arg)
+			return ExecuteCmdCreateStore(&arg)
 		},
 	}
 	cmd.Flags().StringVar(&arg.Address, "Address", "127.0.0.1", "Server to connect in the cluster")

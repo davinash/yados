@@ -12,6 +12,7 @@ func AddCommands(rootCmd *cobra.Command) {
 	CreateListCommand(cmd)
 	CreatePutCommand(cmd)
 	CreateGetCommand(cmd)
+	CreateDeleteCommand(cmd)
 
 	rootCmd.AddCommand(cmd)
 }

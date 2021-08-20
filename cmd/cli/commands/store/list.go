@@ -18,8 +18,8 @@ type ListArgs struct {
 	Port    int32
 }
 
-//ExecuteStoreListCommand executes the list command for a store
-func ExecuteStoreListCommand(args *ListArgs) (*pb.ListStoreReply, error) {
+//ExecuteCmdListStore executes the list command for a store
+func ExecuteCmdListStore(args *ListArgs) (*pb.ListStoreReply, error) {
 	leader, err := server.GetLeader(args.Address, args.Port)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func CreateListCommand(rootCmd *cobra.Command) {
 		Short: "List stores",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			storeList, err := ExecuteStoreListCommand(&listArg)
+			storeList, err := ExecuteCmdListStore(&listArg)
 			if err != nil {
 				return err
 			}
