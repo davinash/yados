@@ -2,9 +2,10 @@ package tests
 
 import (
 	"fmt"
-	"github.com/davinash/yados/internal/server"
 	"sync"
 	"testing"
+
+	"github.com/davinash/yados/internal/server"
 
 	"github.com/davinash/yados/cmd/cli/commands/store"
 )
