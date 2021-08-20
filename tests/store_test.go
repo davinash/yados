@@ -9,7 +9,7 @@ import (
 )
 
 func (suite *YadosTestSuite) TestStoreCreate() {
-	suite.WaitForLeaderElection()
+	WaitForLeaderElection(suite.cluster)
 
 	for _, s := range suite.cluster.members {
 		s.EventHandler().Subscribe(server.CommitEntryEvents)
@@ -42,7 +42,7 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 }
 
 func (suite *YadosTestSuite) TestStoreList() {
-	suite.WaitForLeaderElection()
+	WaitForLeaderElection(suite.cluster)
 
 	for _, s := range suite.cluster.members {
 		s.EventHandler().Subscribe(server.CommitEntryEvents)

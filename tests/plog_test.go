@@ -13,7 +13,7 @@ import (
 )
 
 func (suite *YadosTestSuite) TestPLogAppend() {
-	suite.WaitForLeaderElection()
+	WaitForLeaderElection(suite.cluster)
 	storeName := "TestPLogAppend"
 
 	numOfPuts := 10
@@ -90,7 +90,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 }
 
 func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
-	suite.WaitForLeaderElection()
+	WaitForLeaderElection(suite.cluster)
 	storeName := "TestPLogAppendVerifyEntries"
 
 	numOfPuts := 10

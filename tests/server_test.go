@@ -1,13 +1,14 @@
 package tests
 
 func (suite *YadosTestSuite) TestServerNewLeader() {
-	leader := suite.WaitForLeaderElection()
+	leader := WaitForLeaderElection(suite.cluster)
 
 	for i := 4; i < 7; i++ {
-		err := suite.AddNewServer(i)
+		srv, err := AddNewServer(i, suite.cluster.members, suite.logDir, "debug")
 		if err != nil {
 			suite.T().Fail()
 		}
+		suite.cluster.members = append(suite.cluster.members, srv)
 	}
 	// let us stop the leader
 	err := leader.Stop()
@@ -16,6 +17,6 @@ func (suite *YadosTestSuite) TestServerNewLeader() {
 	}
 	suite.T().Log("Waiting the new leader")
 
-	_ = suite.WaitForLeaderElection()
+	_ = WaitForLeaderElection(suite.cluster)
 
 }
