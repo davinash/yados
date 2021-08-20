@@ -63,7 +63,7 @@ func CreatePutCommand(rootCmd *cobra.Command) {
 			return ExecuteCmdPut(&putArg)
 		},
 	}
-	cmd.Flags().StringVar(&putArg.Address, "Address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().StringVar(&putArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
 	cmd.Flags().Int32Var(&putArg.Port, "port", 9191, "Port to use for communication")
 
 	cmd.Flags().StringVar(&putArg.Key, "key", "", "Key name")

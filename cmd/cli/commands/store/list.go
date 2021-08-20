@@ -63,7 +63,7 @@ func CreateListCommand(rootCmd *cobra.Command) {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&listArg.Address, "Address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().StringVar(&listArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
 	cmd.Flags().Int32Var(&listArg.Port, "port", 9191, "Port to use for communication")
 
 	rootCmd.AddCommand(cmd)

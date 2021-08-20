@@ -62,7 +62,7 @@ func CreateGetCommand(rootCmd *cobra.Command) {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&getArg.Address, "Address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().StringVar(&getArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
 	cmd.Flags().Int32Var(&getArg.Port, "port", 9191, "Port to use for communication")
 
 	cmd.Flags().StringVar(&getArg.Key, "key", "", "Key name")

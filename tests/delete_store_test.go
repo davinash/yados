@@ -18,7 +18,7 @@ func (suite *YadosTestSuite) TestDeleteStore() {
 		Port:    suite.cluster.members[0].Port(),
 	})
 	if err != nil {
-		return
+		suite.T().Error(err)
 	}
 
 	if len(listStore.Name) != 1 {
@@ -31,7 +31,7 @@ func (suite *YadosTestSuite) TestDeleteStore() {
 		StoreName: storeName,
 	})
 	if err != nil {
-		return
+		suite.T().Error(err)
 	}
 
 	if len(listStore.Name) == 0 {
