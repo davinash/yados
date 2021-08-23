@@ -15,7 +15,7 @@ func (suite *YadosTestSuite) TestPutGet() {
 		Name:    "TestPut",
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 
 	err = store.ExecuteCmdPut(&store.PutArgs{
@@ -26,7 +26,7 @@ func (suite *YadosTestSuite) TestPutGet() {
 		StoreName: "TestPut",
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 
 	reply, err := store.ExecuteCmdGet(&store.GetArgs{
@@ -36,10 +36,10 @@ func (suite *YadosTestSuite) TestPutGet() {
 		StoreName: "TestPut",
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 	if reply.Value != "Value-1" {
-		suite.T().Error("Value Mismatch")
+		suite.T().Fatal("Value Mismatch")
 	}
 }
 
@@ -52,7 +52,7 @@ func (suite *YadosTestSuite) TestPutGetMultiple() {
 		Name:    "TestPut",
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 	for i := 0; i < 10; i++ {
 		err = store.ExecuteCmdPut(&store.PutArgs{
@@ -63,7 +63,7 @@ func (suite *YadosTestSuite) TestPutGetMultiple() {
 			StoreName: "TestPut",
 		})
 		if err != nil {
-			suite.T().Error(err)
+			suite.T().Fatal(err)
 		}
 	}
 
@@ -75,10 +75,10 @@ func (suite *YadosTestSuite) TestPutGetMultiple() {
 			StoreName: "TestPut",
 		})
 		if err != nil {
-			suite.T().Error(err)
+			suite.T().Fatal(err)
 		}
 		if reply.Value != fmt.Sprintf("Value-%d", i) {
-			suite.T().Error("Value Mismatch")
+			suite.T().Fatal("Value Mismatch")
 		}
 	}
 }

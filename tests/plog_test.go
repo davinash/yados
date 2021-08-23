@@ -43,7 +43,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 		Name:    storeName,
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 
 	for i := 0; i < numOfPuts; i++ {
@@ -55,7 +55,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 			StoreName: storeName,
 		})
 		if err != nil {
-			suite.T().Error(err)
+			suite.T().Fatal(err)
 		}
 	}
 	// Wait for replication to happen
@@ -64,27 +64,27 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 	for _, member := range suite.cluster.members {
 		iterator, err := member.PLog().Iterator()
 		if err != nil {
-			suite.T().Error(err)
+			suite.T().Fatal(err)
 		}
 		entry, err1 := iterator.Next()
 		if err1 != nil {
-			suite.T().Error(err1)
+			suite.T().Fatal(err1)
 		}
 		count := 0
 		for entry != nil {
 			count++
 			entry, err = iterator.Next()
 			if err != nil {
-				suite.T().Error(err)
+				suite.T().Fatal(err)
 			}
 		}
 		if count != numOfPuts+1 {
-			suite.T().Errorf("[%s] Expected entries = %d Actual = %d", member.Name(), numOfPuts, count)
+			suite.T().Fatalf("[%s] Expected entries = %d Actual = %d", member.Name(), numOfPuts, count)
 		}
 
 		err = iterator.Close()
 		if err != nil {
-			suite.T().Error(err)
+			suite.T().Fatal(err)
 		}
 	}
 }
@@ -120,7 +120,7 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 		Name:    storeName,
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 
 	for i := 0; i < numOfPuts; i++ {
@@ -132,7 +132,7 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 			StoreName: storeName,
 		})
 		if err != nil {
-			suite.T().Error(err)
+			suite.T().Fatal(err)
 		}
 	}
 	// Wait for replication to happen
@@ -141,42 +141,42 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 	for _, member := range suite.cluster.members {
 		iterator, err := member.PLog().Iterator()
 		if err != nil {
-			suite.T().Error(err)
+			suite.T().Fatal(err)
 		}
 		entry, err1 := iterator.Next()
 		if err1 != nil {
-			suite.T().Error(err1)
+			suite.T().Fatal(err1)
 		}
 		entry, err1 = iterator.Next()
 		if err1 != nil {
-			suite.T().Error(err1)
+			suite.T().Fatal(err1)
 		}
 		keyIdx := 0
 		for entry != nil {
 			var command pb.PutRequest
 			err = anypb.UnmarshalTo(entry.Command, &command, proto.UnmarshalOptions{})
 			if err != nil {
-				suite.T().Error(err)
+				suite.T().Fatal(err)
 			}
 
 			if command.Key != fmt.Sprintf("Key-%d", keyIdx) {
-				suite.T().Errorf("[%s] Expected Key = %s Actual = %s",
+				suite.T().Fatalf("[%s] Expected Key = %s Actual = %s",
 					member.Name(), fmt.Sprintf("Key-%d", keyIdx), command.Key)
 			}
 			if command.Value != fmt.Sprintf("Value-%d", keyIdx) {
-				suite.T().Errorf("[%s] Expected Values = %s Actual = %s",
+				suite.T().Fatalf("[%s] Expected Values = %s Actual = %s",
 					member.Name(), fmt.Sprintf("Value-%d", keyIdx), command.Value)
 			}
 			keyIdx++
 			entry, err = iterator.Next()
 			if err != nil {
-				suite.T().Error(err)
+				suite.T().Fatal(err)
 			}
 		}
 
 		err = iterator.Close()
 		if err != nil {
-			suite.T().Error(err)
+			suite.T().Fatal(err)
 		}
 	}
 }

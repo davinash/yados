@@ -99,6 +99,46 @@ type RaftArgs struct {
 	isTestMode bool
 }
 
+func (r *raft) InitializeFromStorage() error {
+	// Apply term and voted for state from the
+	// persistent log
+	term, votedFor, err := r.Server().PLog().ReadState()
+	if err != nil {
+		return err
+	}
+	r.currentTerm = term
+	r.votedFor = votedFor
+
+	iter, err1 := r.Server().PLog().Iterator()
+	if err1 != nil {
+		return nil
+	}
+	defer func(iter PLogIterator) {
+		err := iter.Close()
+		if err != nil {
+			r.logger.Warnf("Failed to close the iterator, Error = %v", err)
+		}
+	}(iter)
+
+	entry, err2 := iter.Next()
+	if err2 != nil {
+		return nil
+	}
+
+	for entry != nil {
+		r.log = append(r.log, entry)
+		err := r.server.Apply(entry)
+		if err != nil {
+			return err
+		}
+		entry, err = iter.Next()
+		if err != nil {
+			return nil
+		}
+	}
+	return nil
+}
+
 //NewRaft creates new instance of Raft
 func NewRaft(args *RaftArgs) (Raft, error) {
 	r := &raft{
@@ -109,13 +149,17 @@ func NewRaft(args *RaftArgs) (Raft, error) {
 	}
 	r.peers = make(map[string]*pb.Peer)
 	r.state = Follower
-	r.votedFor = ""
 	r.commitIndex = -1
 	r.lastApplied = -1
 	r.nextIndex = make(map[string]int64)
 	r.matchIndex = make(map[string]int64)
 	r.newCommitReadyChan = make(chan struct{}, 16)
 	r.commitsChanMap = make(map[string]chan struct{})
+
+	err := r.InitializeFromStorage()
+	if err != nil {
+		return nil, err
+	}
 
 	for _, p := range args.peers {
 		_, err := args.srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
@@ -780,6 +824,10 @@ func (r *raft) lastLogIndexAndTerm() (int64, int64) {
 }
 
 func (r *raft) persistToStorage(entries []*pb.LogEntry) error {
+	err := r.Server().PLog().WriteState(r.currentTerm, r.votedFor)
+	if err != nil {
+		return err
+	}
 	for _, entry := range entries {
 		err := r.Server().PLog().Append(entry)
 		if err != nil {

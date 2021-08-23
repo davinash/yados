@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -15,9 +14,6 @@ import (
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
-
-//ErrorInvalidFormat error for invalid format
-var ErrorInvalidFormat = errors.New("invalid format for peers, use <ip-address>:port")
 
 //Server Server interface
 type Server interface {
@@ -116,9 +112,9 @@ func (srv *server) GetOrCreateStorage() error {
 	}
 	srv.logDir = d
 
-	store, err := NewPLog(srv)
-	if err != nil {
-		return err
+	store, err1 := NewPLog(srv)
+	if err1 != nil {
+		return err1
 	}
 	srv.pLog = store
 	err = srv.pLog.Open()
@@ -134,9 +130,6 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 	if err != nil {
 		return err
 	}
-	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
-	srv.mutex.Lock()
-	defer srv.mutex.Unlock()
 
 	srv.rpcServer = NewRPCServer(srv)
 	err = srv.rpcServer.Start()
@@ -185,6 +178,7 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		if err != nil {
 			return err
 		}
+
 		err = srv.StoreCreate(&req)
 		if err != nil {
 			return err

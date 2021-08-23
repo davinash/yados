@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -19,7 +20,10 @@ import (
 )
 
 //PersistentLogFile name of the log file
-var PersistentLogFile = "pLog.bin"
+var (
+	PersistentLogFile = "pLog.bin"
+	StateFile         = "state.bin"
+)
 
 //PLog represents the pLog
 type PLog interface {
@@ -29,6 +33,8 @@ type PLog interface {
 	Size() int
 	PLogFileName() string
 	Iterator() (PLogIterator, error)
+	WriteState(int64, string) error
+	ReadState() (int64, string, error)
 }
 
 //NewPLog Creates new storage
@@ -47,7 +53,7 @@ type plog struct {
 	logDir        string
 	logger        *logrus.Entry
 	storeFileName string
-	storeFh       *os.File
+	pLogFH        *os.File
 	server        Server
 	size          int
 }
@@ -63,13 +69,13 @@ func (m *plog) Open() error {
 	if err != nil {
 		return err
 	}
-	m.storeFh = file
+	m.pLogFH = file
 	return nil
 }
 
 //Close close the pLog
 func (m *plog) Close() error {
-	err := m.storeFh.Close()
+	err := m.pLogFH.Close()
 	if err != nil {
 		return err
 	}
@@ -87,11 +93,11 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 	}
 	var buf [binary.MaxVarintLen32]byte
 	encodedLength := binary.PutUvarint(buf[:], uint64(len(buffer)))
-	_, err = m.storeFh.Write(buf[:encodedLength])
+	_, err = m.pLogFH.Write(buf[:encodedLength])
 	if err != nil {
 		return err
 	}
-	_, err = m.storeFh.Write(buffer)
+	_, err = m.pLogFH.Write(buffer)
 	if err != nil {
 		return err
 	}
@@ -129,6 +135,82 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 		}
 	}
 	return nil
+}
+
+//State state of the raft instance
+type State struct {
+	Term     int64  `json:"Term"`
+	VotedFor string `json:"VotedFor"`
+}
+
+func (m *plog) WriteState(term int64, votedFor string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	stateFileName := filepath.Join(m.logDir, StateFile)
+
+	if _, err := os.Stat(stateFileName); err == nil {
+		err := os.Truncate(stateFileName, 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	file, err := os.OpenFile(stateFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			m.logger.Warnf("failed to close the file, Error = %v", err)
+		}
+	}(file)
+
+	state := State{
+		Term:     term,
+		VotedFor: votedFor,
+	}
+	stateBytes, err1 := json.Marshal(state)
+	if err1 != nil {
+		return err1
+	}
+	_, err = file.Write(stateBytes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *plog) ReadState() (int64, string, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	stateFileName := filepath.Join(m.logDir, StateFile)
+	file, err := os.Open(stateFileName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, "", nil
+		}
+		return 0, "", err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			m.logger.Warnf("failed to close the file, Error = %v", err)
+		}
+	}(file)
+
+	byteValue, err1 := ioutil.ReadAll(file)
+	if err1 != nil {
+		return 0, "", err1
+	}
+	var state State
+	err = json.Unmarshal(byteValue, &state)
+	if err != nil {
+		return 0, "", err
+	}
+	return state.Term, state.VotedFor, nil
 }
 
 func (m *plog) Size() int {

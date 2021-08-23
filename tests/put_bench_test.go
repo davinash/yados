@@ -42,7 +42,7 @@ func benchmarkPut(numOfPuts int, b *testing.B, cluster *TestCluster, storeName s
 			StoreName: storeName,
 		})
 		if err != nil {
-			b.Error(err)
+			b.Fatal(err)
 		}
 		b.Logf("Put Success  Key = %s Value = %s", key, val)
 	}
@@ -74,7 +74,7 @@ func BenchmarkPut(b *testing.B) {
 			Name:    storeName,
 		})
 		if err != nil {
-			b.Error(err)
+			b.Fatal(err)
 		}
 
 		benchmarkPut(100000, b, cluster, storeName)
@@ -87,7 +87,7 @@ func BenchmarkPut(b *testing.B) {
 			StoreName: storeName,
 		})
 		if err != nil {
-			b.Error(err)
+			b.Fatal(err)
 		}
 	})
 }

@@ -21,9 +21,9 @@ func GetLeader(address string, port int32) (*pb.Peer, error) {
 		}
 	}(peerConn)
 
-	clusterStatus, err := rpcClient.ClusterStatus(context.Background(), &pb.ClusterStatusRequest{})
-	if err != nil {
-		return &pb.Peer{}, err
+	clusterStatus, err1 := rpcClient.ClusterStatus(context.Background(), &pb.ClusterStatusRequest{})
+	if err1 != nil {
+		return &pb.Peer{}, err1
 	}
 
 	for _, peer := range clusterStatus.PeerStatus {
