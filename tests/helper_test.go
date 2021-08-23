@@ -122,9 +122,11 @@ func StopCluster(cluster *TestCluster) {
 		wg.Add(1)
 		go func(wg *sync.WaitGroup, srv server.Server) {
 			defer wg.Done()
-			err := srv.Stop()
-			if err != nil {
-				log.Printf("StopCluster -> %v", err)
+			if srv.State() != server.Dead {
+				err := srv.Stop()
+				if err != nil {
+					log.Printf("StopCluster -> %v", err)
+				}
 			}
 		}(&wg, srv)
 	}

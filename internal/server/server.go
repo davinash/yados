@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -15,9 +14,6 @@ import (
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
-
-//ErrorInvalidFormat error for invalid format
-var ErrorInvalidFormat = errors.New("invalid format for peers, use <ip-address>:port")
 
 //Server Server interface
 type Server interface {

@@ -1,6 +1,8 @@
 package tests
 
-import "github.com/davinash/yados/cmd/cli/commands/store"
+import (
+	"github.com/davinash/yados/cmd/cli/commands/store"
+)
 
 func (suite *YadosTestSuite) TestDeleteStore() {
 	WaitForLeaderElection(suite.cluster)

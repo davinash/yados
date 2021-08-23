@@ -12,7 +12,7 @@ func (suite *YadosTestSuite) TestRestart() {
 	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
-		Name:    "TestPut",
+		Name:    "TestRestart",
 	})
 	if err != nil {
 		suite.T().Fatal(err)
@@ -23,7 +23,7 @@ func (suite *YadosTestSuite) TestRestart() {
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
 			Value:     fmt.Sprintf("Value-%d", i),
-			StoreName: "TestPut",
+			StoreName: "TestRestart",
 		})
 		if err != nil {
 			suite.T().Fatal(err)
@@ -46,7 +46,7 @@ func (suite *YadosTestSuite) TestRestart() {
 			Address:   suite.cluster.members[0].Address(),
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
-			StoreName: "TestPut",
+			StoreName: "TestRestart",
 		})
 		if err != nil {
 			suite.T().Fatal(err)
