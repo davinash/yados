@@ -11,18 +11,18 @@ func (suite *YadosTestSuite) TestDeleteStore() {
 		Name:    storeName,
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 	listStore, err := store.ExecuteCmdListStore(&store.ListArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 
 	if len(listStore.Name) != 1 {
-		suite.T().Errorf("Store count mismatch Expected 1, Actual %d", len(listStore.Name))
+		suite.T().Fatalf("Store count mismatch Expected 1, Actual %d", len(listStore.Name))
 	}
 
 	err = store.ExecuteCmdDeleteStore(&store.DeleteArgs{
@@ -31,10 +31,10 @@ func (suite *YadosTestSuite) TestDeleteStore() {
 		StoreName: storeName,
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 
 	if len(listStore.Name) == 0 {
-		suite.T().Errorf("Store count mismatch Expected 0, Actual %d", len(listStore.Name))
+		suite.T().Fatalf("Store count mismatch Expected 0, Actual %d", len(listStore.Name))
 	}
 }

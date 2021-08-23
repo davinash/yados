@@ -3,6 +3,7 @@ package tests
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -81,7 +82,6 @@ func AddNewServer(suffix int, members []server.Server, logDir string, logLevel s
 	if err != nil {
 		return nil, err
 	}
-	//suite.cluster.members = append(suite.cluster.members, srv)
 	return srv, nil
 }
 
@@ -118,18 +118,14 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 //StopCluster To stop the cluster ( Only for Test Purpose )
 func StopCluster(cluster *TestCluster) {
 	var wg sync.WaitGroup
-	//for i := 0; i < t.numOfServers; i++ {
-	//	wg.Add(1)
-	//	go func(wg *sync.WaitGroup, index int) {
-	//		defer wg.Done()
-	//		t.members[index].Stop()
-	//	}(&wg, i)
-	//}
 	for _, srv := range cluster.members {
 		wg.Add(1)
 		go func(wg *sync.WaitGroup, srv server.Server) {
 			defer wg.Done()
-			srv.Stop()
+			err := srv.Stop()
+			if err != nil {
+				log.Printf("StopCluster -> %v", err)
+			}
 		}(&wg, srv)
 	}
 	wg.Wait()
@@ -154,7 +150,7 @@ func (suite *YadosTestSuite) SetupTest() {
 
 	err := suite.CreateNewCluster(3)
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 
 }

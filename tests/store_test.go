@@ -36,7 +36,7 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 		Name:    "TestStoreCreate",
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 	wg.Wait()
 }
@@ -70,7 +70,7 @@ func (suite *YadosTestSuite) TestStoreList() {
 			Name:    fmt.Sprintf("TestStoreList-%d", i),
 		})
 		if err != nil {
-			suite.T().Error(err)
+			suite.T().Fatal(err)
 		}
 		wg.Wait()
 	}
@@ -80,9 +80,9 @@ func (suite *YadosTestSuite) TestStoreList() {
 		Port:    suite.cluster.members[0].Port(),
 	})
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 	if len(storeList.Name) != 5 {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 }

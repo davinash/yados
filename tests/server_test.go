@@ -13,7 +13,7 @@ func (suite *YadosTestSuite) TestServerNewLeader() {
 	// let us stop the leader
 	err := leader.Stop()
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 	suite.T().Log("Waiting the new leader")
 

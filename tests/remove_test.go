@@ -14,14 +14,14 @@ func (suite *YadosTestSuite) TestRemoveServer() {
 	numOfPeers := numOfServers - 2
 	for _, peer := range suite.cluster.members {
 		if len(peer.Peers()) != numOfPeers {
-			suite.T().Errorf("Number of Peers mismatch, Expected %d, Actual %d", numOfPeers,
+			suite.T().Fatalf("Number of Peers mismatch, Expected %d, Actual %d", numOfPeers,
 				len(peer.Peers()))
 		}
 	}
 	// let us stop a server
 	err := suite.cluster.members[0].Stop()
 	if err != nil {
-		suite.T().Error(err)
+		suite.T().Fatal(err)
 	}
 	numOfPeers--
 	for _, peer := range suite.cluster.members {
@@ -29,7 +29,7 @@ func (suite *YadosTestSuite) TestRemoveServer() {
 			continue
 		}
 		if len(peer.Peers()) != numOfPeers {
-			suite.T().Errorf("Number of Peers mismatch, Expected %d, Actual %d", numOfPeers,
+			suite.T().Fatalf("Number of Peers mismatch, Expected %d, Actual %d", numOfPeers,
 				len(peer.Peers()))
 		}
 	}

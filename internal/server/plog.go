@@ -70,6 +70,7 @@ func (m *plog) Open() error {
 		return err
 	}
 	m.pLogFH = file
+	m.logger.Error("Opened a file")
 	return nil
 }
 
@@ -79,6 +80,7 @@ func (m *plog) Close() error {
 	if err != nil {
 		return err
 	}
+	m.logger.Error("Closed a file")
 	return nil
 }
 
