@@ -5,7 +5,7 @@ import "github.com/davinash/yados/internal/server"
 func (suite *YadosTestSuite) TestRemoveServer() {
 	numOfServers := 7
 	for i := 4; i < numOfServers; i++ {
-		srv, err := AddNewServer(i, suite.cluster.members, suite.logDir, "debug")
+		srv, _, err := AddNewServer(i, suite.cluster.members, suite.logDir, "debug", false)
 		if err != nil {
 			suite.T().Fail()
 		}

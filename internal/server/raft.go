@@ -188,7 +188,6 @@ func (r *raft) Start() {
 		r.electionResetEvent = time.Now()
 		r.mutex.Unlock()
 		r.runElectionTimer()
-		r.logger.Debug("runElectionTimer::NewRaft")
 	}()
 	go r.commitChanSender()
 }
@@ -344,14 +343,13 @@ func (r *raft) runElectionTimer() {
 	r.mutex.Lock()
 	termStarted := r.currentTerm
 	r.mutex.Unlock()
-	r.logger.Debugf("election timer started (%v), term=%d", timeoutDuration, termStarted)
+	r.logger.Tracef("election timer started (%v), term=%d", timeoutDuration, termStarted)
 
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-r.quit:
-			r.logger.Debug("Stopping runElectionTimer")
 			return
 		case <-ticker.C:
 			r.startOrIgnoreElection(termStarted, timeoutDuration)
@@ -364,13 +362,10 @@ func (r *raft) startOrIgnoreElection(termStarted int64, timeoutDuration time.Dur
 	defer r.mutex.Unlock()
 
 	if r.state != Candidate && r.state != Follower {
-		r.logger.Tracef("in election timer state=%s, bailing out", r.state)
 		return
 	}
 
 	if termStarted != r.currentTerm {
-		r.logger.Tracef("in election timer term changed from %d to %d, bailing out",
-			termStarted, r.currentTerm)
 		return
 	}
 
@@ -385,7 +380,6 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 	defer r.mutex.Unlock()
 
 	if r.state != Candidate {
-		r.logger.Debugf("[%s] while waiting for reply, state = %v", reply.Id, r.state)
 		return
 	}
 
@@ -414,7 +408,6 @@ func (r *raft) startElection() {
 	r.electionResetEvent = time.Now()
 	// vote for yourself
 	r.votedFor = r.Server().Name()
-	r.logger.Tracef("becomes Candidate (currentTerm=%d); log=%v", savedCurrentTerm, r.log)
 
 	votesReceived := 1
 	for _, peer := range r.peers {
@@ -450,7 +443,6 @@ func (r *raft) startElection() {
 	go func() {
 		defer r.wg.Done()
 		r.runElectionTimer()
-		r.logger.Debug("runElectionTimer::StartElection")
 	}()
 
 }
@@ -718,7 +710,6 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 					for _, l := range r.log {
 						ids = append(ids, l.Id)
 					}
-					//r.logger.Debugf("[%s] [%s] log is now: %v", r.state, request.Id, ids)
 				}
 				err := r.persistToStorage(request.Entries[newEntriesIndex:])
 				if err != nil {

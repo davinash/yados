@@ -2,12 +2,13 @@ package tests
 
 import (
 	"github.com/davinash/yados/cmd/cli/commands/store"
+	"github.com/davinash/yados/internal/server"
 )
 
 func (suite *YadosTestSuite) TestDeleteStore() {
 	WaitForLeaderElection(suite.cluster)
 	storeName := "TestDeleteStore"
-	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
+	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    storeName,
@@ -15,7 +16,7 @@ func (suite *YadosTestSuite) TestDeleteStore() {
 	if err != nil {
 		suite.T().Fatal(err)
 	}
-	listStore, err := store.ExecuteCmdListStore(&store.ListArgs{
+	listStore, err := server.ExecuteCmdListStore(&server.ListArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 	})

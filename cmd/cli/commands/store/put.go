@@ -1,66 +1,18 @@
 package store
 
 import (
-	"context"
-	"log"
-
-	"github.com/google/uuid"
-
-	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
 )
-
-//PutArgs argument structure for this command
-type PutArgs struct {
-	Address   string
-	Port      int32
-	Key       string
-	Value     string
-	StoreName string
-}
-
-//ExecuteCmdPut helper function to perform put command
-func ExecuteCmdPut(args *PutArgs) error {
-	leader, err := server.GetLeader(args.Address, args.Port)
-	if err != nil {
-		return err
-	}
-
-	peerConn, rpcClient, err1 := server.GetPeerConn(leader.Address, leader.Port)
-	if err1 != nil {
-		return err1
-	}
-	defer func(peerConn *grpc.ClientConn) {
-		err := peerConn.Close()
-		if err != nil {
-			log.Printf("failed to close the connection, error = %v\n", err)
-		}
-	}(peerConn)
-
-	req := &pb.PutRequest{
-		StoreName: args.StoreName,
-		Key:       args.Key,
-		Value:     args.Value,
-		Id:        uuid.New().String(),
-	}
-
-	_, err = rpcClient.Put(context.Background(), req)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 //CreatePutCommand cobra command for listing stores
 func CreatePutCommand(rootCmd *cobra.Command) {
-	putArg := PutArgs{}
+	putArg := server.PutArgs{}
 	cmd := &cobra.Command{
 		Use:   "put",
 		Short: "put a key/value in a store",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return ExecuteCmdPut(&putArg)
+			return server.ExecuteCmdPut(&putArg)
 		},
 	}
 	cmd.Flags().StringVar(&putArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")

@@ -56,10 +56,10 @@ func GetFreePorts(n int) ([]int, error) {
 	return ports, nil
 }
 
-func AddNewServer(suffix int, members []server.Server, logDir string, logLevel string) (server.Server, error) {
+func AddNewServer(suffix int, members []server.Server, logDir string, logLevel string, isWithHTTP bool) (server.Server, int, error) {
 	freePorts, err := GetFreePorts(1)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 	peers := make([]*pb.Peer, 0)
 	for _, p := range members {
@@ -72,28 +72,37 @@ func AddNewServer(suffix int, members []server.Server, logDir string, logLevel s
 		Loglevel:   logLevel,
 		LogDir:     logDir,
 		IsTestMode: true,
+		HTTPPort:   -1,
+	}
+
+	if isWithHTTP {
+		ports, err := GetFreePorts(1)
+		if err != nil {
+			return nil, -1, err
+		}
+		srvArgs.HTTPPort = ports[0]
 	}
 	srv, err := server.NewServer(srvArgs)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 
 	err = srv.Serve(peers)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
-	return srv, nil
+	return srv, srvArgs.HTTPPort, nil
 }
 
 func CreateNewClusterEx(numOfServers int, cluster *TestCluster, logDir string, logLevel string) error {
-	srv, err := AddNewServer(0, cluster.members, logDir, logLevel)
+	srv, _, err := AddNewServer(0, cluster.members, logDir, logLevel, false)
 	if err != nil {
 		panic(err)
 	}
 	cluster.members = append(cluster.members, srv)
 
 	for i := 1; i < numOfServers; i++ {
-		srv, err := AddNewServer(i, cluster.members, logDir, logLevel)
+		srv, _, err := AddNewServer(i, cluster.members, logDir, logLevel, false)
 		if err != nil {
 			panic(err)
 		}

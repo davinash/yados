@@ -3,13 +3,12 @@ package tests
 import (
 	"fmt"
 
-	"github.com/davinash/yados/cmd/cli/commands/store"
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 )
 
 func createStore(srv server.Server, storeName string) error {
-	return store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
+	return server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Address: srv.Address(),
 		Port:    srv.Port(),
 		Name:    storeName,
@@ -18,7 +17,7 @@ func createStore(srv server.Server, storeName string) error {
 
 func performPut(srv server.Server, numOfPuts int, storeName string, prefix string) error {
 	for i := 0; i < numOfPuts; i++ {
-		err := store.ExecuteCmdPut(&store.PutArgs{
+		err := server.ExecuteCmdPut(&server.PutArgs{
 			Address:   srv.Address(),
 			Port:      srv.Port(),
 			Key:       fmt.Sprintf("%s-Key-%d", prefix, i),

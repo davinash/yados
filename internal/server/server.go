@@ -1,6 +1,9 @@
 package server
 
 import (
+	"context"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -42,6 +45,10 @@ type Server interface {
 	SetEventHandler(Events)
 	// EventHandler for test purpose
 	EventHandler() Events
+
+	HTTPPort() int
+	StartHTTPServer() error
+	StopHTTPServer() error
 }
 
 type server struct {
@@ -57,6 +64,10 @@ type server struct {
 	stores     map[string]Store
 	isTestMode bool
 	ev         Events
+
+	httpPort       int
+	httpServerWait sync.WaitGroup
+	httpSrv        *http.Server
 }
 
 //NewServerArgs argument structure for new server
@@ -67,6 +78,7 @@ type NewServerArgs struct {
 	Loglevel   string
 	LogDir     string
 	IsTestMode bool
+	HTTPPort   int
 }
 
 //NewServer creates new instance of a server
@@ -95,6 +107,8 @@ func NewServer(args *NewServerArgs) (Server, error) {
 	srv.SetLogLevel(args.Loglevel)
 	srv.quit = make(chan interface{})
 	srv.stores = make(map[string]Store)
+
+	srv.httpPort = args.HTTPPort
 
 	if args.IsTestMode {
 		srv.isTestMode = true
@@ -130,7 +144,7 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 	if err != nil {
 		return err
 	}
-
+	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	srv.rpcServer = NewRPCServer(srv)
 	err = srv.rpcServer.Start()
 	if err != nil {
@@ -147,6 +161,11 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		return err
 	}
 	srv.raft.Start()
+
+	err = srv.StartHTTPServer()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -269,6 +288,10 @@ func (srv *server) EventHandler() Events {
 	return srv.ev
 }
 
+func (srv *server) HTTPPort() int {
+	return srv.httpPort
+}
+
 func (srv *server) SetLogLevel(level string) {
 	switch level {
 	case "trace":
@@ -288,8 +311,13 @@ func (srv *server) SetLogLevel(level string) {
 
 func (srv *server) Stop() error {
 	srv.logger.Infof("Stopping Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
+	err := srv.StopHTTPServer()
+	if err != nil {
+		return err
+	}
+
 	srv.Raft().Stop()
-	err := srv.RPCServer().Stop()
+	err = srv.RPCServer().Stop()
 	if err != nil {
 		srv.logger.Errorf("failed to stop grpc server, Error = %v", err)
 		return err
@@ -299,6 +327,38 @@ func (srv *server) Stop() error {
 		srv.logger.Errorf("failed to close the pLog, Error = %v", err)
 		return err
 	}
+	srv.httpServerWait.Wait()
 	srv.logger.Infof("Stopped Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
+	return nil
+}
+
+func (srv *server) StartHTTPServer() error {
+	if srv.HTTPPort() == -1 {
+		return nil
+	}
+	httpHandler := NewHTTPHandler(srv)
+	// Start HTTP server (and proxy calls to gRPC server endpoint)
+	srv.httpSrv = &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", srv.Self().Address, srv.HTTPPort()),
+		Handler: httpHandler.Router(),
+	}
+	srv.httpServerWait.Add(1)
+	go func() {
+		defer srv.httpServerWait.Done()
+		if err := srv.httpSrv.ListenAndServe(); err != http.ErrServerClosed {
+			// unexpected error. Port in use?
+			srv.logger.Fatalf("ListenAndServe(): %v", err)
+		}
+	}()
+	srv.logger.Infof("Started HTTP server on %s:%d", srv.Self().Address, srv.HTTPPort())
+	return nil
+}
+
+func (srv *server) StopHTTPServer() error {
+	if srv.httpSrv != nil {
+		if err := srv.httpSrv.Shutdown(context.Background()); err != nil {
+			panic(err)
+		}
+	}
 	return nil
 }
