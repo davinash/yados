@@ -243,13 +243,13 @@ func (r *raft) Peers() map[string]*pb.Peer {
 }
 
 func (r *raft) AddCommandListener(id string) error {
-	r.logger.Debug("[%s] Adding command listener for %s", r.Server().Name(), id)
+	r.logger.Debugf("[%s] Adding command listener for %s", r.Server().Name(), id)
 	r.commitsChanMap[id] = make(chan struct{})
 	return nil
 }
 
 func (r *raft) WaitForCommandCompletion(id string) {
-	r.logger.Debug("[%s] WaitForCommandCompletion for %s", r.Server().Name(), id)
+	r.logger.Debugf("[%s] WaitForCommandCompletion for %s", r.Server().Name(), id)
 	if v, ok := r.commitsChanMap[id]; ok {
 		<-v
 	}
@@ -267,7 +267,7 @@ func (r *raft) RemovePeer(request *pb.RemovePeerRequest) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	r.logger.Debug("[%s] RemovePeer: Received Name = %s; Address = %s; Port = %d;",
+	r.logger.Debugf("[%s] RemovePeer: Received Name = %s; Address = %s; Port = %d;",
 		request.Id, request.GetPeer().Name, request.GetPeer().Address, request.GetPeer().Port)
 
 	delete(r.peers, request.GetPeer().Name)

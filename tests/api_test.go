@@ -3,16 +3,17 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
-	pb "github.com/davinash/yados/internal/proto/gen"
 	"io/ioutil"
 	"log"
 	"net/http"
+
+	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
 func (suite *YadosTestSuite) TestAPI() {
 	WaitForLeaderElection(suite.cluster)
 
-	httpServer, err, port := AddNewServer(len(suite.cluster.members)+1, suite.cluster.members,
+	httpServer, port, err := AddNewServer(len(suite.cluster.members)+1, suite.cluster.members,
 		suite.logDir, "debug", true)
 	if err != nil {
 		suite.T().Fatal(err)
