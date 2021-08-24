@@ -8,7 +8,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/davinash/yados/cmd/cli/commands/store"
 	"github.com/davinash/yados/internal/server"
 )
 
@@ -37,7 +36,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 		}(member)
 	}
 
-	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
+	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    storeName,
@@ -47,7 +46,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 	}
 
 	for i := 0; i < numOfPuts; i++ {
-		err := store.ExecuteCmdPut(&store.PutArgs{
+		err := server.ExecuteCmdPut(&server.PutArgs{
 			Address:   suite.cluster.members[0].Address(),
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
@@ -114,7 +113,7 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 		}(member)
 	}
 
-	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
+	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    storeName,
@@ -124,7 +123,7 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 	}
 
 	for i := 0; i < numOfPuts; i++ {
-		err := store.ExecuteCmdPut(&store.PutArgs{
+		err := server.ExecuteCmdPut(&server.PutArgs{
 			Address:   suite.cluster.members[0].Address(),
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),

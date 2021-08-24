@@ -21,6 +21,7 @@ type StartSrvArgs struct {
 	peers    []string
 	logLevel string
 	logDir   string
+	httpPort int
 }
 
 //StartCommands command for starting a server
@@ -39,6 +40,7 @@ func StartCommands(rootCmd *cobra.Command) {
 				Port:     srvStartArgs.port,
 				Loglevel: srvStartArgs.logLevel,
 				LogDir:   srvStartArgs.logDir,
+				HTTPPort: srvStartArgs.httpPort,
 			}
 			srv, err := server.NewServer(srvArgs)
 			if err != nil {
@@ -100,6 +102,7 @@ func StartCommands(rootCmd *cobra.Command) {
 	if err != nil {
 		panic(err)
 	}
+	cmd.Flags().IntVar(&srvStartArgs.httpPort, "http-port", -1, "Port to use for http server")
 
 	rootCmd.AddCommand(cmd)
 }

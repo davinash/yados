@@ -15,8 +15,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-//ErrorPortNotOpen returned when the port is not open
-var ErrorPortNotOpen = errors.New("port is not open to listen")
+//ErrorPortNotOpen returned when the Port is not open
+var ErrorPortNotOpen = errors.New("Port is not open to listen")
 
 //ErrorUnknownMethod when rpc is called with unknown method
 var ErrorUnknownMethod = errors.New("unknown method ")

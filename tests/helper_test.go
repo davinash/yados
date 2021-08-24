@@ -72,6 +72,7 @@ func AddNewServer(suffix int, members []server.Server, logDir string, logLevel s
 		Loglevel:   logLevel,
 		LogDir:     logDir,
 		IsTestMode: true,
+		HTTPPort:   -1,
 	}
 	srv, err := server.NewServer(srvArgs)
 	if err != nil {

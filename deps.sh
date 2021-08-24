@@ -26,5 +26,7 @@ if test ! -f "${GOPATH}/bin/errcheck"; then
   echo "Installing errcheck" && go get github.com/kisielk/errcheck
 fi
 
-
+if test ! -f "${GOPATH}/bin/swag"; then
+  echo "Installing swag" && go get github.com/swaggo/swag/cmd/swag
+fi
 

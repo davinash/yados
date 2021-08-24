@@ -34,7 +34,7 @@ func benchmarkPut(numOfPuts int, b *testing.B, cluster *TestCluster, storeName s
 		key := fmt.Sprintf("Key-%d", i)
 		val := fmt.Sprintf("Value-%d", i)
 
-		err := store.ExecuteCmdPut(&store.PutArgs{
+		err := server.ExecuteCmdPut(&server.PutArgs{
 			Address:   cluster.members[0].Address(),
 			Port:      cluster.members[0].Port(),
 			Key:       key,
@@ -68,7 +68,7 @@ func BenchmarkPut(b *testing.B) {
 	b.Run("ABC", func(b *testing.B) {
 		storeName := "BenchmarkPut"
 		b.Log("Creating a store")
-		err = store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
+		err = server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 			Address: cluster.members[0].Address(),
 			Port:    cluster.members[0].Port(),
 			Name:    storeName,

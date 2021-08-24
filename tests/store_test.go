@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/davinash/yados/cmd/cli/commands/store"
 	"github.com/davinash/yados/internal/server"
 )
 
@@ -30,7 +29,7 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 		}(member)
 	}
 
-	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
+	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    "TestStoreCreate",
@@ -64,7 +63,7 @@ func (suite *YadosTestSuite) TestStoreList() {
 			}(member)
 		}
 
-		err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
+		err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 			Address: suite.cluster.members[0].Address(),
 			Port:    suite.cluster.members[0].Port(),
 			Name:    fmt.Sprintf("TestStoreList-%d", i),
@@ -75,7 +74,7 @@ func (suite *YadosTestSuite) TestStoreList() {
 		wg.Wait()
 	}
 
-	storeList, err := store.ExecuteCmdListStore(&store.ListArgs{
+	storeList, err := server.ExecuteCmdListStore(&server.ListArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 	})

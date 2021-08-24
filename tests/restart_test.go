@@ -3,13 +3,12 @@ package tests
 import (
 	"fmt"
 
-	"github.com/davinash/yados/cmd/cli/commands/store"
 	"github.com/davinash/yados/internal/server"
 )
 
 func (suite *YadosTestSuite) TestRestart() {
 	WaitForLeaderElection(suite.cluster)
-	err := store.ExecuteCmdCreateStore(&store.CreateCommandArgs{
+	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
 		Port:    suite.cluster.members[0].Port(),
 		Name:    "TestRestart",
@@ -18,7 +17,7 @@ func (suite *YadosTestSuite) TestRestart() {
 		suite.T().Fatal(err)
 	}
 	for i := 0; i < 10; i++ {
-		err = store.ExecuteCmdPut(&store.PutArgs{
+		err = server.ExecuteCmdPut(&server.PutArgs{
 			Address:   suite.cluster.members[0].Address(),
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
@@ -42,7 +41,7 @@ func (suite *YadosTestSuite) TestRestart() {
 	WaitForLeaderElection(suite.cluster)
 
 	for i := 0; i < 10; i++ {
-		reply, err := store.ExecuteCmdGet(&store.GetArgs{
+		reply, err := server.ExecuteCmdGet(&server.GetArgs{
 			Address:   suite.cluster.members[0].Address(),
 			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
