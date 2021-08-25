@@ -1,8 +1,10 @@
 package tests
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
+	"testing"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/protobuf/proto"
@@ -10,6 +12,47 @@ import (
 
 	"github.com/davinash/yados/internal/server"
 )
+
+func printEntry(entry *pb.LogEntry, prefix string, t *testing.T) {
+	t.Logf("[%s] Term= %v, Index= %v, Id= %v Type= %v", prefix, entry.Term, entry.Index, entry.Id, entry.CmdType)
+	switch entry.CmdType {
+	case pb.CommandType_CreateStore:
+		var req pb.StoreCreateRequest
+		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
+		if err != nil {
+			return
+		}
+		marshal, err := json.Marshal(req)
+		if err != nil {
+			return
+		}
+		t.Logf("[%s] Command -> %s", prefix, string(marshal))
+
+	case pb.CommandType_Put:
+		var req pb.PutRequest
+		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
+		if err != nil {
+			return
+		}
+		marshal, err := json.Marshal(req)
+		if err != nil {
+			return
+		}
+		t.Logf("[%s] Command -> %s", prefix, string(marshal))
+
+	case pb.CommandType_DeleteStore:
+		var req pb.StoreDeleteRequest
+		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
+		if err != nil {
+			return
+		}
+		marshal, err := json.Marshal(req)
+		if err != nil {
+			return
+		}
+		t.Logf("[%s] Command -> %s", prefix, string(marshal))
+	}
+}
 
 func (suite *YadosTestSuite) TestPLogAppend() {
 	WaitForLeaderElection(suite.cluster)
@@ -71,6 +114,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 		}
 		count := 0
 		for entry != nil {
+			printEntry(entry, member.Name(), suite.T())
 			count++
 			entry, err = iterator.Next()
 			if err != nil {
