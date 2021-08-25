@@ -22,7 +22,7 @@ func printEntry(entry *pb.LogEntry, prefix string, t *testing.T) {
 		if err != nil {
 			return
 		}
-		marshal, err := json.Marshal(req)
+		marshal, err := json.Marshal(&req)
 		if err != nil {
 			return
 		}
@@ -34,7 +34,7 @@ func printEntry(entry *pb.LogEntry, prefix string, t *testing.T) {
 		if err != nil {
 			return
 		}
-		marshal, err := json.Marshal(req)
+		marshal, err := json.Marshal(&req)
 		if err != nil {
 			return
 		}
@@ -46,7 +46,7 @@ func printEntry(entry *pb.LogEntry, prefix string, t *testing.T) {
 		if err != nil {
 			return
 		}
-		marshal, err := json.Marshal(req)
+		marshal, err := json.Marshal(&req)
 		if err != nil {
 			return
 		}
