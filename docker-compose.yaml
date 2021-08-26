@@ -3,26 +3,31 @@ version: '3.9'
 services:
   yados-1:
     container_name: yados-1
-    image: yados/yados:1.0.0
-    command: "yadosctl server start --name yados-1 --listen-address 192.28.0.2 --log-dir /tmp --port 9191 --log-level debug --http-port 8181"
+    image: davinash/yados:1.0.0
+    command: "yadosctl server start --name yados-1 --listen-address 192.28.0.2 --log-dir /tmp --port 9191 --log-level info --http-port 8181"
     ports:
-      - "8181"
+      - "8181:8181"
     networks:
       yados_network:
         ipv4_address: 192.28.0.2
 
   yados-2:
     container_name: yados-2
-    image: yados/yados:1.0.0
+    image: davinash/yados:1.0.0
     command: "yadosctl server start --name yados-2 --listen-address 192.28.0.3 --log-dir /tmp --port 9192  --peer yados-1:192.28.0.2:9191"
+    depends_on:
+      - yados-1
     networks:
       yados_network:
         ipv4_address: 192.28.0.3
 
   yados-3:
     container_name: yados-3
-    image: yados/yados:1.0.0
+    image: davinash/yados:1.0.0
     command: "yadosctl server start --name yados-3 --listen-address 192.28.0.4 --log-dir /tmp --port 9193 --log-level info --peer yados-1:192.28.0.2:9191 --peer yados-2:192.28.0.3:9192"
+    depends_on:
+      - yados-1
+      - yados-2
     networks:
       yados_network:
         ipv4_address: 192.28.0.4

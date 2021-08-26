@@ -19,7 +19,7 @@ endif
 
 TEST_COUNT=1
 
-TAG ?= "yados/yados:$(VERSION)"
+TAG ?= "davinash/yados:$(VERSION)"
 
 build: getdeps format lint buildx
 
