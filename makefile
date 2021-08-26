@@ -19,6 +19,8 @@ endif
 
 TEST_COUNT=1
 
+TAG ?= "yados/yados:$(VERSION)"
+
 build: getdeps format lint buildx
 
 format:
@@ -62,6 +64,10 @@ test-single:
 
 run-bench:
 	go test -v github.com/davinash/yados/tests  -run $(BENCH_NAME)  -bench=.
+
+build-docker-image:
+	@echo "Building YADOS container"
+	@docker build --no-cache -t $(TAG) . -f Dockerfile
 
 clean:
 	rm -rf out/*
