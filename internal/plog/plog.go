@@ -75,7 +75,7 @@ func (m *plog) Open() error {
 	return nil
 }
 
-//Close close the pLog
+//Close function to close the file handle of the log
 func (m *plog) Close() error {
 	err := m.pLogFH.Close()
 	if err != nil {
@@ -132,7 +132,7 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 	}
 
 	if m.ev != nil {
-		if m.size == m.ev.PersistEntryEventThreshold() {
+		if m.size == m.ev.PersistEntryEventThreshold()+1 {
 			m.ev.SendEvent(m.size)
 		}
 	}
@@ -222,7 +222,7 @@ func (m *plog) Size() int {
 	return m.size
 }
 
-//Iterator iterator interface for persistent logs
+//Iterator interface for persistent logs iterator
 type Iterator interface {
 	Next() (*pb.LogEntry, error)
 	Close() error
