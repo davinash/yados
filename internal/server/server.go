@@ -8,6 +8,13 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/davinash/yados/internal/events"
+	"github.com/davinash/yados/internal/plog"
+	"github.com/davinash/yados/internal/raft"
+	"github.com/davinash/yados/internal/rpc"
+	"github.com/davinash/yados/internal/store"
+	"github.com/google/uuid"
+
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"google.golang.org/protobuf/proto"
@@ -29,22 +36,22 @@ type Server interface {
 	Logger() *logrus.Entry
 	SetLogLevel(level string)
 	Serve([]*pb.Peer) error
-	RPCServer() RPCServer
-	Raft() Raft
+	RPCServer() rpc.Server
+	Raft() raft.Raft
 	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
 	Self() *pb.Peer
-	State() RaftState
+	State() raft.State
 	LogDir() string
-	PLog() PLog
+	PLog() plog.PLog
 	StoreCreate(request *pb.StoreCreateRequest) error
 	StoreDelete(request *pb.StoreDeleteRequest) error
 	Apply(entry *pb.LogEntry) error
-	Stores() map[string]Store
+	Stores() map[string]store.Store
 
 	// SetEventHandler For Test Purpose
-	SetEventHandler(Events)
+	SetEventHandler(events.Events)
 	// EventHandler for test purpose
-	EventHandler() Events
+	EventHandler() events.Events
 
 	HTTPPort() int
 	StartHTTPServer() error
@@ -54,16 +61,16 @@ type Server interface {
 type server struct {
 	pb.UnimplementedYadosServiceServer
 	mutex      sync.Mutex
-	raft       Raft
+	raft       raft.Raft
 	quit       chan interface{}
-	rpcServer  RPCServer
+	rpcServer  rpc.Server
 	self       *pb.Peer
 	logger     *logrus.Entry
 	logDir     string
-	pLog       PLog
-	stores     map[string]Store
+	pLog       plog.PLog
+	stores     map[string]store.Store
 	isTestMode bool
-	ev         Events
+	ev         events.Events
 
 	httpPort       int
 	httpServerWait sync.WaitGroup
@@ -106,16 +113,73 @@ func NewServer(args *NewServerArgs) (Server, error) {
 
 	srv.SetLogLevel(args.Loglevel)
 	srv.quit = make(chan interface{})
-	srv.stores = make(map[string]Store)
+	srv.stores = make(map[string]store.Store)
 
 	srv.httpPort = args.HTTPPort
 
 	if args.IsTestMode {
 		srv.isTestMode = true
-		srv.ev = NewEvents()
+		srv.ev = events.NewEvents()
 	}
 
 	return srv, nil
+}
+
+func (srv *server) Serve(peers []*pb.Peer) error {
+	err := srv.GetOrCreateStorage()
+	if err != nil {
+		return err
+	}
+	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
+	srv.rpcServer = rpc.NewRPCServer(srv.Name(), srv.self.Address, srv.self.Port, srv.logger)
+
+	pb.RegisterYadosServiceServer(srv.rpcServer.GrpcServer(), srv)
+
+	err = srv.rpcServer.Start()
+	if err != nil {
+		srv.logger.Fatalf("failed to start the rpc, error = %v", err)
+	}
+
+	args := raft.Args{
+		IsTestMode:   srv.isTestMode,
+		Apply:        srv.Apply,
+		Logger:       srv.logger,
+		PstLog:       srv.pLog,
+		RPCServer:    srv.rpcServer,
+		Server:       srv.Self(),
+		EventHandler: srv.EventHandler(),
+	}
+	srv.raft, err = raft.NewRaft(&args)
+	if err != nil {
+		return err
+	}
+
+	for _, p := range peers {
+		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
+			Id: uuid.New().String(),
+			NewPeer: &pb.Peer{
+				Name:    srv.Name(),
+				Address: srv.Address(),
+				Port:    srv.Port(),
+			},
+		})
+		if err != nil {
+			srv.logger.Fatalf("failed add peer , err = %v", err)
+		}
+		// add this peer to self
+		err = srv.raft.AddPeer(p)
+		if err != nil {
+			srv.logger.Fatalf("failed add peer , err = %v", err)
+		}
+	}
+	srv.raft.Start()
+
+	err = srv.StartHTTPServer()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (srv *server) GetOrCreateStorage() error {
@@ -126,7 +190,7 @@ func (srv *server) GetOrCreateStorage() error {
 	}
 	srv.logDir = d
 
-	store, err1 := NewPLog(srv)
+	store, err1 := plog.NewPLog(srv.logDir, srv.logger, srv.EventHandler())
 	if err1 != nil {
 		return err1
 	}
@@ -139,42 +203,11 @@ func (srv *server) GetOrCreateStorage() error {
 	return nil
 }
 
-func (srv *server) Serve(peers []*pb.Peer) error {
-	err := srv.GetOrCreateStorage()
-	if err != nil {
-		return err
-	}
-	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
-	srv.rpcServer = NewRPCServer(srv)
-	err = srv.rpcServer.Start()
-	if err != nil {
-		srv.logger.Fatalf("failed to start the rpc, error = %v", err)
-	}
-
-	args := RaftArgs{
-		srv:        srv,
-		peers:      peers,
-		isTestMode: srv.isTestMode,
-	}
-	srv.raft, err = NewRaft(&args)
-	if err != nil {
-		return err
-	}
-	srv.raft.Start()
-
-	err = srv.StartHTTPServer()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
 	srv.mutex.Lock()
 	defer srv.mutex.Unlock()
 
-	s := NewStore(&StoreArgs{})
+	s := store.NewStore(&store.Args{})
 	srv.Stores()[request.Name] = s
 
 	return nil
@@ -257,11 +290,11 @@ func (srv *server) Logger() *logrus.Entry {
 	return srv.logger
 }
 
-func (srv *server) RPCServer() RPCServer {
+func (srv *server) RPCServer() rpc.Server {
 	return srv.rpcServer
 }
 
-func (srv *server) Raft() Raft {
+func (srv *server) Raft() raft.Raft {
 	return srv.raft
 }
 
@@ -269,22 +302,22 @@ func (srv *server) Self() *pb.Peer {
 	return srv.self
 }
 
-func (srv *server) State() RaftState {
+func (srv *server) State() raft.State {
 	return srv.Raft().State()
 }
 
-func (srv *server) PLog() PLog {
+func (srv *server) PLog() plog.PLog {
 	return srv.pLog
 }
 
-func (srv *server) Stores() map[string]Store {
+func (srv *server) Stores() map[string]store.Store {
 	return srv.stores
 }
 
-func (srv *server) SetEventHandler(ev Events) {
+func (srv *server) SetEventHandler(ev events.Events) {
 	srv.ev = ev
 }
-func (srv *server) EventHandler() Events {
+func (srv *server) EventHandler() events.Events {
 	return srv.ev
 }
 

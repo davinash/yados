@@ -11,6 +11,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/davinash/yados/internal/events"
+	"github.com/davinash/yados/internal/raft"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 	"github.com/stretchr/testify/suite"
@@ -131,7 +134,7 @@ func StopCluster(cluster *TestCluster) {
 		wg.Add(1)
 		go func(wg *sync.WaitGroup, srv server.Server) {
 			defer wg.Done()
-			if srv.State() != server.Dead {
+			if srv.State() != raft.Dead {
 				err := srv.Stop()
 				if err != nil {
 					log.Printf("StopCluster -> %v", err)
@@ -166,14 +169,14 @@ func (suite *YadosTestSuite) SetupTest() {
 
 }
 
-func WaitForLeaderElection(cluster *TestCluster) server.Server {
+func WaitForLeaderElection(cluster *TestCluster) *pb.Peer {
 	for _, s := range cluster.members {
-		s.EventHandler().Subscribe(server.LeaderChangeEvents)
+		s.EventHandler().Subscribe(events.LeaderChangeEvents)
 	}
 
 	defer func() {
 		for _, s := range cluster.members {
-			s.EventHandler().UnSubscribe(server.LeaderChangeEvents)
+			s.EventHandler().UnSubscribe(events.LeaderChangeEvents)
 		}
 	}()
 
@@ -185,7 +188,7 @@ func WaitForLeaderElection(cluster *TestCluster) server.Server {
 		})
 	}
 	_, valValue, _ := reflect.Select(set)
-	peer := valValue.Interface().(server.Server)
+	peer := valValue.Interface().(*pb.Peer)
 	return peer
 }
 

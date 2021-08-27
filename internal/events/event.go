@@ -1,4 +1,4 @@
-package server
+package events
 
 import (
 	"sync"
@@ -23,7 +23,7 @@ type Events interface {
 	SendEvent(interface{})
 
 	CommitEntryEvent() chan *pb.LogEntry
-	LeaderChangeEvent() chan Server
+	LeaderChangeEvent() chan *pb.Peer
 	PersistEntryEvent() chan int
 
 	SetPersistEntryEventThreshold(int)
@@ -36,7 +36,7 @@ type Events interface {
 type events struct {
 	mutex             sync.Mutex
 	commitEntryChan   chan *pb.LogEntry
-	leaderChangeChan  chan Server
+	leaderChangeChan  chan *pb.Peer
 	eventSubscription map[EventType]bool
 	persistEntryChan  chan int
 	perstEvThreshold  int
@@ -47,7 +47,7 @@ func NewEvents() Events {
 	e := &events{
 		eventSubscription: make(map[EventType]bool),
 		commitEntryChan:   make(chan *pb.LogEntry),
-		leaderChangeChan:  make(chan Server),
+		leaderChangeChan:  make(chan *pb.Peer),
 		persistEntryChan:  make(chan int),
 	}
 	return e
@@ -69,7 +69,7 @@ func (ev *events) CommitEntryEvent() chan *pb.LogEntry {
 	return ev.commitEntryChan
 }
 
-func (ev *events) LeaderChangeEvent() chan Server {
+func (ev *events) LeaderChangeEvent() chan *pb.Peer {
 	return ev.leaderChangeChan
 }
 
@@ -90,7 +90,7 @@ func (ev *events) SendEvent(obj interface{}) {
 	defer ev.mutex.Unlock()
 
 	switch event := obj.(type) {
-	case Server:
+	case *pb.Peer:
 		if v, ok := ev.eventSubscription[LeaderChangeEvents]; ok {
 			if v {
 				ev.leaderChangeChan <- event

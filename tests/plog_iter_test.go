@@ -1,8 +1,8 @@
 package tests
 
 import (
+	"github.com/davinash/yados/internal/plog"
 	pb "github.com/davinash/yados/internal/proto/gen"
-	"github.com/davinash/yados/internal/server"
 	"github.com/google/uuid"
 )
 
@@ -29,7 +29,7 @@ func (suite *YadosTestSuite) TestPLogIterator() {
 		suite.T().Fatal(err)
 	}
 
-	defer func(iter server.PLogIterator) {
+	defer func(iter plog.Iterator) {
 		err := iter.Close()
 		if err != nil {
 			suite.T().Fatal(err)
@@ -66,7 +66,7 @@ func (suite *YadosTestSuite) TestPLogIteratorEmpty() {
 	if err != nil {
 		suite.T().Fatal(err)
 	}
-	defer func(iter server.PLogIterator) {
+	defer func(iter plog.Iterator) {
 		err := iter.Close()
 		if err != nil {
 			suite.T().Fatal(err)

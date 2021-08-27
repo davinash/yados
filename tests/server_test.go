@@ -1,7 +1,11 @@
 package tests
 
+import (
+	"github.com/davinash/yados/internal/raft"
+)
+
 func (suite *YadosTestSuite) TestServerNewLeader() {
-	leader := WaitForLeaderElection(suite.cluster)
+	_ = WaitForLeaderElection(suite.cluster)
 
 	for i := 4; i < 7; i++ {
 		srv, _, err := AddNewServer(i, suite.cluster.members, suite.logDir, "debug", false)
@@ -10,10 +14,16 @@ func (suite *YadosTestSuite) TestServerNewLeader() {
 		}
 		suite.cluster.members = append(suite.cluster.members, srv)
 	}
+
 	// let us stop the leader
-	err := leader.Stop()
-	if err != nil {
-		suite.T().Fatal(err)
+	for _, server := range suite.cluster.members {
+		if server.State() == raft.Leader {
+			err := server.Stop()
+			if err != nil {
+				suite.T().Fatal(err)
+			}
+			break
+		}
 	}
 	suite.T().Log("Waiting the new leader")
 
