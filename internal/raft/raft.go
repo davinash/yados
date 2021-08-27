@@ -1,4 +1,4 @@
-package server
+package raft
 
 import (
 	"context"
@@ -7,6 +7,10 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/davinash/yados/internal/events"
+	"github.com/davinash/yados/internal/plog"
+	"github.com/davinash/yados/internal/rpc"
 
 	"github.com/google/uuid"
 
@@ -30,12 +34,12 @@ type CommitEntry struct {
 	Term int64
 }
 
-//RaftState state of the raft instance
-type RaftState int
+//State of the raft instance
+type State int
 
 const (
 	//Follower indicate follower state
-	Follower RaftState = iota
+	Follower State = iota
 	//Candidate indicate candidate state
 	Candidate
 	//Leader indicate leader state
@@ -46,10 +50,9 @@ const (
 
 //Raft raft interface
 type Raft interface {
-	Server() Server
 	Peers() map[string]*pb.Peer
 	AddPeer(peer *pb.Peer) error
-	State() RaftState
+	State() State
 	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
 	RemovePeer(*pb.RemovePeerRequest) error
 	Start()
@@ -59,12 +62,16 @@ type Raft interface {
 	Submit(interface{}, string, pb.CommandType) error
 	AddCommandListener(string) error
 	WaitForCommandCompletion(string)
+
+	Apply() func(entry *pb.LogEntry) error
+
+	Server() *pb.Peer
+
+	EventHandler() events.Events
 }
 
 type raft struct {
-	mutex  sync.Mutex
-	server Server
-	//TODO : Check if we need this or can work with from the object in Server interface
+	mutex sync.Mutex
 	peers map[string]*pb.Peer
 
 	// Persistent Raft state on all servers
@@ -75,7 +82,7 @@ type raft struct {
 	// Volatile Raft state on all servers
 	commitIndex        int64
 	lastApplied        int64
-	state              RaftState
+	state              State
 	electionResetEvent time.Time
 
 	// Volatile Raft state on leaders
@@ -90,63 +97,37 @@ type raft struct {
 
 	newCommitReadyChan chan struct{}
 	logger             *logrus.Entry
+	apply              func(entry *pb.LogEntry) error
+	pLog               plog.PLog
+	rpcServer          rpc.Server
+	server             *pb.Peer
+	ev                 events.Events
 }
 
-//RaftArgs argument structure for Raft Instance
-type RaftArgs struct {
-	srv        Server
-	peers      []*pb.Peer
-	isTestMode bool
-}
-
-func (r *raft) InitializeFromStorage() error {
-	// Apply term and voted for state from the
-	// persistent log
-	term, votedFor, err := r.Server().PLog().ReadState()
-	if err != nil {
-		return err
-	}
-	r.currentTerm = term
-	r.votedFor = votedFor
-
-	iter, err1 := r.Server().PLog().Iterator()
-	if err1 != nil {
-		return nil
-	}
-	defer func(iter PLogIterator) {
-		err := iter.Close()
-		if err != nil {
-			r.logger.Warnf("Failed to close the iterator, Error = %v", err)
-		}
-	}(iter)
-
-	entry, err2 := iter.Next()
-	if err2 != nil {
-		return nil
-	}
-
-	for entry != nil {
-		r.log = append(r.log, entry)
-		err := r.server.Apply(entry)
-		if err != nil {
-			return err
-		}
-		entry, err = iter.Next()
-		if err != nil {
-			return nil
-		}
-	}
-	return nil
+//Args argument structure for Raft Instance
+type Args struct {
+	IsTestMode   bool
+	Apply        func(entry *pb.LogEntry) error
+	Logger       *logrus.Entry
+	PstLog       plog.PLog
+	RPCServer    rpc.Server
+	Server       *pb.Peer
+	EventHandler events.Events
 }
 
 //NewRaft creates new instance of Raft
-func NewRaft(args *RaftArgs) (Raft, error) {
+func NewRaft(args *Args) (Raft, error) {
 	r := &raft{
-		server:        args.srv,
 		quit:          make(chan interface{}),
 		triggerAEChan: make(chan struct{}, 1),
-		logger:        args.srv.Logger(),
+		apply:         args.Apply,
+		logger:        args.Logger,
+		pLog:          args.PstLog,
+		rpcServer:     args.RPCServer,
+		server:        args.Server,
+		ev:            args.EventHandler,
 	}
+
 	r.peers = make(map[string]*pb.Peer)
 	r.state = Follower
 	r.commitIndex = -1
@@ -160,26 +141,47 @@ func NewRaft(args *RaftArgs) (Raft, error) {
 	if err != nil {
 		return nil, err
 	}
+	return r, nil
+}
 
-	for _, p := range args.peers {
-		_, err := args.srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
-			Id: uuid.New().String(),
-			NewPeer: &pb.Peer{
-				Name:    args.srv.Name(),
-				Address: args.srv.Address(),
-				Port:    args.srv.Port(),
-			},
-		})
+func (r *raft) InitializeFromStorage() error {
+	// Apply term and voted for state from the
+	// persistent log
+	term, votedFor, err := r.pLog.ReadState()
+	if err != nil {
+		return err
+	}
+	r.currentTerm = term
+	r.votedFor = votedFor
+
+	iter, err1 := r.pLog.Iterator()
+	if err1 != nil {
+		return nil
+	}
+	defer func(iter plog.Iterator) {
+		err := iter.Close()
 		if err != nil {
-			return nil, err
+			r.logger.Warnf("Failed to close the iterator, Error = %v", err)
 		}
-		// add this peer to self
-		err = r.AddPeer(p)
+	}(iter)
+
+	entry, err2 := iter.Next()
+	if err2 != nil {
+		return nil
+	}
+
+	for entry != nil {
+		r.log = append(r.log, entry)
+		err := r.apply(entry)
 		if err != nil {
-			return nil, err
+			return err
+		}
+		entry, err = iter.Next()
+		if err != nil {
+			return nil
 		}
 	}
-	return r, nil
+	return nil
 }
 
 func (r *raft) Start() {
@@ -211,7 +213,7 @@ func (r *raft) Stop() {
 	r.logger.Debug("Stopped Raft Instance")
 }
 
-func (s RaftState) String() string {
+func (s State) String() string {
 	switch s {
 	case Follower:
 		return "Follower"
@@ -226,30 +228,36 @@ func (s RaftState) String() string {
 	}
 }
 
+func (r *raft) Server() *pb.Peer {
+	return r.server
+}
+
+func (r *raft) Apply() func(entry *pb.LogEntry) error {
+	return r.apply
+}
+
 func (r *raft) Log() []*pb.LogEntry {
 	return r.log
 }
 
-func (r *raft) State() RaftState {
+func (r *raft) State() State {
 	return r.state
-}
-
-func (r *raft) Server() Server {
-	return r.server
 }
 
 func (r *raft) Peers() map[string]*pb.Peer {
 	return r.peers
 }
 
+func (r *raft) EventHandler() events.Events {
+	return r.ev
+}
+
 func (r *raft) AddCommandListener(id string) error {
-	r.logger.Debugf("[%s] Adding command listener for %s", r.Server().Name(), id)
 	r.commitsChanMap[id] = make(chan struct{})
 	return nil
 }
 
 func (r *raft) WaitForCommandCompletion(id string) {
-	r.logger.Debugf("[%s] WaitForCommandCompletion for %s", r.Server().Name(), id)
 	if v, ok := r.commitsChanMap[id]; ok {
 		<-v
 	}
@@ -281,10 +289,10 @@ func (r *raft) RemoveSelf() error {
 		go func(peer *pb.Peer) {
 			defer r.wg.Done()
 			args := pb.RemovePeerRequest{
-				Peer: r.Server().Self(),
+				Peer: r.server,
 			}
 
-			resp, err := r.Server().Send(peer, "RPC.RemoveSelf", &args)
+			resp, err := r.rpcServer.Send(peer, "RPC.RemoveSelf", &args)
 			if err != nil {
 				r.logger.Errorf("failed to send RemoveSelf to %s, Error = %v", peer.Name, err)
 				return
@@ -407,7 +415,7 @@ func (r *raft) startElection() {
 	savedCurrentTerm := r.currentTerm
 	r.electionResetEvent = time.Now()
 	// vote for yourself
-	r.votedFor = r.Server().Name()
+	r.votedFor = r.server.Name
 
 	votesReceived := 1
 	for _, peer := range r.peers {
@@ -421,13 +429,13 @@ func (r *raft) startElection() {
 
 			args := pb.VoteRequest{
 				Term:          savedCurrentTerm,
-				CandidateName: r.Server().Name(),
+				CandidateName: r.server.Name,
 				LastLogIndex:  savedLastLogIndex,
 				LastLogTerm:   savedLastLogTerm,
 				Id:            uuid.New().String(),
 			}
 			// Send request vote to all peer
-			resp, err := r.Server().Send(peer, "RPC.RequestVote", &args)
+			resp, err := r.rpcServer.Send(peer, "RPC.RequestVote", &args)
 			if err != nil {
 				r.logger.Errorf("failed to send RequestVote to %s, Error = %v", peer.Name, err)
 				return
@@ -480,7 +488,7 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 		reply.VoteGranted = false
 	}
 	reply.Term = r.currentTerm
-	reply.CandidateName = r.Server().Name()
+	reply.CandidateName = r.server.Name
 
 	err := r.persistToStorage(nil)
 	if err != nil {
@@ -496,8 +504,8 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 func (r *raft) startLeader() {
 	r.state = Leader
 
-	if r.Server().EventHandler() != nil {
-		r.Server().EventHandler().SendEvent(r.Server())
+	if r.EventHandler() != nil {
+		r.EventHandler().SendEvent(r.Server())
 	}
 
 	for _, peer := range r.Peers() {
@@ -624,7 +632,7 @@ func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string)
 
 	request := pb.AppendEntryRequest{
 		Term:         savedCurrentTerm,
-		Leader:       r.Server().Self(),
+		Leader:       r.server,
 		PrevLogIndex: prevLogIndex,
 		PrevLogTerm:  prevLogTerm,
 		Entries:      entries,
@@ -649,7 +657,7 @@ func (r *raft) leaderSendAEs() {
 
 			request, nextIndex, entries := r.createAERequest(peer, savedCurrentTerm, id)
 
-			resp, err := r.Server().Send(peer, "RPC.AppendEntries", request)
+			resp, err := r.rpcServer.Send(peer, "RPC.AppendEntries", request)
 			if err != nil {
 				r.logger.Errorf("[%s] Sending AppendEntries failed, Error = %v", request.Id, err)
 				return
@@ -764,11 +772,11 @@ func (r *raft) becomeFollower(term int64) {
 func (r *raft) applyCommittedEntry(entry *pb.LogEntry) error {
 
 	// For Tests
-	if r.Server().EventHandler() != nil {
-		r.Server().EventHandler().SendEvent(entry)
+	if r.EventHandler() != nil {
+		r.EventHandler().SendEvent(entry)
 	}
 
-	err := r.Server().Apply(entry)
+	err := r.apply(entry)
 	if err != nil {
 		return err
 	}
@@ -780,7 +788,7 @@ func (r *raft) applyCommittedEntry(entry *pb.LogEntry) error {
 
 func (r *raft) commitChanSender() {
 	for range r.newCommitReadyChan {
-		// Find which entries we have to apply.
+		// Find which entries we have to Apply.
 		r.mutex.Lock()
 		savedLastApplied := r.lastApplied
 		var entries []*pb.LogEntry
@@ -815,12 +823,12 @@ func (r *raft) lastLogIndexAndTerm() (int64, int64) {
 }
 
 func (r *raft) persistToStorage(entries []*pb.LogEntry) error {
-	err := r.Server().PLog().WriteState(r.currentTerm, r.votedFor)
+	err := r.pLog.WriteState(r.currentTerm, r.votedFor)
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
-		err := r.Server().PLog().Append(entry)
+		err := r.pLog.Append(entry)
 		if err != nil {
 			return err
 		}

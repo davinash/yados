@@ -6,6 +6,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/davinash/yados/internal/raft"
+
 	"github.com/sirupsen/logrus"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
@@ -66,7 +68,7 @@ func (srv *server) PeerStatus(ctx context.Context, request *pb.StatusRequest) (*
 	}
 	reply.Server = srv.Self()
 	reply.Status = srv.State().String()
-	if srv.State() == Leader {
+	if srv.State() == raft.Leader {
 		reply.IsLeader = true
 	}
 	return reply, nil

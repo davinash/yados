@@ -1,4 +1,4 @@
-package server
+package store
 
 import (
 	"sync"
@@ -15,8 +15,8 @@ type Store interface {
 	InternalMap() map[string]string
 }
 
-//StoreArgs arguments for creating new store
-type StoreArgs struct {
+//Args arguments for creating new store
+type Args struct {
 	name string
 }
 
@@ -27,7 +27,7 @@ type store struct {
 }
 
 //NewStore creates a new store
-func NewStore(args *StoreArgs) Store {
+func NewStore(args *Args) Store {
 	s := &store{
 		name: args.name,
 		kv:   make(map[string]string),

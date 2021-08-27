@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 
+	"github.com/davinash/yados/internal/rpc"
+
 	"github.com/google/uuid"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
@@ -18,7 +20,7 @@ type StatusArgs struct {
 
 //ExecuteCmdStatus helper function to execute grpc call to get the status
 func ExecuteCmdStatus(args *StatusArgs) (*pb.ClusterStatusReply, error) {
-	peerConn, rpcClient, err := GetPeerConn(args.Address, args.Port)
+	peerConn, rpcClient, err := rpc.GetPeerConn(args.Address, args.Port)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +52,7 @@ func ExecuteCmdCreateStore(args *CreateCommandArgs) error {
 		return err
 	}
 
-	peerConn, rpcClient, err1 := GetPeerConn(leader.Address, leader.Port)
+	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
 	if err1 != nil {
 		return err1
 	}
@@ -87,7 +89,7 @@ func ExecuteCmdGet(args *GetArgs) (*pb.GetReply, error) {
 	if err != nil {
 		return nil, err
 	}
-	peerConn, rpcClient, err := GetPeerConn(leader.Address, leader.Port)
+	peerConn, rpcClient, err := rpc.GetPeerConn(leader.Address, leader.Port)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +124,7 @@ func ExecuteCmdListStore(args *ListArgs) (*pb.ListStoreReply, error) {
 		return nil, err
 	}
 
-	peerConn, rpcClient, err := GetPeerConn(leader.Address, leader.Port)
+	peerConn, rpcClient, err := rpc.GetPeerConn(leader.Address, leader.Port)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +158,7 @@ func ExecuteCmdPut(args *PutArgs) error {
 		return err
 	}
 
-	peerConn, rpcClient, err1 := GetPeerConn(leader.Address, leader.Port)
+	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
 	if err1 != nil {
 		return err1
 	}

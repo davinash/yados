@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 
+	"github.com/davinash/yados/internal/rpc"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 	"github.com/google/uuid"
@@ -24,7 +26,7 @@ func ExecuteCmdDeleteStore(args *DeleteArgs) error {
 	if err != nil {
 		return err
 	}
-	peerConn, rpcClient, err1 := server.GetPeerConn(leader.Address, leader.Port)
+	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
 	if err1 != nil {
 		return err1
 	}

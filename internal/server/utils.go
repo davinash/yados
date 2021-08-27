@@ -4,13 +4,15 @@ import (
 	"context"
 	"log"
 
+	"github.com/davinash/yados/internal/rpc"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/grpc"
 )
 
 //GetLeader returns the current leader in the system
 func GetLeader(address string, port int32) (*pb.Peer, error) {
-	peerConn, rpcClient, err := GetPeerConn(address, port)
+	peerConn, rpcClient, err := rpc.GetPeerConn(address, port)
 	if err != nil {
 		return nil, err
 	}

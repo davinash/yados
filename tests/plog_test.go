@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/davinash/yados/internal/events"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -62,11 +64,11 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 
 	for _, s := range suite.cluster.members {
 		s.EventHandler().SetPersistEntryEventThreshold(numOfPuts)
-		s.EventHandler().Subscribe(server.EntryPersistEvents)
+		s.EventHandler().Subscribe(events.EntryPersistEvents)
 	}
 	defer func() {
 		for _, s := range suite.cluster.members {
-			s.EventHandler().UnSubscribe(server.EntryPersistEvents)
+			s.EventHandler().UnSubscribe(events.EntryPersistEvents)
 		}
 	}()
 
@@ -140,11 +142,11 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 
 	for _, s := range suite.cluster.members {
 		s.EventHandler().SetPersistEntryEventThreshold(numOfPuts)
-		s.EventHandler().Subscribe(server.EntryPersistEvents)
+		s.EventHandler().Subscribe(events.EntryPersistEvents)
 	}
 	defer func() {
 		for _, s := range suite.cluster.members {
-			s.EventHandler().UnSubscribe(server.EntryPersistEvents)
+			s.EventHandler().UnSubscribe(events.EntryPersistEvents)
 		}
 	}()
 

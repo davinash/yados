@@ -1,4 +1,4 @@
-package server
+package plog
 
 import (
 	"encoding/binary"
@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/davinash/yados/internal/events"
 
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -32,17 +34,17 @@ type PLog interface {
 	Append(entry *pb.LogEntry) error
 	Size() int
 	PLogFileName() string
-	Iterator() (PLogIterator, error)
+	Iterator() (Iterator, error)
 	WriteState(int64, string) error
 	ReadState() (int64, string, error)
 }
 
 //NewPLog Creates new storage
-func NewPLog(srv Server) (PLog, error) {
+func NewPLog(logDir string, logger *logrus.Entry, ev events.Events) (PLog, error) {
 	ms := &plog{
-		logDir: srv.LogDir(),
-		logger: srv.Logger(),
-		server: srv,
+		logDir: logDir,
+		logger: logger,
+		ev:     ev,
 	}
 	return ms, nil
 }
@@ -54,8 +56,8 @@ type plog struct {
 	logger        *logrus.Entry
 	storeFileName string
 	pLogFH        *os.File
-	server        Server
 	size          int
+	ev            events.Events
 }
 
 func (m *plog) PLogFileName() string {
@@ -73,7 +75,7 @@ func (m *plog) Open() error {
 	return nil
 }
 
-//Close close the pLog
+//Close function to close the file handle of the log
 func (m *plog) Close() error {
 	err := m.pLogFH.Close()
 	if err != nil {
@@ -129,9 +131,9 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 			entry.Id, entry.Term, entry.Index, string(commandStr))
 	}
 
-	if m.server.EventHandler() != nil {
-		if m.size == m.server.EventHandler().PersistEntryEventThreshold() {
-			m.server.EventHandler().SendEvent(m.size)
+	if m.ev != nil {
+		if m.size == m.ev.PersistEntryEventThreshold()+1 {
+			m.ev.SendEvent(m.size)
 		}
 	}
 	return nil
@@ -220,8 +222,8 @@ func (m *plog) Size() int {
 	return m.size
 }
 
-//PLogIterator iterator interface for persistent logs
-type PLogIterator interface {
+//Iterator interface for persistent logs iterator
+type Iterator interface {
 	Next() (*pb.LogEntry, error)
 	Close() error
 }
@@ -232,7 +234,7 @@ type pLogIterator struct {
 }
 
 //Iterator creates a new instance of the iterator
-func (m *plog) Iterator() (PLogIterator, error) {
+func (m *plog) Iterator() (Iterator, error) {
 	iter := pLogIterator{
 		pLog: m,
 	}

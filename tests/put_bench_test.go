@@ -5,6 +5,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/davinash/yados/internal/events"
+
 	"github.com/davinash/yados/internal/server"
 
 	"github.com/davinash/yados/cmd/cli/commands/store"
@@ -13,11 +15,11 @@ import (
 func benchmarkPut(numOfPuts int, b *testing.B, cluster *TestCluster, storeName string) {
 	for _, s := range cluster.members {
 		s.EventHandler().SetPersistEntryEventThreshold(numOfPuts)
-		s.EventHandler().Subscribe(server.EntryPersistEvents)
+		s.EventHandler().Subscribe(events.EntryPersistEvents)
 	}
 	defer func() {
 		for _, s := range cluster.members {
-			s.EventHandler().UnSubscribe(server.EntryPersistEvents)
+			s.EventHandler().UnSubscribe(events.EntryPersistEvents)
 		}
 	}()
 

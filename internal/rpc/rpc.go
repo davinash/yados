@@ -1,4 +1,4 @@
-package server
+package rpc
 
 import (
 	"context"
@@ -16,44 +16,53 @@ import (
 )
 
 //ErrorPortNotOpen returned when the Port is not open
-var ErrorPortNotOpen = errors.New("Port is not open to listen")
+var ErrorPortNotOpen = errors.New("port is not open to listen")
 
 //ErrorUnknownMethod when rpc is called with unknown method
 var ErrorUnknownMethod = errors.New("unknown method ")
 
-//RPCServer interface for rpc server
-type RPCServer interface {
+//Server interface for rpc server
+type Server interface {
 	Start() error
 	Stop() error
 	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
-	Server() Server
+	GrpcServer() *grpc.Server
 }
 
 type rpcServer struct {
-	server     Server
 	grpcServer *grpc.Server
+	logger     *logrus.Entry
+	srvName    string
+	address    string
+	port       int32
 }
 
 //NewRPCServer creates a new instance of rpc server
-func NewRPCServer(srv Server) RPCServer {
+func NewRPCServer(srvName string, address string, port int32, logger *logrus.Entry) Server {
 	rpc := &rpcServer{
 		grpcServer: grpc.NewServer(),
-		server:     srv,
+		logger:     logger,
+		srvName:    srvName,
+		address:    address,
+		port:       port,
 	}
 	return rpc
 }
 
+func (rpc *rpcServer) GrpcServer() *grpc.Server {
+	return rpc.grpcServer
+}
+
 func (rpc *rpcServer) Start() error {
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", rpc.server.Address(), rpc.server.Port()))
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", rpc.address, rpc.port))
 	if err != nil {
 		return ErrorPortNotOpen
 	}
 
-	pb.RegisterYadosServiceServer(rpc.grpcServer, rpc.server)
 	go func() {
 		err := rpc.grpcServer.Serve(lis)
 		if err != nil {
-			rpc.Server().Logger().Errorf("failed to start the grpc server, Error = %v", err)
+			rpc.logger.Errorf("failed to start the grpc server, Error = %v", err)
 			return
 		}
 	}()
@@ -61,14 +70,10 @@ func (rpc *rpcServer) Start() error {
 }
 
 func (rpc *rpcServer) Stop() error {
-	rpc.Server().Logger().Debug("Stopping RPC server")
+	rpc.logger.Debug("Stopping RPC server")
 	rpc.grpcServer.Stop()
-	rpc.Server().Logger().Debug("Stopped RPC server")
+	rpc.logger.Debug("Stopped RPC server")
 	return nil
-}
-
-func (rpc *rpcServer) Server() Server {
-	return rpc.server
 }
 
 //GetPeerConn returns the connection and grpc client for the remote peer
@@ -90,15 +95,15 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 	defer func(peerConn *grpc.ClientConn) {
 		err := peerConn.Close()
 		if err != nil {
-			rpc.Server().Logger().Warnf("failed to close the connection, error = %v", err)
+			rpc.logger.Warnf("failed to close the connection, error = %v", err)
 		}
 	}(peerConn)
 
 	switch serviceMethod {
 	case "RPC.RequestVote":
 		request := args.(*pb.VoteRequest)
-		rpc.Server().Logger().Debugf("[%s] Type = RequestVotes %s -----> %s  "+
-			"Request : {Term = %v Candidate Name = %v }", request.Id, rpc.Server().Name(), peer.Name,
+		rpc.logger.Debugf("[%s] Type = RequestVotes %s -----> %s  "+
+			"Request : {Term = %v Candidate Name = %v }", request.Id, rpc.srvName, peer.Name,
 			request.Term, request.CandidateName)
 
 		reply, err := rpcClient.RequestVotes(context.Background(), request)
@@ -108,8 +113,8 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 		return reply, nil
 	case "server.AddNewMember":
 		request := args.(*pb.NewPeerRequest)
-		rpc.Server().Logger().Debugf("[%s] Type = AddNewMember %s -----> %s  ",
-			request.Id, rpc.Server().Name(), peer.Name)
+		rpc.logger.Debugf("[%s] Type = AddNewMember %s -----> %s  ",
+			request.Id, rpc.srvName, peer.Name)
 
 		reply, err := rpcClient.AddMember(context.Background(), request)
 		if err != nil {
@@ -119,13 +124,13 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 	case "RPC.AppendEntries":
 		request := args.(*pb.AppendEntryRequest)
 
-		if rpc.Server().Logger().Logger.IsLevelEnabled(logrus.DebugLevel) {
+		if rpc.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 			marshal, err := json.MarshalIndent(request, "", "   ")
 			if err != nil {
 				return nil, err
 			}
 
-			rpc.Server().Logger().Debugf("[%s] AppendEntries ( -> %s ) : nextIndex = %d Term = %v; LeaderName = "+
+			rpc.logger.Debugf("[%s] AppendEntries ( -> %s ) : nextIndex = %d Term = %v; LeaderName = "+
 				"%v; PrevLogTerm = %v; PrevLogIndex = %v; LeaderCommit = %v \nrequest = %s", request.Id,
 				peer.Name, request.NextIndex, request.Term, request.Leader.Name, request.PrevLogTerm,
 				request.PrevLogIndex, request.LeaderCommit, string(marshal))
@@ -139,7 +144,7 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 	case "RPC.RemoveSelf":
 		request := args.(*pb.RemovePeerRequest)
 		request.Id = uuid.New().String()
-		rpc.Server().Logger().Debugf("[%s] RemovePeerRequest ", request.Id)
+		rpc.logger.Debugf("[%s] RemovePeerRequest ", request.Id)
 		reply, err := rpcClient.RemovePeer(context.Background(), request)
 		if err != nil {
 			return nil, err
@@ -148,7 +153,7 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 	case "RPC.PeerStatus":
 		request := args.(*pb.StatusRequest)
 		request.Id = uuid.New().String()
-		rpc.Server().Logger().Debugf("[%s] PeerStatus ", request.Id)
+		rpc.logger.Debugf("[%s] PeerStatus ", request.Id)
 		reply, err := rpcClient.PeerStatus(context.Background(), request)
 		if err != nil {
 			return nil, err

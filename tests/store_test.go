@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/davinash/yados/internal/events"
+
 	"github.com/davinash/yados/internal/server"
 )
 
@@ -11,12 +13,12 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 	WaitForLeaderElection(suite.cluster)
 
 	for _, s := range suite.cluster.members {
-		s.EventHandler().Subscribe(server.CommitEntryEvents)
+		s.EventHandler().Subscribe(events.CommitEntryEvents)
 	}
 
 	defer func() {
 		for _, s := range suite.cluster.members {
-			s.EventHandler().UnSubscribe(server.CommitEntryEvents)
+			s.EventHandler().UnSubscribe(events.CommitEntryEvents)
 		}
 	}()
 
@@ -44,12 +46,12 @@ func (suite *YadosTestSuite) TestStoreList() {
 	WaitForLeaderElection(suite.cluster)
 
 	for _, s := range suite.cluster.members {
-		s.EventHandler().Subscribe(server.CommitEntryEvents)
+		s.EventHandler().Subscribe(events.CommitEntryEvents)
 	}
 
 	defer func() {
 		for _, s := range suite.cluster.members {
-			s.EventHandler().UnSubscribe(server.CommitEntryEvents)
+			s.EventHandler().UnSubscribe(events.CommitEntryEvents)
 		}
 	}()
 
