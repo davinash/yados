@@ -6,8 +6,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/davinash/yados/internal/events"
-
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -59,16 +57,15 @@ func printEntry(entry *pb.LogEntry, prefix string, t *testing.T) {
 func (suite *YadosTestSuite) TestPLogAppend() {
 	WaitForLeaderElection(suite.cluster)
 	storeName := "TestPLogAppend"
-
 	numOfPuts := 10
 
 	for _, s := range suite.cluster.members {
-		s.EventHandler().SetPersistEntryEventThreshold(numOfPuts)
-		s.EventHandler().Subscribe(events.EntryPersistEvents)
+		s.EventHandler().PersistEntryChan = make(chan *pb.LogEntry)
 	}
 	defer func() {
 		for _, s := range suite.cluster.members {
-			s.EventHandler().UnSubscribe(events.EntryPersistEvents)
+			close(s.EventHandler().PersistEntryChan)
+			s.EventHandler().PersistEntryChan = nil
 		}
 	}()
 
@@ -77,7 +74,17 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 		wg.Add(1)
 		go func(s server.Server) {
 			defer wg.Done()
-			<-s.EventHandler().PersistEntryEvent()
+			count := 0
+			for {
+				select {
+				case <-s.EventHandler().PersistEntryChan:
+					count++
+					if count == numOfPuts+1 {
+						return
+					}
+				default:
+				}
+			}
 		}(member)
 	}
 
@@ -141,12 +148,12 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 	numOfPuts := 10
 
 	for _, s := range suite.cluster.members {
-		s.EventHandler().SetPersistEntryEventThreshold(numOfPuts)
-		s.EventHandler().Subscribe(events.EntryPersistEvents)
+		s.EventHandler().PersistEntryChan = make(chan *pb.LogEntry)
 	}
 	defer func() {
 		for _, s := range suite.cluster.members {
-			s.EventHandler().UnSubscribe(events.EntryPersistEvents)
+			close(s.EventHandler().PersistEntryChan)
+			s.EventHandler().PersistEntryChan = nil
 		}
 	}()
 
@@ -155,7 +162,17 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 		wg.Add(1)
 		go func(s server.Server) {
 			defer wg.Done()
-			<-s.EventHandler().PersistEntryEvent()
+			count := 0
+			for {
+				select {
+				case <-s.EventHandler().PersistEntryChan:
+					count++
+					if count == numOfPuts+1 {
+						return
+					}
+				default:
+				}
+			}
 		}(member)
 	}
 

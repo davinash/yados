@@ -50,14 +50,12 @@ type Server interface {
 	Apply(entry *pb.LogEntry) error
 	Stores() map[string]store.Store
 
-	// SetEventHandler For Test Purpose
-	SetEventHandler(events.Events)
-	// EventHandler for test purpose
-	EventHandler() events.Events
-
 	HTTPPort() int
 	StartHTTPServer() error
 	StopHTTPServer() error
+
+	// EventHandler for test purpose
+	EventHandler() *events.Events
 }
 
 type server struct {
@@ -72,7 +70,7 @@ type server struct {
 	pLog       plog.PLog
 	stores     map[string]store.Store
 	isTestMode bool
-	ev         events.Events
+	ev         *events.Events
 
 	httpPort       int
 	httpServerWait sync.WaitGroup
@@ -192,7 +190,7 @@ func (srv *server) GetOrCreateStorage() error {
 	}
 	srv.logDir = d
 
-	s, err1 := plog.NewPLog(srv.logDir, srv.logger, srv.EventHandler())
+	s, err1 := plog.NewPLog(srv.logDir, srv.logger, srv.EventHandler(), srv.isTestMode)
 	if err1 != nil {
 		return err1
 	}
@@ -240,13 +238,13 @@ func (srv *server) StoreDelete(request *pb.StoreDeleteRequest) error {
 
 func (srv *server) Apply(entry *pb.LogEntry) error {
 	switch entry.CmdType {
+
 	case pb.CommandType_CreateStore:
 		var req pb.StoreCreateRequest
 		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
 		if err != nil {
 			return err
 		}
-
 		err = srv.StoreCreate(&req)
 		if err != nil {
 			return err
@@ -270,6 +268,18 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		if err != nil {
 			return err
 		}
+
+	case pb.CommandType_SqlDDL:
+		var req pb.DDLQueryRequest
+		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
+		if err != nil {
+			return err
+		}
+		q, err := (srv.Stores()[req.StoreName].(store.SQLStore)).ExecuteDDLQuery(&req)
+		if err != nil {
+			return err
+		}
+		srv.logger.Debug(q)
 	}
 	return nil
 }
@@ -330,10 +340,7 @@ func (srv *server) Stores() map[string]store.Store {
 	return srv.stores
 }
 
-func (srv *server) SetEventHandler(ev events.Events) {
-	srv.ev = ev
-}
-func (srv *server) EventHandler() events.Events {
+func (srv *server) EventHandler() *events.Events {
 	return srv.ev
 }
 

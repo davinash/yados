@@ -12,7 +12,7 @@ func CreateQueryCommand(rootCmd *cobra.Command) {
 		Use:   "query",
 		Short: "execute sql query on the store ( DML )",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return server.ExecuteDDLQuery(&queryArg)
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&queryArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")

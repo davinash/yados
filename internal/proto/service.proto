@@ -8,6 +8,8 @@ enum CommandType {
   Put = 1;
   Get = 2;
   DeleteStore = 3;
+  SqlDML = 4;
+  SqlDDL = 5;
 }
 
 enum StoreType {
@@ -180,6 +182,8 @@ message DDLQueryRequest {
 
 message DDLQueryReply {
   string Id = 1;
+  string Error = 2;
+  int64  rowsAffected = 3;
 }
 
 

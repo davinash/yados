@@ -54,19 +54,18 @@ func (ss *storeSqlite) Type() pb.StoreType {
 }
 
 func (ss *storeSqlite) ExecuteDDLQuery(request *pb.DDLQueryRequest) (*pb.DDLQueryReply, error) {
+	reply := &pb.DDLQueryReply{}
 
-	rows, err := ss.db.Query(request.SqlQuery)
+	result, err := ss.db.Exec(request.SqlQuery)
 	if err != nil {
-		return nil, err
+		reply.Error = err.Error()
+		return reply, err
 	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			ss.logger.Warnf("failed to close the rows handle, Error = %v", err)
-		}
-	}(rows)
+	reply.RowsAffected, err = result.RowsAffected()
+	if err != nil {
+		reply.Error = err.Error()
+		return reply, err
+	}
 
-	ss.logger.Debug(rows)
-
-	return &pb.DDLQueryReply{}, nil
+	return reply, nil
 }

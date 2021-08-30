@@ -197,15 +197,15 @@ type QueryArgs struct {
 }
 
 //ExecuteDDLQuery executes the query on the store
-func ExecuteDDLQuery(args *QueryArgs) error {
+func ExecuteDDLQuery(args *QueryArgs) (*pb.DDLQueryReply, error) {
 	leader, err := GetLeader(args.Address, args.Port)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
 	if err1 != nil {
-		return err1
+		return nil, err1
 	}
 	defer func(peerConn *grpc.ClientConn) {
 		err := peerConn.Close()
@@ -220,10 +220,9 @@ func ExecuteDDLQuery(args *QueryArgs) error {
 		SqlQuery:  args.SQLStr,
 	}
 
-	_, err = rpcClient.ExecuteDDLSQLQuery(context.Background(), &req)
-	if err != nil {
-		return err
+	resp, err1 := rpcClient.ExecuteDDLSQLQuery(context.Background(), &req)
+	if err1 != nil {
+		return nil, err1
 	}
-
-	return nil
+	return resp, nil
 }

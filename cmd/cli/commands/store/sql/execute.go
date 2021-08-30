@@ -1,6 +1,9 @@
 package sql
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -12,7 +15,16 @@ func CreateExecuteQueryCommand(rootCmd *cobra.Command) {
 		Use:   "execute",
 		Short: "execute sql query on the store ( DDL ) ",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return server.ExecuteDDLQuery(&queryArg)
+			reply, err := server.ExecuteDDLQuery(&queryArg)
+			if err != nil {
+				return err
+			}
+			replyBytes, err := json.Marshal(reply)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("%s\n", string(replyBytes))
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&queryArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")

@@ -11,7 +11,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/davinash/yados/internal/events"
 	"github.com/davinash/yados/internal/raft"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
@@ -171,12 +170,12 @@ func (suite *YadosTestSuite) SetupTest() {
 
 func WaitForLeaderElection(cluster *TestCluster) *pb.Peer {
 	for _, s := range cluster.members {
-		s.EventHandler().Subscribe(events.LeaderChangeEvents)
+		s.EventHandler().LeaderChangeChan = make(chan interface{})
 	}
-
 	defer func() {
 		for _, s := range cluster.members {
-			s.EventHandler().UnSubscribe(events.LeaderChangeEvents)
+			close(s.EventHandler().LeaderChangeChan)
+			s.EventHandler().LeaderChangeChan = nil
 		}
 	}()
 
@@ -184,7 +183,7 @@ func WaitForLeaderElection(cluster *TestCluster) *pb.Peer {
 	for _, s := range cluster.members {
 		set = append(set, reflect.SelectCase{
 			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(s.EventHandler().LeaderChangeEvent()),
+			Chan: reflect.ValueOf(s.EventHandler().LeaderChangeChan),
 		})
 	}
 	_, valValue, _ := reflect.Select(set)
