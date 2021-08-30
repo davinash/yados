@@ -28,6 +28,7 @@ type KVStore interface {
 type SQLStore interface {
 	Store
 	ExecuteDDLQuery(*pb.DDLQueryRequest) (*pb.DDLQueryReply, error)
+	ExecuteDMLQuery(*pb.DMLQueryRequest) (*pb.DMLQueryReply, error)
 }
 
 //Args arguments for creating new store

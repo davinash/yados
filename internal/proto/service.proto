@@ -187,6 +187,18 @@ message DDLQueryReply {
 }
 
 
+message DMLQueryRequest {
+  string Id = 1;
+  string StoreName = 2;
+  string SqlQuery = 3;
+}
+
+message DMLQueryReply {
+  string Id = 1;
+  string Error = 2;
+}
+
+
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
   rpc AppendEntries(AppendEntryRequest) returns (AppendEntryReply) {}
@@ -200,4 +212,5 @@ service YadosService {
   rpc Get(GetRequest) returns(GetReply) {}
   rpc DeleteStore(StoreDeleteRequest) returns (StoreDeleteReply) {}
   rpc ExecuteDDLSQLQuery(DDLQueryRequest) returns (DDLQueryReply) {}
+  rpc ExecuteDMLSQLQuery(DMLQueryRequest) returns (DMLQueryReply) {}
 }

@@ -226,3 +226,34 @@ func ExecuteDDLQuery(args *QueryArgs) (*pb.DDLQueryReply, error) {
 	}
 	return resp, nil
 }
+
+//ExecuteDMLQuery executes the query on the store
+func ExecuteDMLQuery(args *QueryArgs) (*pb.DMLQueryReply, error) {
+	leader, err := GetLeader(args.Address, args.Port)
+	if err != nil {
+		return nil, err
+	}
+
+	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
+	if err1 != nil {
+		return nil, err1
+	}
+	defer func(peerConn *grpc.ClientConn) {
+		err := peerConn.Close()
+		if err != nil {
+			log.Printf("failed to close the connection, error = %v\n", err)
+		}
+	}(peerConn)
+
+	req := pb.DMLQueryRequest{
+		Id:        uuid.New().String(),
+		StoreName: args.StoreName,
+		SqlQuery:  args.SQLStr,
+	}
+
+	resp, err1 := rpcClient.ExecuteDMLSQLQuery(context.Background(), &req)
+	if err1 != nil {
+		return nil, err1
+	}
+	return resp, nil
+}

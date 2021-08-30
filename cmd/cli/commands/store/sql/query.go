@@ -1,6 +1,8 @@
 package sql
 
 import (
+	"fmt"
+
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -12,6 +14,11 @@ func CreateQueryCommand(rootCmd *cobra.Command) {
 		Use:   "query",
 		Short: "execute sql query on the store ( DML )",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			result, err := server.ExecuteDMLQuery(&queryArg)
+			if err != nil {
+				return err
+			}
+			fmt.Println(result)
 			return nil
 		},
 	}
@@ -20,6 +27,11 @@ func CreateQueryCommand(rootCmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&queryArg.SQLStr, "sql", "", "SQL statement to execute")
 	err := cmd.MarkFlagRequired("sql")
+	if err != nil {
+		panic(err)
+	}
+	cmd.Flags().StringVar(&queryArg.StoreName, "store-name", "", "Name of the store to create")
+	err = cmd.MarkFlagRequired("store-name")
 	if err != nil {
 		panic(err)
 	}

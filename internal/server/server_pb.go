@@ -225,3 +225,17 @@ func (srv *server) ExecuteDDLSQLQuery(ctx context.Context, request *pb.DDLQueryR
 
 	return reply, err
 }
+
+func (srv *server) ExecuteDMLSQLQuery(ctx context.Context, request *pb.DMLQueryRequest) (*pb.DMLQueryReply, error) {
+	reply := &pb.DMLQueryReply{}
+	if _, ok := srv.Stores()[request.StoreName]; !ok {
+		return reply, ErrorStoreDoesExists
+	}
+
+	resp, err := (srv.Stores()[request.StoreName].(store.SQLStore)).ExecuteDMLQuery(request)
+	if err != nil {
+		return reply, err
+	}
+
+	return resp, nil
+}

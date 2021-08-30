@@ -31,6 +31,7 @@ type YadosServiceClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetReply, error)
 	DeleteStore(ctx context.Context, in *StoreDeleteRequest, opts ...grpc.CallOption) (*StoreDeleteReply, error)
 	ExecuteDDLSQLQuery(ctx context.Context, in *DDLQueryRequest, opts ...grpc.CallOption) (*DDLQueryReply, error)
+	ExecuteDMLSQLQuery(ctx context.Context, in *DMLQueryRequest, opts ...grpc.CallOption) (*DMLQueryReply, error)
 }
 
 type yadosServiceClient struct {
@@ -149,6 +150,15 @@ func (c *yadosServiceClient) ExecuteDDLSQLQuery(ctx context.Context, in *DDLQuer
 	return out, nil
 }
 
+func (c *yadosServiceClient) ExecuteDMLSQLQuery(ctx context.Context, in *DMLQueryRequest, opts ...grpc.CallOption) (*DMLQueryReply, error) {
+	out := new(DMLQueryReply)
+	err := c.cc.Invoke(ctx, "/YadosService/ExecuteDMLSQLQuery", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
@@ -165,6 +175,7 @@ type YadosServiceServer interface {
 	Get(context.Context, *GetRequest) (*GetReply, error)
 	DeleteStore(context.Context, *StoreDeleteRequest) (*StoreDeleteReply, error)
 	ExecuteDDLSQLQuery(context.Context, *DDLQueryRequest) (*DDLQueryReply, error)
+	ExecuteDMLSQLQuery(context.Context, *DMLQueryRequest) (*DMLQueryReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -207,6 +218,9 @@ func (UnimplementedYadosServiceServer) DeleteStore(context.Context, *StoreDelete
 }
 func (UnimplementedYadosServiceServer) ExecuteDDLSQLQuery(context.Context, *DDLQueryRequest) (*DDLQueryReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExecuteDDLSQLQuery not implemented")
+}
+func (UnimplementedYadosServiceServer) ExecuteDMLSQLQuery(context.Context, *DMLQueryRequest) (*DMLQueryReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ExecuteDMLSQLQuery not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -437,6 +451,24 @@ func _YadosService_ExecuteDDLSQLQuery_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_ExecuteDMLSQLQuery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DMLQueryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).ExecuteDMLSQLQuery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/ExecuteDMLSQLQuery",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).ExecuteDMLSQLQuery(ctx, req.(*DMLQueryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -491,6 +523,10 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExecuteDDLSQLQuery",
 			Handler:    _YadosService_ExecuteDDLSQLQuery_Handler,
+		},
+		{
+			MethodName: "ExecuteDMLSQLQuery",
+			Handler:    _YadosService_ExecuteDMLSQLQuery_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

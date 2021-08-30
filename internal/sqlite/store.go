@@ -69,3 +69,15 @@ func (ss *storeSqlite) ExecuteDDLQuery(request *pb.DDLQueryRequest) (*pb.DDLQuer
 
 	return reply, nil
 }
+
+func (ss *storeSqlite) ExecuteDMLQuery(request *pb.DMLQueryRequest) (*pb.DMLQueryReply, error) {
+	reply := &pb.DMLQueryReply{}
+	rows, err := ss.db.Query(request.SqlQuery)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+
+	}
+	return reply, nil
+}
