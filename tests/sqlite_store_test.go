@@ -3,42 +3,17 @@ package tests
 import (
 	"sync"
 
-	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 )
 
 func (suite *YadosTestSuite) TestStoreCreateSqlite() {
 	WaitForLeaderElection(suite.cluster)
 
-	for _, s := range suite.cluster.members {
-		s.EventHandler().PersistEntryChan = make(chan *pb.LogEntry)
-	}
-	defer func() {
-		for _, s := range suite.cluster.members {
-			close(s.EventHandler().PersistEntryChan)
-			s.EventHandler().PersistEntryChan = nil
-		}
-	}()
-
 	wg := sync.WaitGroup{}
-	for _, member := range suite.cluster.members {
-		wg.Add(1)
-		go func(s server.Server) {
-			defer wg.Done()
-			count := 0
-			for {
-				select {
-				case <-s.EventHandler().PersistEntryChan:
-					count++
-					if count == 2 {
-						return
-					}
-				default:
-
-				}
-			}
-		}(member)
-	}
+	WaitForEvents(suite.cluster.members, &wg, 2)
+	defer func() {
+		StopWaitForEvents(suite.cluster.members)
+	}()
 
 	storeName := "TestStoreCreateSqlite"
 

@@ -59,34 +59,11 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 	storeName := "TestPLogAppend"
 	numOfPuts := 10
 
-	for _, s := range suite.cluster.members {
-		s.EventHandler().PersistEntryChan = make(chan *pb.LogEntry)
-	}
-	defer func() {
-		for _, s := range suite.cluster.members {
-			close(s.EventHandler().PersistEntryChan)
-			s.EventHandler().PersistEntryChan = nil
-		}
-	}()
-
 	wg := sync.WaitGroup{}
-	for _, member := range suite.cluster.members {
-		wg.Add(1)
-		go func(s server.Server) {
-			defer wg.Done()
-			count := 0
-			for {
-				select {
-				case <-s.EventHandler().PersistEntryChan:
-					count++
-					if count == numOfPuts+1 {
-						return
-					}
-				default:
-				}
-			}
-		}(member)
-	}
+	WaitForEvents(suite.cluster.members, &wg, numOfPuts+1)
+	defer func() {
+		StopWaitForEvents(suite.cluster.members)
+	}()
 
 	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
@@ -147,34 +124,11 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 
 	numOfPuts := 10
 
-	for _, s := range suite.cluster.members {
-		s.EventHandler().PersistEntryChan = make(chan *pb.LogEntry)
-	}
-	defer func() {
-		for _, s := range suite.cluster.members {
-			close(s.EventHandler().PersistEntryChan)
-			s.EventHandler().PersistEntryChan = nil
-		}
-	}()
-
 	wg := sync.WaitGroup{}
-	for _, member := range suite.cluster.members {
-		wg.Add(1)
-		go func(s server.Server) {
-			defer wg.Done()
-			count := 0
-			for {
-				select {
-				case <-s.EventHandler().PersistEntryChan:
-					count++
-					if count == numOfPuts+1 {
-						return
-					}
-				default:
-				}
-			}
-		}(member)
-	}
+	WaitForEvents(suite.cluster.members, &wg, numOfPuts+1)
+	defer func() {
+		StopWaitForEvents(suite.cluster.members)
+	}()
 
 	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
