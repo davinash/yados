@@ -36,6 +36,12 @@ func CreateExecuteQueryCommand(rootCmd *cobra.Command) {
 		panic(err)
 	}
 
+	cmd.Flags().StringVar(&queryArg.StoreName, "store-name", "", "Name of the store to create")
+	err = cmd.MarkFlagRequired("store-name")
+	if err != nil {
+		panic(err)
+	}
+
 	rootCmd.AddCommand(cmd)
 
 }
