@@ -3,34 +3,58 @@ package store
 import (
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 )
 
 //Store Interface for store
 type Store interface {
-	Put(*pb.PutRequest) error
-	Get(*pb.GetRequest) string
 	Name() string
 	Delete() error
+	Close() error
+	Type() pb.StoreType
+}
+
+//KVStore interface for Key Value store
+type KVStore interface {
+	Store
+	Put(*pb.PutRequest) error
+	Get(*pb.GetRequest) string
 	InternalMap() map[string]string
+}
+
+//SQLStore interface for Sql store
+type SQLStore interface {
+	Store
+	ExecuteDDLQuery(*pb.DDLQueryRequest) (*pb.DDLQueryReply, error)
 }
 
 //Args arguments for creating new store
 type Args struct {
-	name string
+	Name      string
+	PLogDir   string
+	Logger    *logrus.Entry
+	StoreType pb.StoreType
 }
 
 type store struct {
-	mutex sync.RWMutex
-	name  string
-	kv    map[string]string
+	mutex     sync.RWMutex
+	name      string
+	kv        map[string]string
+	storeType pb.StoreType
+}
+
+func (s *store) Type() pb.StoreType {
+	return s.storeType
 }
 
 //NewStore creates a new store
-func NewStore(args *Args) Store {
+func NewStore(args *Args) KVStore {
 	s := &store{
-		name: args.name,
-		kv:   make(map[string]string),
+		name:      args.Name,
+		kv:        make(map[string]string),
+		storeType: args.StoreType,
 	}
 	return s
 }
@@ -58,4 +82,8 @@ func (s *store) Get(getRequest *pb.GetRequest) string {
 
 func (s *store) Delete() error {
 	panic("implement me")
+}
+
+func (s *store) Close() error {
+	return nil
 }

@@ -43,6 +43,7 @@ type CreateCommandArgs struct {
 	Address string `json:"address,omitempty"`
 	Port    int32  `json:"port,omitempty"`
 	Name    string `json:"name"`
+	Type    string `json:"type"`
 }
 
 //ExecuteCmdCreateStore helper function to executed create store command
@@ -66,6 +67,10 @@ func ExecuteCmdCreateStore(args *CreateCommandArgs) error {
 	req := &pb.StoreCreateRequest{
 		Name: args.Name,
 		Id:   uuid.New().String(),
+		Type: pb.StoreType_Memory,
+	}
+	if args.Type == "sqlite" {
+		req.Type = pb.StoreType_Sqlite
 	}
 
 	_, err = rpcClient.CreateStore(context.Background(), req)
@@ -180,5 +185,45 @@ func ExecuteCmdPut(args *PutArgs) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+//QueryArgs arguments for the query command
+type QueryArgs struct {
+	Address   string `json:"address,omitempty"`
+	Port      int32  `json:"port,omitempty"`
+	SQLStr    string `json:"sql"`
+	StoreName string `json:"storeName"`
+}
+
+//ExecuteDDLQuery executes the query on the store
+func ExecuteDDLQuery(args *QueryArgs) error {
+	leader, err := GetLeader(args.Address, args.Port)
+	if err != nil {
+		return err
+	}
+
+	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
+	if err1 != nil {
+		return err1
+	}
+	defer func(peerConn *grpc.ClientConn) {
+		err := peerConn.Close()
+		if err != nil {
+			log.Printf("failed to close the connection, error = %v\n", err)
+		}
+	}(peerConn)
+
+	req := pb.DDLQueryRequest{
+		Id:        uuid.New().String(),
+		StoreName: args.StoreName,
+		SqlQuery:  args.SQLStr,
+	}
+
+	_, err = rpcClient.ExecuteDDLSQLQuery(context.Background(), &req)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

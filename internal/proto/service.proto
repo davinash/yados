@@ -10,6 +10,11 @@ enum CommandType {
   DeleteStore = 3;
 }
 
+enum StoreType {
+  Memory = 0;
+  Sqlite = 1;
+}
+
 message VoteRequest {
   string Id = 1;
   int64 Term = 2;
@@ -108,6 +113,7 @@ message ClusterStatusReply {
 message StoreCreateRequest {
   string Id = 1;
   string name = 2;
+  StoreType type = 3;
 }
 
 message StoreCreateReply {
@@ -166,6 +172,16 @@ message StoreDeleteReply {
   string Error = 2;
 }
 
+message DDLQueryRequest {
+  string Id = 1;
+  string StoreName = 2;
+  string SqlQuery = 3;
+}
+
+message DDLQueryReply {
+  string Id = 1;
+}
+
 
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
@@ -179,4 +195,5 @@ service YadosService {
   rpc Put(PutRequest) returns (PutReply) {}
   rpc Get(GetRequest) returns(GetReply) {}
   rpc DeleteStore(StoreDeleteRequest) returns (StoreDeleteReply) {}
+  rpc ExecuteDDLSQLQuery(DDLQueryRequest) returns (DDLQueryReply) {}
 }

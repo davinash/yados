@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
+
+	"github.com/davinash/yados/internal/store"
 
 	"github.com/davinash/yados/internal/raft"
 
@@ -169,6 +172,11 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 		reply.Error = ErrorStoreDoesExists.Error()
 		return reply, ErrorStoreDoesExists
 	}
+
+	if srv.Stores()[request.StoreName].Type() == pb.StoreType_Sqlite {
+		return reply, fmt.Errorf("operation not permitted on In Memory Stores")
+	}
+
 	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 		marshal, err := json.Marshal(request)
 		if err != nil {
@@ -192,8 +200,11 @@ func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRepl
 		reply.Value = ErrorStoreDoesExists.Error()
 		return reply, ErrorStoreDoesExists
 	}
+	if srv.Stores()[request.StoreName].Type() == pb.StoreType_Sqlite {
+		return reply, fmt.Errorf("operation not permitted on In Memory Stores")
+	}
 
-	value := srv.Stores()[request.StoreName].Get(request)
+	value := (srv.Stores()[request.StoreName].(store.KVStore)).Get(request)
 	reply.Value = value
 
 	return reply, nil
@@ -205,4 +216,14 @@ func (srv *server) ListStores(ctx context.Context, request *pb.ListStoreRequest)
 		reply.Name = append(reply.Name, k)
 	}
 	return reply, nil
+}
+
+func (srv *server) ExecuteDDLSQLQuery(ctx context.Context, request *pb.DDLQueryRequest) (*pb.DDLQueryReply, error) {
+	reply := &pb.DDLQueryReply{}
+	// Check if store with name exists
+	if _, ok := srv.Stores()[request.StoreName]; !ok {
+		return reply, ErrorStoreDoesExists
+	}
+	resp, err := srv.Stores()[request.StoreName].(store.SQLStore).ExecuteDDLQuery(request)
+	return resp, err
 }

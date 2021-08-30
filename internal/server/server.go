@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	store_sqlite "github.com/davinash/yados/internal/sqlite"
+
 	"github.com/davinash/yados/internal/events"
 	"github.com/davinash/yados/internal/plog"
 	"github.com/davinash/yados/internal/raft"
@@ -190,11 +192,11 @@ func (srv *server) GetOrCreateStorage() error {
 	}
 	srv.logDir = d
 
-	store, err1 := plog.NewPLog(srv.logDir, srv.logger, srv.EventHandler())
+	s, err1 := plog.NewPLog(srv.logDir, srv.logger, srv.EventHandler())
 	if err1 != nil {
 		return err1
 	}
-	srv.pLog = store
+	srv.pLog = s
 	err = srv.pLog.Open()
 	if err != nil {
 		return err
@@ -207,7 +209,21 @@ func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
 	srv.mutex.Lock()
 	defer srv.mutex.Unlock()
 
-	s := store.NewStore(&store.Args{})
+	if request.Type == pb.StoreType_Sqlite {
+		s, err := store_sqlite.NewSqliteStore(&store.Args{
+			Name:    request.Name,
+			PLogDir: srv.LogDir(),
+			Logger:  srv.Logger(),
+		})
+		if err != nil {
+			return err
+		}
+		srv.Stores()[request.Name] = s
+		return nil
+	}
+	s := store.NewStore(&store.Args{
+		StoreType: pb.StoreType_Memory,
+	})
 	srv.Stores()[request.Name] = s
 
 	return nil
@@ -242,7 +258,7 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		if err != nil {
 			return err
 		}
-		return srv.Stores()[req.StoreName].Put(&req)
+		return (srv.Stores()[req.StoreName].(store.KVStore)).Put(&req)
 
 	case pb.CommandType_DeleteStore:
 		var req pb.StoreDeleteRequest
@@ -347,6 +363,13 @@ func (srv *server) Stop() error {
 	err := srv.StopHTTPServer()
 	if err != nil {
 		return err
+	}
+	// Close all the stores
+	for _, v := range srv.Stores() {
+		err := v.Close()
+		if err != nil {
+			return err
+		}
 	}
 
 	srv.Raft().Stop()

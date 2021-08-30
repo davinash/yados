@@ -24,5 +24,7 @@ func CreateCommand(rootCmd *cobra.Command) {
 		panic(err)
 	}
 
+	cmd.Flags().StringVar(&arg.Type, "store-type", "memory", "type of the store to create [ memory | sqlite ]")
+
 	rootCmd.AddCommand(cmd)
 }
