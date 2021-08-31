@@ -46,6 +46,7 @@ func (suite *YadosTestSuite) TestStoreList() {
 			suite.T().Fatal(err)
 		}
 	}
+	wg.Wait()
 
 	storeList, err := server.ExecuteCmdListStore(&server.ListArgs{
 		Address: suite.cluster.members[0].Address(),
@@ -54,7 +55,6 @@ func (suite *YadosTestSuite) TestStoreList() {
 	if err != nil {
 		suite.T().Fatal(err)
 	}
-	wg.Wait()
 
 	if len(storeList.Name) != 5 {
 		suite.T().Fatal(err)
