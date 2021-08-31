@@ -196,8 +196,8 @@ type QueryArgs struct {
 	StoreName string `json:"storeName"`
 }
 
-//ExecuteDDLQuery executes the query on the store
-func ExecuteDDLQuery(args *QueryArgs) (*pb.DDLQueryReply, error) {
+//ExecuteQuery executes the query on the store
+func ExecuteQuery(args *QueryArgs) (*pb.ExecuteQueryReply, error) {
 	leader, err := GetLeader(args.Address, args.Port)
 	if err != nil {
 		return nil, err
@@ -214,21 +214,21 @@ func ExecuteDDLQuery(args *QueryArgs) (*pb.DDLQueryReply, error) {
 		}
 	}(peerConn)
 
-	req := pb.DDLQueryRequest{
+	req := pb.ExecuteQueryRequest{
 		Id:        uuid.New().String(),
 		StoreName: args.StoreName,
 		SqlQuery:  args.SQLStr,
 	}
 
-	resp, err1 := rpcClient.ExecuteDDLSQLQuery(context.Background(), &req)
+	resp, err1 := rpcClient.ExecuteQuery(context.Background(), &req)
 	if err1 != nil {
 		return nil, err1
 	}
 	return resp, nil
 }
 
-//ExecuteDMLQuery executes the query on the store
-func ExecuteDMLQuery(args *QueryArgs) (*pb.DMLQueryReply, error) {
+//Query executes the query on the store
+func Query(args *QueryArgs) (*pb.QueryReply, error) {
 	leader, err := GetLeader(args.Address, args.Port)
 	if err != nil {
 		return nil, err
@@ -245,13 +245,13 @@ func ExecuteDMLQuery(args *QueryArgs) (*pb.DMLQueryReply, error) {
 		}
 	}(peerConn)
 
-	req := pb.DMLQueryRequest{
+	req := pb.QueryRequest{
 		Id:        uuid.New().String(),
 		StoreName: args.StoreName,
 		SqlQuery:  args.SQLStr,
 	}
 
-	resp, err1 := rpcClient.ExecuteDMLSQLQuery(context.Background(), &req)
+	resp, err1 := rpcClient.Query(context.Background(), &req)
 	if err1 != nil {
 		return nil, err1
 	}

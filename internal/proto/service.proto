@@ -174,30 +174,34 @@ message StoreDeleteReply {
   string Error = 2;
 }
 
-message DDLQueryRequest {
+message ExecuteQueryRequest {
   string Id = 1;
   string StoreName = 2;
   string SqlQuery = 3;
 }
 
-message DDLQueryReply {
+message ExecuteQueryReply {
   string Id = 1;
   string Error = 2;
   int64  rowsAffected = 3;
 }
 
 
-message DMLQueryRequest {
+message QueryRequest {
   string Id = 1;
   string StoreName = 2;
   string SqlQuery = 3;
 }
 
-message DMLQueryReply {
-  string Id = 1;
-  string Error = 2;
+message SingleRow {
+  map<string, bytes> row = 1;
 }
 
+message QueryReply {
+  string Id = 1;
+  string Error = 2;
+  repeated SingleRow AllRows = 3;
+}
 
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
@@ -211,6 +215,6 @@ service YadosService {
   rpc Put(PutRequest) returns (PutReply) {}
   rpc Get(GetRequest) returns(GetReply) {}
   rpc DeleteStore(StoreDeleteRequest) returns (StoreDeleteReply) {}
-  rpc ExecuteDDLSQLQuery(DDLQueryRequest) returns (DDLQueryReply) {}
-  rpc ExecuteDMLSQLQuery(DMLQueryRequest) returns (DMLQueryReply) {}
+  rpc ExecuteQuery(ExecuteQueryRequest) returns (ExecuteQueryReply) {}
+  rpc Query(QueryRequest) returns (QueryReply) {}
 }

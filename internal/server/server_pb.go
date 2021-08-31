@@ -210,8 +210,8 @@ func (srv *server) ListStores(ctx context.Context, request *pb.ListStoreRequest)
 	return reply, nil
 }
 
-func (srv *server) ExecuteDDLSQLQuery(ctx context.Context, request *pb.DDLQueryRequest) (*pb.DDLQueryReply, error) {
-	reply := &pb.DDLQueryReply{}
+func (srv *server) ExecuteQuery(ctx context.Context, request *pb.ExecuteQueryRequest) (*pb.ExecuteQueryReply, error) {
+	reply := &pb.ExecuteQueryReply{}
 
 	// Check if store with name exists
 	if _, ok := srv.Stores()[request.StoreName]; !ok {
@@ -226,13 +226,13 @@ func (srv *server) ExecuteDDLSQLQuery(ctx context.Context, request *pb.DDLQueryR
 	return reply, err
 }
 
-func (srv *server) ExecuteDMLSQLQuery(ctx context.Context, request *pb.DMLQueryRequest) (*pb.DMLQueryReply, error) {
-	reply := &pb.DMLQueryReply{}
+func (srv *server) Query(ctx context.Context, request *pb.QueryRequest) (*pb.QueryReply, error) {
+	reply := &pb.QueryReply{}
 	if _, ok := srv.Stores()[request.StoreName]; !ok {
 		return reply, ErrorStoreDoesExists
 	}
 
-	resp, err := (srv.Stores()[request.StoreName].(store.SQLStore)).ExecuteDMLQuery(request)
+	resp, err := (srv.Stores()[request.StoreName].(store.SQLStore)).Query(request)
 	if err != nil {
 		return reply, err
 	}

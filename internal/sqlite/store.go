@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -53,8 +54,8 @@ func (ss *storeSqlite) Type() pb.StoreType {
 	return ss.storeType
 }
 
-func (ss *storeSqlite) ExecuteDDLQuery(request *pb.DDLQueryRequest) (*pb.DDLQueryReply, error) {
-	reply := &pb.DDLQueryReply{}
+func (ss *storeSqlite) Execute(request *pb.ExecuteQueryRequest) (*pb.ExecuteQueryReply, error) {
+	reply := &pb.ExecuteQueryReply{}
 
 	result, err := ss.db.Exec(request.SqlQuery)
 	if err != nil {
@@ -70,14 +71,55 @@ func (ss *storeSqlite) ExecuteDDLQuery(request *pb.DDLQueryRequest) (*pb.DDLQuer
 	return reply, nil
 }
 
-func (ss *storeSqlite) ExecuteDMLQuery(request *pb.DMLQueryRequest) (*pb.DMLQueryReply, error) {
-	reply := &pb.DMLQueryReply{}
+func (ss *storeSqlite) Query(request *pb.QueryRequest) (*pb.QueryReply, error) {
+	reply := &pb.QueryReply{}
 	rows, err := ss.db.Query(request.SqlQuery)
 	if err != nil {
-		return nil, err
+		return reply, err
 	}
-	for rows.Next() {
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			ss.logger.Warnf("failed to close rows, Error = %v", err)
+		}
+	}(rows)
 
+	columns, err := rows.Columns()
+	if err != nil {
+		return reply, err
+	}
+	count := len(columns)
+	values := make([]interface{}, count)
+	valuePtrs := make([]interface{}, count)
+
+	for rows.Next() {
+		for i := range columns {
+			valuePtrs[i] = &values[i]
+		}
+		err := rows.Scan(valuePtrs...)
+		if err != nil {
+			return reply, err
+		}
+		row := pb.SingleRow{
+			Row: map[string][]byte{},
+		}
+
+		for i, col := range columns {
+			val := values[i]
+			b, ok := val.([]byte)
+			var v interface{}
+			if ok {
+				v = string(b)
+			} else {
+				v = val
+			}
+			bytes, err := json.Marshal(v)
+			if err != nil {
+				return reply, err
+			}
+			row.Row[col] = bytes
+		}
+		reply.AllRows = append(reply.AllRows, &row)
 	}
 	return reply, nil
 }

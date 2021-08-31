@@ -270,12 +270,12 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		}
 
 	case pb.CommandType_SqlDDL:
-		var req pb.DDLQueryRequest
+		var req pb.ExecuteQueryRequest
 		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
 		if err != nil {
 			return err
 		}
-		q, err := (srv.Stores()[req.StoreName].(store.SQLStore)).ExecuteDDLQuery(&req)
+		q, err := (srv.Stores()[req.StoreName].(store.SQLStore)).Execute(&req)
 		if err != nil {
 			return err
 		}
