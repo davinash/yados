@@ -107,13 +107,6 @@ func (ss *storeSqlite) Query(request *pb.QueryRequest) (*pb.QueryReply, error) {
 		}
 		for i, col := range columns {
 			val := values[i]
-			//b, ok := val.([]byte)
-			//var v interface{}
-			//if ok {
-			//	v = string(b)
-			//} else {
-			//	v = val
-			//}
 			bytes, err := json.Marshal(val)
 			if err != nil {
 				return reply, err

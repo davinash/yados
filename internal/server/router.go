@@ -28,8 +28,10 @@ func (h *HTTPHandler) Router() *gin.Engine {
 	router.GET("/api/v1/status", h.getStatus)
 	router.POST("/api/v1/store", h.createStore)
 	router.GET("/api/v1/stores", h.getStores)
-	router.POST("/api/v1/put", h.put)
-	router.GET("/api/v1/get/:storeName/:key", h.get)
+	router.POST("/api/v1/kv/put", h.put)
+	router.GET("/api/v1/kv/get/:storeName/:key", h.get)
+	router.POST("/api/v1/sql/execute", h.execute)
+	router.POST("/api/v1/sql/query", h.query)
 
 	return router
 }
@@ -115,6 +117,44 @@ func (h *HTTPHandler) get(c *gin.Context) {
 	request.Key = key
 
 	reply, err := ExecuteCmdGet(&request)
+	if err != nil {
+		h.srv.Logger().Error(err)
+		c.JSON(http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, reply)
+}
+
+func (h *HTTPHandler) execute(c *gin.Context) {
+	request := QueryArgs{
+		Address: h.srv.Self().Address,
+		Port:    h.srv.Self().Port,
+	}
+	if err := c.ShouldBindWith(&request, binding.JSON); err != nil {
+		h.srv.Logger().Error(err)
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	reply, err := ExecuteCmdQuery(&request)
+	if err != nil {
+		h.srv.Logger().Error(err)
+		c.JSON(http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, reply)
+}
+
+func (h *HTTPHandler) query(c *gin.Context) {
+	request := QueryArgs{
+		Address: h.srv.Self().Address,
+		Port:    h.srv.Self().Port,
+	}
+	if err := c.ShouldBindWith(&request, binding.JSON); err != nil {
+		h.srv.Logger().Error(err)
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	reply, err := ExecuteCmdSQLQuery(&request)
 	if err != nil {
 		h.srv.Logger().Error(err)
 		c.JSON(http.StatusInternalServerError, err)

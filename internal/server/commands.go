@@ -196,8 +196,8 @@ type QueryArgs struct {
 	StoreName string `json:"storeName"`
 }
 
-//ExecuteQuery executes the query on the store
-func ExecuteQuery(args *QueryArgs) (*pb.ExecuteQueryReply, error) {
+//ExecuteCmdQuery executes the query on the store
+func ExecuteCmdQuery(args *QueryArgs) (*pb.ExecuteQueryReply, error) {
 	leader, err := GetLeader(args.Address, args.Port)
 	if err != nil {
 		return nil, err
@@ -227,8 +227,8 @@ func ExecuteQuery(args *QueryArgs) (*pb.ExecuteQueryReply, error) {
 	return resp, nil
 }
 
-//Query executes the query on the store
-func Query(args *QueryArgs) (*pb.QueryReply, error) {
+//ExecuteCmdSQLQuery executes the query on the store
+func ExecuteCmdSQLQuery(args *QueryArgs) (*pb.QueryReply, error) {
 	leader, err := GetLeader(args.Address, args.Port)
 	if err != nil {
 		return nil, err
