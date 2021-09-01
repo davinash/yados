@@ -119,7 +119,7 @@ func (suite *YadosTestSuite) TestStoreSelectSqlite() {
 	}
 	suite.T().Log(string(marshal))
 
-	if len(reply.AllRows) != 5 {
-		suite.T().Fatalf("expected Rows = 5, Actual = %d", len(reply.AllRows))
+	if len(reply.Rows) != 5 {
+		suite.T().Fatalf("expected Rows = 5, Actual = %d", len(reply.Rows))
 	}
 }

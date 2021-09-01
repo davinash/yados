@@ -193,14 +193,19 @@ message QueryRequest {
   string SqlQuery = 3;
 }
 
-message SingleRow {
-  map<string, bytes> row = 1;
+message ColumnValue {
+  string name = 1;
+  bytes value = 2;
+}
+
+message TableRow {
+  repeated ColumnValue row = 1;
 }
 
 message QueryReply {
   string Id = 1;
   string Error = 2;
-  repeated SingleRow AllRows = 3;
+  repeated TableRow rows = 3;
 }
 
 service YadosService {

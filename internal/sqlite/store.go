@@ -92,7 +92,12 @@ func (ss *storeSqlite) Query(request *pb.QueryRequest) (*pb.QueryReply, error) {
 	values := make([]interface{}, count)
 	valuePtrs := make([]interface{}, count)
 
+	reply.Rows = make([]*pb.TableRow, 0)
+
 	for rows.Next() {
+		tRow := pb.TableRow{
+			Row: make([]*pb.ColumnValue, 0),
+		}
 		for i := range columns {
 			valuePtrs[i] = &values[i]
 		}
@@ -100,26 +105,25 @@ func (ss *storeSqlite) Query(request *pb.QueryRequest) (*pb.QueryReply, error) {
 		if err != nil {
 			return reply, err
 		}
-		row := pb.SingleRow{
-			Row: map[string][]byte{},
-		}
-
 		for i, col := range columns {
 			val := values[i]
-			b, ok := val.([]byte)
-			var v interface{}
-			if ok {
-				v = string(b)
-			} else {
-				v = val
-			}
-			bytes, err := json.Marshal(v)
+			//b, ok := val.([]byte)
+			//var v interface{}
+			//if ok {
+			//	v = string(b)
+			//} else {
+			//	v = val
+			//}
+			bytes, err := json.Marshal(val)
 			if err != nil {
 				return reply, err
 			}
-			row.Row[col] = bytes
+			tRow.Row = append(tRow.Row, &pb.ColumnValue{
+				Name:  col,
+				Value: bytes,
+			})
 		}
-		reply.AllRows = append(reply.AllRows, &row)
+		reply.Rows = append(reply.Rows, &tRow)
 	}
 	return reply, nil
 }
