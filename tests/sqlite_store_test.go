@@ -33,7 +33,7 @@ func CreateTableAndWait(cluster *TestCluster, storeName string) error {
 		StopWaitForEvents(cluster.members)
 	}()
 
-	_, err := server.ExecuteQuery(&server.QueryArgs{
+	_, err := server.ExecuteCmdQuery(&server.QueryArgs{
 		Address:   cluster.members[0].Address(),
 		Port:      cluster.members[0].Port(),
 		StoreName: storeName,
@@ -61,7 +61,7 @@ func InsertRowsAndWait(cluster *TestCluster, storeName string) error {
 		"insert into employee values(105,'Rita Patel','DBA')",
 	}
 	for _, q := range queries {
-		_, err := server.ExecuteQuery(&server.QueryArgs{
+		_, err := server.ExecuteCmdQuery(&server.QueryArgs{
 			Address:   cluster.members[0].Address(),
 			Port:      cluster.members[0].Port(),
 			StoreName: storeName,
@@ -104,7 +104,7 @@ func (suite *YadosTestSuite) TestStoreSelectSqlite() {
 	if err := InsertRowsAndWait(suite.cluster, storeName); err != nil {
 		suite.T().Fatal(err)
 	}
-	reply, err := server.Query(&server.QueryArgs{
+	reply, err := server.ExecuteCmdSQLQuery(&server.QueryArgs{
 		Address:   suite.cluster.members[0].Address(),
 		Port:      suite.cluster.members[0].Port(),
 		StoreName: storeName,

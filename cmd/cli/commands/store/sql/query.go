@@ -26,7 +26,7 @@ func CreateQueryCommand(rootCmd *cobra.Command) {
 		Use:   "query",
 		Short: "execute sql query on the store ( DML )",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := server.Query(&queryArg)
+			result, err := server.ExecuteCmdSQLQuery(&queryArg)
 			if err != nil {
 				//return err
 				panic(err)
