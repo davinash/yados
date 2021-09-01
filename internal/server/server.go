@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	store_sqlite "github.com/davinash/yados/internal/sqlite"
+
 	"github.com/davinash/yados/internal/events"
 	"github.com/davinash/yados/internal/plog"
 	"github.com/davinash/yados/internal/raft"
@@ -48,14 +50,12 @@ type Server interface {
 	Apply(entry *pb.LogEntry) error
 	Stores() map[string]store.Store
 
-	// SetEventHandler For Test Purpose
-	SetEventHandler(events.Events)
-	// EventHandler for test purpose
-	EventHandler() events.Events
-
 	HTTPPort() int
 	StartHTTPServer() error
 	StopHTTPServer() error
+
+	// EventHandler for test purpose
+	EventHandler() *events.Events
 }
 
 type server struct {
@@ -70,7 +70,7 @@ type server struct {
 	pLog       plog.PLog
 	stores     map[string]store.Store
 	isTestMode bool
-	ev         events.Events
+	ev         *events.Events
 
 	httpPort       int
 	httpServerWait sync.WaitGroup
@@ -190,11 +190,11 @@ func (srv *server) GetOrCreateStorage() error {
 	}
 	srv.logDir = d
 
-	store, err1 := plog.NewPLog(srv.logDir, srv.logger, srv.EventHandler())
+	s, err1 := plog.NewPLog(srv.logDir, srv.logger, srv.EventHandler(), srv.isTestMode)
 	if err1 != nil {
 		return err1
 	}
-	srv.pLog = store
+	srv.pLog = s
 	err = srv.pLog.Open()
 	if err != nil {
 		return err
@@ -207,7 +207,21 @@ func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
 	srv.mutex.Lock()
 	defer srv.mutex.Unlock()
 
-	s := store.NewStore(&store.Args{})
+	if request.Type == pb.StoreType_Sqlite {
+		s, err := store_sqlite.NewSqliteStore(&store.Args{
+			Name:    request.Name,
+			PLogDir: srv.LogDir(),
+			Logger:  srv.Logger(),
+		})
+		if err != nil {
+			return err
+		}
+		srv.Stores()[request.Name] = s
+		return nil
+	}
+	s := store.NewStore(&store.Args{
+		StoreType: pb.StoreType_Memory,
+	})
 	srv.Stores()[request.Name] = s
 
 	return nil
@@ -224,13 +238,13 @@ func (srv *server) StoreDelete(request *pb.StoreDeleteRequest) error {
 
 func (srv *server) Apply(entry *pb.LogEntry) error {
 	switch entry.CmdType {
+
 	case pb.CommandType_CreateStore:
 		var req pb.StoreCreateRequest
 		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
 		if err != nil {
 			return err
 		}
-
 		err = srv.StoreCreate(&req)
 		if err != nil {
 			return err
@@ -242,7 +256,7 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		if err != nil {
 			return err
 		}
-		return srv.Stores()[req.StoreName].Put(&req)
+		return (srv.Stores()[req.StoreName].(store.KVStore)).Put(&req)
 
 	case pb.CommandType_DeleteStore:
 		var req pb.StoreDeleteRequest
@@ -254,6 +268,18 @@ func (srv *server) Apply(entry *pb.LogEntry) error {
 		if err != nil {
 			return err
 		}
+
+	case pb.CommandType_SqlDDL:
+		var req pb.ExecuteQueryRequest
+		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
+		if err != nil {
+			return err
+		}
+		q, err := (srv.Stores()[req.StoreName].(store.SQLStore)).Execute(&req)
+		if err != nil {
+			return err
+		}
+		srv.logger.Debug(q)
 	}
 	return nil
 }
@@ -314,10 +340,7 @@ func (srv *server) Stores() map[string]store.Store {
 	return srv.stores
 }
 
-func (srv *server) SetEventHandler(ev events.Events) {
-	srv.ev = ev
-}
-func (srv *server) EventHandler() events.Events {
+func (srv *server) EventHandler() *events.Events {
 	return srv.ev
 }
 
@@ -347,6 +370,13 @@ func (srv *server) Stop() error {
 	err := srv.StopHTTPServer()
 	if err != nil {
 		return err
+	}
+	// Close all the stores
+	for _, v := range srv.Stores() {
+		err := v.Close()
+		if err != nil {
+			return err
+		}
 	}
 
 	srv.Raft().Stop()

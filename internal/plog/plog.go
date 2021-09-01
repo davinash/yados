@@ -12,8 +12,6 @@ import (
 
 	"github.com/davinash/yados/internal/events"
 
-	"google.golang.org/protobuf/types/known/anypb"
-
 	"google.golang.org/protobuf/proto"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
@@ -40,11 +38,12 @@ type PLog interface {
 }
 
 //NewPLog Creates new storage
-func NewPLog(logDir string, logger *logrus.Entry, ev events.Events) (PLog, error) {
+func NewPLog(logDir string, logger *logrus.Entry, ev *events.Events, isTestMode bool) (PLog, error) {
 	ms := &plog{
-		logDir: logDir,
-		logger: logger,
-		ev:     ev,
+		logDir:     logDir,
+		logger:     logger,
+		ev:         ev,
+		isTestMode: isTestMode,
 	}
 	return ms, nil
 }
@@ -57,7 +56,8 @@ type plog struct {
 	storeFileName string
 	pLogFH        *os.File
 	size          int
-	ev            events.Events
+	ev            *events.Events
+	isTestMode    bool
 }
 
 func (m *plog) PLogFileName() string {
@@ -105,35 +105,9 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 	}
 	m.size++
 
-	if m.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-		var commandStr []byte
-
-		switch entry.CmdType {
-		case pb.CommandType_CreateStore:
-			var command pb.StoreCreateRequest
-			err = anypb.UnmarshalTo(entry.Command, &command, proto.UnmarshalOptions{})
-			if err != nil {
-			}
-			commandStr, err = json.Marshal(&command)
-			if err != nil {
-			}
-
-		case pb.CommandType_Put:
-			var command pb.PutRequest
-			err = anypb.UnmarshalTo(entry.Command, &command, proto.UnmarshalOptions{})
-			if err != nil {
-			}
-			commandStr, err = json.Marshal(&command)
-			if err != nil {
-			}
-		}
-		m.logger.Debugf("[%s] Entry Appended (Term = %v, Index = %v ) Value = %s",
-			entry.Id, entry.Term, entry.Index, string(commandStr))
-	}
-
-	if m.ev != nil {
-		if m.size == m.ev.PersistEntryEventThreshold()+1 {
-			m.ev.SendEvent(m.size)
+	if m.isTestMode {
+		if m.ev.PersistEntryChan != nil {
+			m.ev.PersistEntryChan <- entry
 		}
 	}
 	return nil

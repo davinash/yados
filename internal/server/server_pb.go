@@ -6,6 +6,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/davinash/yados/internal/store"
+
 	"github.com/davinash/yados/internal/raft"
 
 	"github.com/sirupsen/logrus"
@@ -169,6 +171,7 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 		reply.Error = ErrorStoreDoesExists.Error()
 		return reply, ErrorStoreDoesExists
 	}
+
 	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 		marshal, err := json.Marshal(request)
 		if err != nil {
@@ -193,7 +196,7 @@ func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRepl
 		return reply, ErrorStoreDoesExists
 	}
 
-	value := srv.Stores()[request.StoreName].Get(request)
+	value := (srv.Stores()[request.StoreName].(store.KVStore)).Get(request)
 	reply.Value = value
 
 	return reply, nil
@@ -205,4 +208,34 @@ func (srv *server) ListStores(ctx context.Context, request *pb.ListStoreRequest)
 		reply.Name = append(reply.Name, k)
 	}
 	return reply, nil
+}
+
+func (srv *server) ExecuteQuery(ctx context.Context, request *pb.ExecuteQueryRequest) (*pb.ExecuteQueryReply, error) {
+	reply := &pb.ExecuteQueryReply{}
+
+	// Check if store with name exists
+	if _, ok := srv.Stores()[request.StoreName]; !ok {
+		return reply, ErrorStoreDoesExists
+	}
+
+	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_SqlDDL)
+	if err != nil {
+		return reply, err
+	}
+
+	return reply, err
+}
+
+func (srv *server) Query(ctx context.Context, request *pb.QueryRequest) (*pb.QueryReply, error) {
+	reply := &pb.QueryReply{}
+	if _, ok := srv.Stores()[request.StoreName]; !ok {
+		return reply, ErrorStoreDoesExists
+	}
+
+	resp, err := (srv.Stores()[request.StoreName].(store.SQLStore)).Query(request)
+	if err != nil {
+		return reply, err
+	}
+
+	return resp, nil
 }

@@ -1,6 +1,10 @@
 package store
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/davinash/yados/cmd/cli/commands/store/kv"
+	"github.com/davinash/yados/cmd/cli/commands/store/sql"
+	"github.com/spf13/cobra"
+)
 
 //AddCommands commands related to server
 func AddCommands(rootCmd *cobra.Command) {
@@ -10,9 +14,10 @@ func AddCommands(rootCmd *cobra.Command) {
 	}
 	CreateCommand(cmd)
 	CreateListCommand(cmd)
-	CreatePutCommand(cmd)
-	CreateGetCommand(cmd)
 	CreateDeleteCommand(cmd)
+
+	kv.AddCommands(cmd)
+	sql.AddCommands(cmd)
 
 	rootCmd.AddCommand(cmd)
 }

@@ -43,6 +43,7 @@ type CreateCommandArgs struct {
 	Address string `json:"address,omitempty"`
 	Port    int32  `json:"port,omitempty"`
 	Name    string `json:"name"`
+	Type    string `json:"type"`
 }
 
 //ExecuteCmdCreateStore helper function to executed create store command
@@ -66,6 +67,10 @@ func ExecuteCmdCreateStore(args *CreateCommandArgs) error {
 	req := &pb.StoreCreateRequest{
 		Name: args.Name,
 		Id:   uuid.New().String(),
+		Type: pb.StoreType_Memory,
+	}
+	if args.Type == "sqlite" {
+		req.Type = pb.StoreType_Sqlite
 	}
 
 	_, err = rpcClient.CreateStore(context.Background(), req)
@@ -181,4 +186,74 @@ func ExecuteCmdPut(args *PutArgs) error {
 		return err
 	}
 	return nil
+}
+
+//QueryArgs arguments for the query command
+type QueryArgs struct {
+	Address   string `json:"address,omitempty"`
+	Port      int32  `json:"port,omitempty"`
+	SQLStr    string `json:"sql"`
+	StoreName string `json:"storeName"`
+}
+
+//ExecuteQuery executes the query on the store
+func ExecuteQuery(args *QueryArgs) (*pb.ExecuteQueryReply, error) {
+	leader, err := GetLeader(args.Address, args.Port)
+	if err != nil {
+		return nil, err
+	}
+
+	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
+	if err1 != nil {
+		return nil, err1
+	}
+	defer func(peerConn *grpc.ClientConn) {
+		err := peerConn.Close()
+		if err != nil {
+			log.Printf("failed to close the connection, error = %v\n", err)
+		}
+	}(peerConn)
+
+	req := pb.ExecuteQueryRequest{
+		Id:        uuid.New().String(),
+		StoreName: args.StoreName,
+		SqlQuery:  args.SQLStr,
+	}
+
+	resp, err1 := rpcClient.ExecuteQuery(context.Background(), &req)
+	if err1 != nil {
+		return nil, err1
+	}
+	return resp, nil
+}
+
+//Query executes the query on the store
+func Query(args *QueryArgs) (*pb.QueryReply, error) {
+	leader, err := GetLeader(args.Address, args.Port)
+	if err != nil {
+		return nil, err
+	}
+
+	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
+	if err1 != nil {
+		return nil, err1
+	}
+	defer func(peerConn *grpc.ClientConn) {
+		err := peerConn.Close()
+		if err != nil {
+			log.Printf("failed to close the connection, error = %v\n", err)
+		}
+	}(peerConn)
+
+	req := pb.QueryRequest{
+		Id:        uuid.New().String(),
+		StoreName: args.StoreName,
+		SqlQuery:  args.SQLStr,
+	}
+
+	resp, err1 := rpcClient.Query(context.Background(), &req)
+	if err1 != nil {
+		return nil, err1
+	}
+	return resp, nil
 }

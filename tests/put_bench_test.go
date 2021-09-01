@@ -2,10 +2,7 @@ package tests
 
 import (
 	"fmt"
-	"sync"
 	"testing"
-
-	"github.com/davinash/yados/internal/events"
 
 	"github.com/davinash/yados/internal/server"
 
@@ -13,24 +10,24 @@ import (
 )
 
 func benchmarkPut(numOfPuts int, b *testing.B, cluster *TestCluster, storeName string) {
-	for _, s := range cluster.members {
-		s.EventHandler().SetPersistEntryEventThreshold(numOfPuts)
-		s.EventHandler().Subscribe(events.EntryPersistEvents)
-	}
-	defer func() {
-		for _, s := range cluster.members {
-			s.EventHandler().UnSubscribe(events.EntryPersistEvents)
-		}
-	}()
+	//for _, s := range cluster.members {
+	//	s.EventHandler().SetPersistEntryEventThreshold(numOfPuts)
+	//	s.EventHandler().Subscribe(events.EntryPersistEvents)
+	//}
+	//defer func() {
+	//	for _, s := range cluster.members {
+	//		s.EventHandler().UnSubscribe(events.EntryPersistEvents)
+	//	}
+	//}()
 
-	wg := sync.WaitGroup{}
-	for _, member := range cluster.members {
-		wg.Add(1)
-		go func(s server.Server) {
-			defer wg.Done()
-			<-s.EventHandler().PersistEntryEvent()
-		}(member)
-	}
+	//wg := sync.WaitGroup{}
+	//for _, member := range cluster.members {
+	//	wg.Add(1)
+	//	go func(s server.Server) {
+	//		defer wg.Done()
+	//		<-s.EventHandler().PersistEntryEvent()
+	//	}(member)
+	//}
 
 	for i := 0; i < numOfPuts; i++ {
 		key := fmt.Sprintf("Key-%d", i)
@@ -49,7 +46,7 @@ func benchmarkPut(numOfPuts int, b *testing.B, cluster *TestCluster, storeName s
 		b.Logf("Put Success  Key = %s Value = %s", key, val)
 	}
 	// Wait for replication to happen
-	wg.Wait()
+	//wg.Wait()
 }
 
 func BenchmarkPut(b *testing.B) {

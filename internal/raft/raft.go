@@ -67,7 +67,9 @@ type Raft interface {
 
 	Server() *pb.Peer
 
-	EventHandler() events.Events
+	EventHandler() *events.Events
+
+	IsTestMode() bool
 }
 
 type raft struct {
@@ -101,7 +103,8 @@ type raft struct {
 	pLog               plog.PLog
 	rpcServer          rpc.Server
 	server             *pb.Peer
-	ev                 events.Events
+	ev                 *events.Events
+	isTestMode         bool
 }
 
 //Args argument structure for Raft Instance
@@ -112,7 +115,7 @@ type Args struct {
 	PstLog       plog.PLog
 	RPCServer    rpc.Server
 	Server       *pb.Peer
-	EventHandler events.Events
+	EventHandler *events.Events
 }
 
 //NewRaft creates new instance of Raft
@@ -126,6 +129,7 @@ func NewRaft(args *Args) (Raft, error) {
 		rpcServer:     args.RPCServer,
 		server:        args.Server,
 		ev:            args.EventHandler,
+		isTestMode:    args.IsTestMode,
 	}
 
 	r.peers = make(map[string]*pb.Peer)
@@ -248,8 +252,12 @@ func (r *raft) Peers() map[string]*pb.Peer {
 	return r.peers
 }
 
-func (r *raft) EventHandler() events.Events {
+func (r *raft) EventHandler() *events.Events {
 	return r.ev
+}
+
+func (r *raft) IsTestMode() bool {
+	return r.isTestMode
 }
 
 func (r *raft) AddCommandListener(id string) error {
@@ -504,8 +512,10 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 func (r *raft) startLeader() {
 	r.state = Leader
 
-	if r.EventHandler() != nil {
-		r.EventHandler().SendEvent(r.Server())
+	if r.IsTestMode() {
+		if r.ev.LeaderChangeChan != nil {
+			r.ev.LeaderChangeChan <- r.Server()
+		}
 	}
 
 	for _, peer := range r.Peers() {
@@ -772,9 +782,9 @@ func (r *raft) becomeFollower(term int64) {
 func (r *raft) applyCommittedEntry(entry *pb.LogEntry) error {
 
 	// For Tests
-	if r.EventHandler() != nil {
-		r.EventHandler().SendEvent(entry)
-	}
+	//if r.EventHandler() != nil {
+	//	r.EventHandler().SendEvent(entry)
+	//}
 
 	err := r.apply(entry)
 	if err != nil {

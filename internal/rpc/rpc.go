@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -124,17 +123,10 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 	case "RPC.AppendEntries":
 		request := args.(*pb.AppendEntryRequest)
 
-		if rpc.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
-			marshal, err := json.MarshalIndent(request, "", "   ")
-			if err != nil {
-				return nil, err
-			}
-
-			rpc.logger.Debugf("[%s] AppendEntries ( -> %s ) : nextIndex = %d Term = %v; LeaderName = "+
-				"%v; PrevLogTerm = %v; PrevLogIndex = %v; LeaderCommit = %v \nrequest = %s", request.Id,
-				peer.Name, request.NextIndex, request.Term, request.Leader.Name, request.PrevLogTerm,
-				request.PrevLogIndex, request.LeaderCommit, string(marshal))
-		}
+		rpc.logger.Debugf("[%s] AppendEntries ( -> %s ) : nextIndex = %d Term = %v; LeaderName = "+
+			"%v; PrevLogTerm = %v; PrevLogIndex = %v; LeaderCommit = %v ", request.Id,
+			peer.Name, request.NextIndex, request.Term, request.Leader.Name, request.PrevLogTerm,
+			request.PrevLogIndex, request.LeaderCommit)
 
 		reply, err := rpcClient.AppendEntries(context.Background(), request)
 		if err != nil {

@@ -1,4 +1,4 @@
-package store
+package kv
 
 import (
 	"github.com/davinash/yados/internal/server"

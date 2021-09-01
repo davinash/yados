@@ -4,32 +4,17 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/davinash/yados/internal/events"
-
 	"github.com/davinash/yados/internal/server"
 )
 
 func (suite *YadosTestSuite) TestStoreCreate() {
 	WaitForLeaderElection(suite.cluster)
 
-	for _, s := range suite.cluster.members {
-		s.EventHandler().Subscribe(events.CommitEntryEvents)
-	}
-
-	defer func() {
-		for _, s := range suite.cluster.members {
-			s.EventHandler().UnSubscribe(events.CommitEntryEvents)
-		}
-	}()
-
 	wg := sync.WaitGroup{}
-	for _, member := range suite.cluster.members {
-		wg.Add(1)
-		go func(s server.Server) {
-			defer wg.Done()
-			<-s.EventHandler().CommitEntryEvent()
-		}(member)
-	}
+	WaitForEvents(suite.cluster.members, &wg, 1)
+	defer func() {
+		StopWaitForEvents(suite.cluster.members)
+	}()
 
 	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Address: suite.cluster.members[0].Address(),
@@ -45,26 +30,13 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 func (suite *YadosTestSuite) TestStoreList() {
 	WaitForLeaderElection(suite.cluster)
 
-	for _, s := range suite.cluster.members {
-		s.EventHandler().Subscribe(events.CommitEntryEvents)
-	}
-
+	wg := sync.WaitGroup{}
+	WaitForEvents(suite.cluster.members, &wg, 5)
 	defer func() {
-		for _, s := range suite.cluster.members {
-			s.EventHandler().UnSubscribe(events.CommitEntryEvents)
-		}
+		StopWaitForEvents(suite.cluster.members)
 	}()
 
 	for i := 0; i < 5; i++ {
-		wg := sync.WaitGroup{}
-		for _, member := range suite.cluster.members {
-			wg.Add(1)
-			go func(s server.Server) {
-				defer wg.Done()
-				<-s.EventHandler().CommitEntryEvent()
-			}(member)
-		}
-
 		err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 			Address: suite.cluster.members[0].Address(),
 			Port:    suite.cluster.members[0].Port(),
@@ -73,8 +45,8 @@ func (suite *YadosTestSuite) TestStoreList() {
 		if err != nil {
 			suite.T().Fatal(err)
 		}
-		wg.Wait()
 	}
+	wg.Wait()
 
 	storeList, err := server.ExecuteCmdListStore(&server.ListArgs{
 		Address: suite.cluster.members[0].Address(),
@@ -83,6 +55,7 @@ func (suite *YadosTestSuite) TestStoreList() {
 	if err != nil {
 		suite.T().Fatal(err)
 	}
+
 	if len(storeList.Name) != 5 {
 		suite.T().Fatal(err)
 	}
