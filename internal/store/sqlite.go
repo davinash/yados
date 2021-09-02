@@ -1,4 +1,4 @@
-package sqlite
+package store
 
 import (
 	"database/sql"
@@ -9,8 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
-	"github.com/davinash/yados/internal/store"
-
 	// sqlite driver
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -23,7 +21,7 @@ type storeSqlite struct {
 }
 
 //NewSqliteStore creates a new store for sqlite database
-func NewSqliteStore(args *store.Args) (store.SQLStore, error) {
+func NewSqliteStore(args *Args) (SQLStore, error) {
 	s := &storeSqlite{
 		logger:    args.Logger,
 		storeType: args.StoreType,
@@ -40,10 +38,6 @@ func NewSqliteStore(args *store.Args) (store.SQLStore, error) {
 
 func (ss *storeSqlite) Name() string {
 	return ss.name
-}
-
-func (ss *storeSqlite) Delete() error {
-	panic("implement me")
 }
 
 func (ss *storeSqlite) Close() error {
@@ -119,4 +113,12 @@ func (ss *storeSqlite) Query(request *pb.QueryRequest) (*pb.QueryReply, error) {
 		reply.Rows = append(reply.Rows, &tRow)
 	}
 	return reply, nil
+}
+
+func (ss *storeSqlite) Create(request *pb.StoreCreateRequest) {
+	panic("implement me")
+}
+
+func (ss *storeSqlite) Delete(request *pb.StoreDeleteRequest) {
+	panic("implement me")
 }

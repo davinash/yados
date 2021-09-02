@@ -121,7 +121,7 @@ var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
 func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
 	reply := &pb.StoreCreateReply{}
 	// Check if store with name already exists
-	if _, ok := srv.Stores()[request.Name]; ok {
+	if _, ok := srv.StoreManager().Stores()[request.Name]; ok {
 		reply.Error = ErrorStoreAlreadyExists.Error()
 		return reply, ErrorStoreAlreadyExists
 	}
@@ -146,7 +146,7 @@ var ErrorStoreDoesExists = errors.New("store does not exists")
 
 func (srv *server) DeleteStore(ctx context.Context, request *pb.StoreDeleteRequest) (*pb.StoreDeleteReply, error) {
 	reply := &pb.StoreDeleteReply{}
-	if _, ok := srv.Stores()[request.StoreName]; !ok {
+	if _, ok := srv.StoreManager().Stores()[request.StoreName]; !ok {
 		reply.Error = ErrorStoreDoesExists.Error()
 		return reply, ErrorStoreDoesExists
 	}
@@ -167,7 +167,7 @@ func (srv *server) DeleteStore(ctx context.Context, request *pb.StoreDeleteReque
 func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutReply, error) {
 	reply := &pb.PutReply{}
 	// Check if store with name exists
-	if _, ok := srv.Stores()[request.StoreName]; !ok {
+	if _, ok := srv.StoreManager().Stores()[request.StoreName]; !ok {
 		reply.Error = ErrorStoreDoesExists.Error()
 		return reply, ErrorStoreDoesExists
 	}
@@ -191,12 +191,12 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetReply, error) {
 	reply := &pb.GetReply{}
 	// Check if store with name exists
-	if _, ok := srv.Stores()[request.StoreName]; !ok {
+	if _, ok := srv.StoreManager().Stores()[request.StoreName]; !ok {
 		reply.Value = ErrorStoreDoesExists.Error()
 		return reply, ErrorStoreDoesExists
 	}
 
-	value := (srv.Stores()[request.StoreName].(store.KVStore)).Get(request)
+	value := (srv.StoreManager().Stores()[request.StoreName].(store.KVStore)).Get(request)
 	reply.Value = value
 
 	return reply, nil
@@ -204,7 +204,7 @@ func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRepl
 
 func (srv *server) ListStores(ctx context.Context, request *pb.ListStoreRequest) (*pb.ListStoreReply, error) {
 	reply := &pb.ListStoreReply{}
-	for k := range srv.Stores() {
+	for k := range srv.StoreManager().Stores() {
 		reply.Name = append(reply.Name, k)
 	}
 	return reply, nil
@@ -214,7 +214,7 @@ func (srv *server) ExecuteQuery(ctx context.Context, request *pb.ExecuteQueryReq
 	reply := &pb.ExecuteQueryReply{}
 
 	// Check if store with name exists
-	if _, ok := srv.Stores()[request.StoreName]; !ok {
+	if _, ok := srv.StoreManager().Stores()[request.StoreName]; !ok {
 		return reply, ErrorStoreDoesExists
 	}
 
@@ -228,11 +228,11 @@ func (srv *server) ExecuteQuery(ctx context.Context, request *pb.ExecuteQueryReq
 
 func (srv *server) Query(ctx context.Context, request *pb.QueryRequest) (*pb.QueryReply, error) {
 	reply := &pb.QueryReply{}
-	if _, ok := srv.Stores()[request.StoreName]; !ok {
+	if _, ok := srv.StoreManager().Stores()[request.StoreName]; !ok {
 		return reply, ErrorStoreDoesExists
 	}
 
-	resp, err := (srv.Stores()[request.StoreName].(store.SQLStore)).Query(request)
+	resp, err := (srv.StoreManager().Stores()[request.StoreName].(store.SQLStore)).Query(request)
 	if err != nil {
 		return reply, err
 	}

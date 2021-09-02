@@ -8,18 +8,13 @@ import (
 	"path/filepath"
 	"sync"
 
-	store_sqlite "github.com/davinash/yados/internal/sqlite"
+	"github.com/davinash/yados/internal/store"
 
 	"github.com/davinash/yados/internal/events"
 	"github.com/davinash/yados/internal/plog"
 	"github.com/davinash/yados/internal/raft"
 	"github.com/davinash/yados/internal/rpc"
-	"github.com/davinash/yados/internal/store"
 	"github.com/google/uuid"
-
-	"google.golang.org/protobuf/types/known/anypb"
-
-	"google.golang.org/protobuf/proto"
 
 	"github.com/sirupsen/logrus"
 	easy "github.com/t-tomalak/logrus-easy-formatter"
@@ -45,36 +40,34 @@ type Server interface {
 	State() raft.State
 	LogDir() string
 	PLog() plog.PLog
-	StoreCreate(request *pb.StoreCreateRequest) error
-	StoreDelete(request *pb.StoreDeleteRequest) error
-	Apply(entry *pb.LogEntry) error
-	Stores() map[string]store.Store
-
 	HTTPPort() int
 	StartHTTPServer() error
 	StopHTTPServer() error
 
 	// EventHandler for test purpose
 	EventHandler() *events.Events
+
+	StoreManager() store.Manager
 }
 
 type server struct {
 	pb.UnimplementedYadosServiceServer
-	mutex      sync.Mutex
-	raft       raft.Raft
-	quit       chan interface{}
-	rpcServer  rpc.Server
-	self       *pb.Peer
-	logger     *logrus.Entry
-	logDir     string
-	pLog       plog.PLog
-	stores     map[string]store.Store
-	isTestMode bool
-	ev         *events.Events
+	mutex     sync.Mutex
+	raft      raft.Raft
+	quit      chan interface{}
+	rpcServer rpc.Server
+	self      *pb.Peer
+	logger    *logrus.Entry
+	logDir    string
+	pLog      plog.PLog
+	ev        *events.Events
 
 	httpPort       int
 	httpServerWait sync.WaitGroup
 	httpSrv        *http.Server
+	storageMgr     store.Manager
+
+	isTestMode bool
 }
 
 //NewServerArgs argument structure for new server
@@ -113,7 +106,6 @@ func NewServer(args *NewServerArgs) (Server, error) {
 
 	srv.SetLogLevel(args.Loglevel)
 	srv.quit = make(chan interface{})
-	srv.stores = make(map[string]store.Store)
 
 	srv.httpPort = args.HTTPPort
 
@@ -126,7 +118,7 @@ func NewServer(args *NewServerArgs) (Server, error) {
 }
 
 func (srv *server) Serve(peers []*pb.Peer) error {
-	err := srv.GetOrCreateStorage()
+	err := srv.GetOrCreateWAL()
 	if err != nil {
 		return err
 	}
@@ -140,15 +132,18 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		srv.logger.Fatalf("failed to start the rpc, error = %v", err)
 	}
 
+	srv.storageMgr = store.NewStoreManger(srv.logger, srv.logDir)
+
 	args := raft.Args{
 		IsTestMode:   srv.isTestMode,
-		Apply:        srv.Apply,
 		Logger:       srv.logger,
 		PstLog:       srv.pLog,
 		RPCServer:    srv.rpcServer,
 		Server:       srv.Self(),
 		EventHandler: srv.EventHandler(),
+		StorageMgr:   srv.StoreManager(),
 	}
+
 	srv.raft, err = raft.NewRaft(&args)
 	if err != nil {
 		return err
@@ -182,7 +177,7 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 	return nil
 }
 
-func (srv *server) GetOrCreateStorage() error {
+func (srv *server) GetOrCreateWAL() error {
 	d := filepath.Join(srv.logDir, srv.Name(), "log")
 	err := os.MkdirAll(d, os.ModePerm)
 	if err != nil {
@@ -200,87 +195,6 @@ func (srv *server) GetOrCreateStorage() error {
 		return err
 	}
 
-	return nil
-}
-
-func (srv *server) StoreCreate(request *pb.StoreCreateRequest) error {
-	srv.mutex.Lock()
-	defer srv.mutex.Unlock()
-
-	if request.Type == pb.StoreType_Sqlite {
-		s, err := store_sqlite.NewSqliteStore(&store.Args{
-			Name:    request.Name,
-			PLogDir: srv.LogDir(),
-			Logger:  srv.Logger(),
-		})
-		if err != nil {
-			return err
-		}
-		srv.Stores()[request.Name] = s
-		return nil
-	}
-	s := store.NewStore(&store.Args{
-		StoreType: pb.StoreType_Memory,
-	})
-	srv.Stores()[request.Name] = s
-
-	return nil
-}
-
-func (srv *server) StoreDelete(request *pb.StoreDeleteRequest) error {
-	srv.mutex.Lock()
-	defer srv.mutex.Unlock()
-
-	delete(srv.Stores(), request.StoreName)
-
-	return nil
-}
-
-func (srv *server) Apply(entry *pb.LogEntry) error {
-	switch entry.CmdType {
-
-	case pb.CommandType_CreateStore:
-		var req pb.StoreCreateRequest
-		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
-		if err != nil {
-			return err
-		}
-		err = srv.StoreCreate(&req)
-		if err != nil {
-			return err
-		}
-
-	case pb.CommandType_Put:
-		var req pb.PutRequest
-		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
-		if err != nil {
-			return err
-		}
-		return (srv.Stores()[req.StoreName].(store.KVStore)).Put(&req)
-
-	case pb.CommandType_DeleteStore:
-		var req pb.StoreDeleteRequest
-		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
-		if err != nil {
-			return err
-		}
-		err = srv.StoreDelete(&req)
-		if err != nil {
-			return err
-		}
-
-	case pb.CommandType_SqlDDL:
-		var req pb.ExecuteQueryRequest
-		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
-		if err != nil {
-			return err
-		}
-		q, err := (srv.Stores()[req.StoreName].(store.SQLStore)).Execute(&req)
-		if err != nil {
-			return err
-		}
-		srv.logger.Debug(q)
-	}
 	return nil
 }
 
@@ -336,16 +250,16 @@ func (srv *server) PLog() plog.PLog {
 	return srv.pLog
 }
 
-func (srv *server) Stores() map[string]store.Store {
-	return srv.stores
-}
-
 func (srv *server) EventHandler() *events.Events {
 	return srv.ev
 }
 
 func (srv *server) HTTPPort() int {
 	return srv.httpPort
+}
+
+func (srv *server) StoreManager() store.Manager {
+	return srv.storageMgr
 }
 
 func (srv *server) SetLogLevel(level string) {
@@ -371,12 +285,10 @@ func (srv *server) Stop() error {
 	if err != nil {
 		return err
 	}
-	// Close all the stores
-	for _, v := range srv.Stores() {
-		err := v.Close()
-		if err != nil {
-			return err
-		}
+
+	err = srv.StoreManager().Close()
+	if err != nil {
+		return err
 	}
 
 	srv.Raft().Stop()

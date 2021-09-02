@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davinash/yados/internal/store"
+
 	"github.com/davinash/yados/internal/events"
 	"github.com/davinash/yados/internal/plog"
 	"github.com/davinash/yados/internal/rpc"
@@ -63,13 +65,13 @@ type Raft interface {
 	AddCommandListener(string) error
 	WaitForCommandCompletion(string)
 
-	Apply() func(entry *pb.LogEntry) error
-
 	Server() *pb.Peer
 
 	EventHandler() *events.Events
 
 	IsTestMode() bool
+
+	StorageManager() store.Manager
 }
 
 type raft struct {
@@ -99,23 +101,23 @@ type raft struct {
 
 	newCommitReadyChan chan struct{}
 	logger             *logrus.Entry
-	apply              func(entry *pb.LogEntry) error
 	pLog               plog.PLog
 	rpcServer          rpc.Server
 	server             *pb.Peer
 	ev                 *events.Events
 	isTestMode         bool
+	storageMgr         store.Manager
 }
 
 //Args argument structure for Raft Instance
 type Args struct {
 	IsTestMode   bool
-	Apply        func(entry *pb.LogEntry) error
 	Logger       *logrus.Entry
 	PstLog       plog.PLog
 	RPCServer    rpc.Server
 	Server       *pb.Peer
 	EventHandler *events.Events
+	StorageMgr   store.Manager
 }
 
 //NewRaft creates new instance of Raft
@@ -123,13 +125,13 @@ func NewRaft(args *Args) (Raft, error) {
 	r := &raft{
 		quit:          make(chan interface{}),
 		triggerAEChan: make(chan struct{}, 1),
-		apply:         args.Apply,
 		logger:        args.Logger,
 		pLog:          args.PstLog,
 		rpcServer:     args.RPCServer,
 		server:        args.Server,
 		ev:            args.EventHandler,
 		isTestMode:    args.IsTestMode,
+		storageMgr:    args.StorageMgr,
 	}
 
 	r.peers = make(map[string]*pb.Peer)
@@ -176,7 +178,7 @@ func (r *raft) InitializeFromStorage() error {
 
 	for entry != nil {
 		r.log = append(r.log, entry)
-		err := r.apply(entry)
+		err := r.StorageManager().Apply(entry)
 		if err != nil {
 			return err
 		}
@@ -236,10 +238,6 @@ func (r *raft) Server() *pb.Peer {
 	return r.server
 }
 
-func (r *raft) Apply() func(entry *pb.LogEntry) error {
-	return r.apply
-}
-
 func (r *raft) Log() []*pb.LogEntry {
 	return r.log
 }
@@ -254,6 +252,10 @@ func (r *raft) Peers() map[string]*pb.Peer {
 
 func (r *raft) EventHandler() *events.Events {
 	return r.ev
+}
+
+func (r *raft) StorageManager() store.Manager {
+	return r.storageMgr
 }
 
 func (r *raft) IsTestMode() bool {
@@ -781,12 +783,7 @@ func (r *raft) becomeFollower(term int64) {
 
 func (r *raft) applyCommittedEntry(entry *pb.LogEntry) error {
 
-	// For Tests
-	//if r.EventHandler() != nil {
-	//	r.EventHandler().SendEvent(entry)
-	//}
-
-	err := r.apply(entry)
+	err := r.StorageManager().Apply(entry)
 	if err != nil {
 		return err
 	}
