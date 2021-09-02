@@ -37,8 +37,8 @@ type SQLStore interface {
 //Args arguments for creating new store
 type Args struct {
 	Name      string
-	PLogDir   string
-	Logger    *logrus.Entry
+	WALDir    string
+	Logger    *logrus.Logger
 	StoreType pb.StoreType
 }
 
@@ -46,7 +46,7 @@ type Args struct {
 type Manager interface {
 	Create(*pb.StoreCreateRequest) error
 	Delete(*pb.StoreDeleteRequest) error
-	Apply(entry *pb.LogEntry) error
+	Apply(entry *pb.WalEntry) error
 	Close() error
 	Stores() map[string]Store
 }
@@ -54,12 +54,12 @@ type Manager interface {
 type manager struct {
 	mutex  sync.Mutex
 	stores map[string]Store
-	logger *logrus.Entry
+	logger *logrus.Logger
 	logDir string
 }
 
 //NewStoreManger new instance of storage manager
-func NewStoreManger(logger *logrus.Entry, logDir string) Manager {
+func NewStoreManger(logger *logrus.Logger, logDir string) Manager {
 	m := &manager{
 		logger: logger,
 		logDir: logDir,
@@ -74,9 +74,9 @@ func (sm *manager) Create(request *pb.StoreCreateRequest) error {
 
 	if request.Type == pb.StoreType_Sqlite {
 		s, err := NewSqliteStore(&Args{
-			Name:    request.Name,
-			PLogDir: sm.logDir,
-			Logger:  sm.logger,
+			Name:   request.Name,
+			WALDir: sm.logDir,
+			Logger: sm.logger,
 		})
 		if err != nil {
 			return err
@@ -114,7 +114,7 @@ func (sm *manager) Close() error {
 	return nil
 }
 
-func (sm *manager) Apply(entry *pb.LogEntry) error {
+func (sm *manager) Apply(entry *pb.WalEntry) error {
 	switch entry.CmdType {
 
 	case pb.CommandType_CreateStore:

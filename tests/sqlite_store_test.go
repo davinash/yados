@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"encoding/json"
 	"sync"
 
 	"github.com/davinash/yados/internal/server"
@@ -113,11 +112,6 @@ func (suite *YadosTestSuite) TestStoreSelectSqlite() {
 	if err != nil {
 		suite.T().Fatal(err)
 	}
-	marshal, err := json.Marshal(reply)
-	if err != nil {
-		return
-	}
-	suite.T().Log(string(marshal))
 
 	if len(reply.Rows) != 5 {
 		suite.T().Fatalf("expected Rows = 5, Actual = %d", len(reply.Rows))

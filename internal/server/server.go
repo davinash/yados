@@ -11,9 +11,9 @@ import (
 	"github.com/davinash/yados/internal/store"
 
 	"github.com/davinash/yados/internal/events"
-	"github.com/davinash/yados/internal/plog"
 	"github.com/davinash/yados/internal/raft"
 	"github.com/davinash/yados/internal/rpc"
+	"github.com/davinash/yados/internal/wal"
 	"github.com/google/uuid"
 
 	"github.com/sirupsen/logrus"
@@ -30,16 +30,15 @@ type Server interface {
 	Address() string
 	Port() int32
 	Peers() map[string]*pb.Peer
-	Logger() *logrus.Entry
+	Logger() *logrus.Logger
 	SetLogLevel(level string)
 	Serve([]*pb.Peer) error
 	RPCServer() rpc.Server
 	Raft() raft.Raft
-	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
 	Self() *pb.Peer
 	State() raft.State
-	LogDir() string
-	PLog() plog.PLog
+	WALDir() string
+	WAL() wal.Wal
 	HTTPPort() int
 	StartHTTPServer() error
 	StopHTTPServer() error
@@ -57,9 +56,9 @@ type server struct {
 	quit      chan interface{}
 	rpcServer rpc.Server
 	self      *pb.Peer
-	logger    *logrus.Entry
+	logger    *logrus.Logger
 	logDir    string
-	pLog      plog.PLog
+	wal       wal.Wal
 	ev        *events.Events
 
 	httpPort       int
@@ -96,14 +95,12 @@ func NewServer(args *NewServerArgs) (Server, error) {
 	logger := &logrus.Logger{
 		Out: os.Stderr,
 		Formatter: &easy.Formatter{
-			LogFormat:       "[%lvl%]:%time% [%server%] %msg% \n",
+			LogFormat:       "[%lvl%]:%time% %msg% \n",
 			TimestampFormat: "2006-01-02 15:04:05",
 		},
 	}
-	srv.logger = logger.WithFields(logrus.Fields{
-		"server": srv.self.Name,
-	})
 
+	srv.logger = logger
 	srv.SetLogLevel(args.Loglevel)
 	srv.quit = make(chan interface{})
 
@@ -123,6 +120,7 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		return err
 	}
 	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
+
 	srv.rpcServer = rpc.NewRPCServer(srv.Name(), srv.self.Address, srv.self.Port, srv.logger)
 
 	pb.RegisterYadosServiceServer(srv.rpcServer.GrpcServer(), srv)
@@ -137,7 +135,7 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 	args := raft.Args{
 		IsTestMode:   srv.isTestMode,
 		Logger:       srv.logger,
-		PstLog:       srv.pLog,
+		PstLog:       srv.wal,
 		RPCServer:    srv.rpcServer,
 		Server:       srv.Self(),
 		EventHandler: srv.EventHandler(),
@@ -146,11 +144,15 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 
 	srv.raft, err = raft.NewRaft(&args)
 	if err != nil {
+		err := srv.RPCServer().Stop()
+		if err != nil {
+			return err
+		}
 		return err
 	}
 
 	for _, p := range peers {
-		_, err := srv.Send(p, "server.AddNewMember", &pb.NewPeerRequest{
+		_, err := srv.RPCServer().Send(p, "server.AddNewMember", &pb.NewPeerRequest{
 			Id: uuid.New().String(),
 			NewPeer: &pb.Peer{
 				Name:    srv.Name(),
@@ -185,12 +187,12 @@ func (srv *server) GetOrCreateWAL() error {
 	}
 	srv.logDir = d
 
-	s, err1 := plog.NewPLog(srv.logDir, srv.logger, srv.EventHandler(), srv.isTestMode)
+	s, err1 := wal.NewWAL(srv.logDir, srv.logger, srv.EventHandler(), srv.isTestMode)
 	if err1 != nil {
 		return err1
 	}
-	srv.pLog = s
-	err = srv.pLog.Open()
+	srv.wal = s
+	err = srv.wal.Open()
 	if err != nil {
 		return err
 	}
@@ -198,15 +200,7 @@ func (srv *server) GetOrCreateWAL() error {
 	return nil
 }
 
-func (srv *server) Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error) {
-	reply, err := srv.RPCServer().Send(peer, serviceMethod, args)
-	if err != nil {
-		return nil, err
-	}
-	return reply, nil
-}
-
-func (srv *server) LogDir() string {
+func (srv *server) WALDir() string {
 	return srv.logDir
 }
 
@@ -226,7 +220,7 @@ func (srv *server) Peers() map[string]*pb.Peer {
 	return srv.Raft().Peers()
 }
 
-func (srv *server) Logger() *logrus.Entry {
+func (srv *server) Logger() *logrus.Logger {
 	return srv.logger
 }
 
@@ -246,8 +240,8 @@ func (srv *server) State() raft.State {
 	return srv.Raft().State()
 }
 
-func (srv *server) PLog() plog.PLog {
-	return srv.pLog
+func (srv *server) WAL() wal.Wal {
+	return srv.wal
 }
 
 func (srv *server) EventHandler() *events.Events {
@@ -265,17 +259,17 @@ func (srv *server) StoreManager() store.Manager {
 func (srv *server) SetLogLevel(level string) {
 	switch level {
 	case "trace":
-		srv.logger.Logger.SetLevel(logrus.TraceLevel)
+		srv.logger.SetLevel(logrus.TraceLevel)
 	case "debug":
-		srv.logger.Logger.SetLevel(logrus.DebugLevel)
+		srv.logger.SetLevel(logrus.DebugLevel)
 	case "info":
-		srv.logger.Logger.SetLevel(logrus.InfoLevel)
+		srv.logger.SetLevel(logrus.InfoLevel)
 	case "warn":
-		srv.logger.Logger.SetLevel(logrus.WarnLevel)
+		srv.logger.SetLevel(logrus.WarnLevel)
 	case "error":
-		srv.logger.Logger.SetLevel(logrus.ErrorLevel)
+		srv.logger.SetLevel(logrus.ErrorLevel)
 	default:
-		srv.logger.Logger.SetLevel(logrus.InfoLevel)
+		srv.logger.SetLevel(logrus.InfoLevel)
 	}
 }
 
@@ -297,9 +291,9 @@ func (srv *server) Stop() error {
 		srv.logger.Errorf("failed to stop grpc server, Error = %v", err)
 		return err
 	}
-	err = srv.PLog().Close()
+	err = srv.WAL().Close()
 	if err != nil {
-		srv.logger.Errorf("failed to close the pLog, Error = %v", err)
+		srv.logger.Errorf("failed to close the wal, Error = %v", err)
 		return err
 	}
 	srv.httpServerWait.Wait()

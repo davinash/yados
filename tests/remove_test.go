@@ -7,7 +7,7 @@ import (
 func (suite *YadosTestSuite) TestRemoveServer() {
 	numOfServers := 7
 	for i := 4; i < numOfServers; i++ {
-		srv, _, err := AddNewServer(i, suite.cluster.members, suite.logDir, "debug", false)
+		srv, _, err := AddNewServer(i, suite.cluster.members, suite.logDir, "info", false)
 		if err != nil {
 			suite.T().Fail()
 		}

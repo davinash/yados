@@ -80,7 +80,7 @@ func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusR
 	reply := &pb.ClusterStatusReply{Id: request.Id}
 	for _, peer := range srv.Peers() {
 		args := pb.StatusRequest{}
-		status, err := srv.Send(peer, "RPC.PeerStatus", &args)
+		status, err := srv.RPCServer().Send(peer, "RPC.PeerStatus", &args)
 		if err != nil {
 			srv.logger.Errorf("failed to send PeerStatus to %s, Error = %v", peer.Name, err)
 			return reply, err
@@ -126,7 +126,7 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 		return reply, ErrorStoreAlreadyExists
 	}
 
-	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if srv.logger.IsLevelEnabled(logrus.DebugLevel) {
 		marshal, err := json.Marshal(request)
 		if err != nil {
 			return nil, err
@@ -150,7 +150,7 @@ func (srv *server) DeleteStore(ctx context.Context, request *pb.StoreDeleteReque
 		reply.Error = ErrorStoreDoesExists.Error()
 		return reply, ErrorStoreDoesExists
 	}
-	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if srv.logger.IsLevelEnabled(logrus.DebugLevel) {
 		marshal, err := json.Marshal(request)
 		if err != nil {
 			return nil, err
@@ -172,7 +172,7 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 		return reply, ErrorStoreDoesExists
 	}
 
-	if srv.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+	if srv.logger.IsLevelEnabled(logrus.DebugLevel) {
 		marshal, err := json.Marshal(request)
 		if err != nil {
 			return nil, err

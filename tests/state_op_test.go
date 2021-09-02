@@ -3,11 +3,11 @@ package tests
 func (suite *YadosTestSuite) TestStateFileOp() {
 	WaitForLeaderElection(suite.cluster)
 
-	err := suite.cluster.members[0].PLog().WriteState(1, "abc")
+	err := suite.cluster.members[0].WAL().WriteState(1, "abc")
 	if err != nil {
 		suite.T().Fatal(err)
 	}
-	term, votedFor, err := suite.cluster.members[0].PLog().ReadState()
+	term, votedFor, err := suite.cluster.members[0].WAL().ReadState()
 	if err != nil {
 		suite.T().Fatal(err)
 	}
@@ -19,11 +19,11 @@ func (suite *YadosTestSuite) TestStateFileOp() {
 	}
 
 	// write new state
-	err = suite.cluster.members[0].PLog().WriteState(2, "pqr")
+	err = suite.cluster.members[0].WAL().WriteState(2, "pqr")
 	if err != nil {
 		suite.T().Fatal(err)
 	}
-	term, votedFor, err = suite.cluster.members[0].PLog().ReadState()
+	term, votedFor, err = suite.cluster.members[0].WAL().ReadState()
 	if err != nil {
 		suite.T().Fatal(err)
 	}

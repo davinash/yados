@@ -7,7 +7,7 @@ import (
 
 //FSM interface for state machine to apply
 type FSM interface {
-	Apply(entry *pb.LogEntry) error
+	Apply(entry *pb.WalEntry) error
 	Store() store.Store
 }
 
@@ -25,7 +25,7 @@ func (f *fsm) Store() store.Store {
 	return f.store
 }
 
-func (f *fsm) Apply(entry *pb.LogEntry) error {
+func (f *fsm) Apply(entry *pb.WalEntry) error {
 	//switch entry.CmdType {
 	//
 	//case pb.CommandType_CreateStore:

@@ -1,10 +1,8 @@
 package tests
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
-	"testing"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/protobuf/proto"
@@ -13,50 +11,50 @@ import (
 	"github.com/davinash/yados/internal/server"
 )
 
-func printEntry(entry *pb.LogEntry, prefix string, t *testing.T) {
-	t.Logf("[%s] Term= %v, Index= %v, Id= %v Type= %v", prefix, entry.Term, entry.Index, entry.Id, entry.CmdType)
-	switch entry.CmdType {
-	case pb.CommandType_CreateStore:
-		var req pb.StoreCreateRequest
-		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
-		if err != nil {
-			return
-		}
-		marshal, err := json.Marshal(&req)
-		if err != nil {
-			return
-		}
-		t.Logf("[%s] Command -> %s", prefix, string(marshal))
+//func printEntry(entry *pb.WalEntry, prefix string, t *testing.T) {
+//	t.Logf("[%s] Term= %v, Index= %v, Id= %v Type= %v", prefix, entry.Term, entry.Index, entry.Id, entry.CmdType)
+//	switch entry.CmdType {
+//	case pb.CommandType_CreateStore:
+//		var req pb.StoreCreateRequest
+//		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
+//		if err != nil {
+//			return
+//		}
+//		marshal, err := json.Marshal(&req)
+//		if err != nil {
+//			return
+//		}
+//		t.Logf("[%s] Command -> %s", prefix, string(marshal))
+//
+//	case pb.CommandType_Put:
+//		var req pb.PutRequest
+//		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
+//		if err != nil {
+//			return
+//		}
+//		marshal, err := json.Marshal(&req)
+//		if err != nil {
+//			return
+//		}
+//		t.Logf("[%s] Command -> %s", prefix, string(marshal))
+//
+//	case pb.CommandType_DeleteStore:
+//		var req pb.StoreDeleteRequest
+//		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
+//		if err != nil {
+//			return
+//		}
+//		marshal, err := json.Marshal(&req)
+//		if err != nil {
+//			return
+//		}
+//		t.Logf("[%s] Command -> %s", prefix, string(marshal))
+//	}
+//}
 
-	case pb.CommandType_Put:
-		var req pb.PutRequest
-		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
-		if err != nil {
-			return
-		}
-		marshal, err := json.Marshal(&req)
-		if err != nil {
-			return
-		}
-		t.Logf("[%s] Command -> %s", prefix, string(marshal))
-
-	case pb.CommandType_DeleteStore:
-		var req pb.StoreDeleteRequest
-		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
-		if err != nil {
-			return
-		}
-		marshal, err := json.Marshal(&req)
-		if err != nil {
-			return
-		}
-		t.Logf("[%s] Command -> %s", prefix, string(marshal))
-	}
-}
-
-func (suite *YadosTestSuite) TestPLogAppend() {
+func (suite *YadosTestSuite) TestWALAppend() {
 	WaitForLeaderElection(suite.cluster)
-	storeName := "TestPLogAppend"
+	storeName := "TestWALAppend"
 	numOfPuts := 10
 
 	wg := sync.WaitGroup{}
@@ -90,7 +88,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 	wg.Wait()
 
 	for _, member := range suite.cluster.members {
-		iterator, err := member.PLog().Iterator()
+		iterator, err := member.WAL().Iterator()
 		if err != nil {
 			suite.T().Fatal(err)
 		}
@@ -100,7 +98,7 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 		}
 		count := 0
 		for entry != nil {
-			printEntry(entry, member.Name(), suite.T())
+			//printEntry(entry, member.Name(), suite.T())
 			count++
 			entry, err = iterator.Next()
 			if err != nil {
@@ -118,9 +116,9 @@ func (suite *YadosTestSuite) TestPLogAppend() {
 	}
 }
 
-func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
+func (suite *YadosTestSuite) TestWALAppendVerifyEntries() {
 	WaitForLeaderElection(suite.cluster)
-	storeName := "TestPLogAppendVerifyEntries"
+	storeName := "TestWALAppendVerifyEntries"
 
 	numOfPuts := 10
 
@@ -155,7 +153,7 @@ func (suite *YadosTestSuite) TestPLogAppendVerifyEntries() {
 	wg.Wait()
 
 	for _, member := range suite.cluster.members {
-		iterator, err := member.PLog().Iterator()
+		iterator, err := member.WAL().Iterator()
 		if err != nil {
 			suite.T().Fatal(err)
 		}

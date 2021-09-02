@@ -11,8 +11,8 @@ import (
 	"github.com/davinash/yados/internal/store"
 
 	"github.com/davinash/yados/internal/events"
-	"github.com/davinash/yados/internal/plog"
 	"github.com/davinash/yados/internal/rpc"
+	"github.com/davinash/yados/internal/wal"
 
 	"github.com/google/uuid"
 
@@ -60,7 +60,7 @@ type Raft interface {
 	Start()
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
-	Log() []*pb.LogEntry
+	Log() []*pb.WalEntry
 	Submit(interface{}, string, pb.CommandType) error
 	AddCommandListener(string) error
 	WaitForCommandCompletion(string)
@@ -80,7 +80,7 @@ type raft struct {
 
 	// Persistent Raft state on all servers
 	currentTerm int64
-	log         []*pb.LogEntry
+	log         []*pb.WalEntry
 	votedFor    string
 
 	// Volatile Raft state on all servers
@@ -100,8 +100,8 @@ type raft struct {
 	wg   sync.WaitGroup
 
 	newCommitReadyChan chan struct{}
-	logger             *logrus.Entry
-	pLog               plog.PLog
+	logger             *logrus.Logger
+	wal                wal.Wal
 	rpcServer          rpc.Server
 	server             *pb.Peer
 	ev                 *events.Events
@@ -112,8 +112,8 @@ type raft struct {
 //Args argument structure for Raft Instance
 type Args struct {
 	IsTestMode   bool
-	Logger       *logrus.Entry
-	PstLog       plog.PLog
+	Logger       *logrus.Logger
+	PstLog       wal.Wal
 	RPCServer    rpc.Server
 	Server       *pb.Peer
 	EventHandler *events.Events
@@ -126,7 +126,7 @@ func NewRaft(args *Args) (Raft, error) {
 		quit:          make(chan interface{}),
 		triggerAEChan: make(chan struct{}, 1),
 		logger:        args.Logger,
-		pLog:          args.PstLog,
+		wal:           args.PstLog,
 		rpcServer:     args.RPCServer,
 		server:        args.Server,
 		ev:            args.EventHandler,
@@ -153,18 +153,18 @@ func NewRaft(args *Args) (Raft, error) {
 func (r *raft) InitializeFromStorage() error {
 	// Apply term and voted for state from the
 	// persistent log
-	term, votedFor, err := r.pLog.ReadState()
+	term, votedFor, err := r.wal.ReadState()
 	if err != nil {
 		return err
 	}
 	r.currentTerm = term
 	r.votedFor = votedFor
 
-	iter, err1 := r.pLog.Iterator()
+	iter, err1 := r.wal.Iterator()
 	if err1 != nil {
 		return nil
 	}
-	defer func(iter plog.Iterator) {
+	defer func(iter wal.Iterator) {
 		err := iter.Close()
 		if err != nil {
 			r.logger.Warnf("Failed to close the iterator, Error = %v", err)
@@ -238,7 +238,7 @@ func (r *raft) Server() *pb.Peer {
 	return r.server
 }
 
-func (r *raft) Log() []*pb.LogEntry {
+func (r *raft) Log() []*pb.WalEntry {
 	return r.log
 }
 
@@ -339,7 +339,7 @@ func (r *raft) Submit(command interface{}, commandID string, cmdType pb.CommandT
 		return err
 	}
 
-	entry := &pb.LogEntry{
+	entry := &pb.WalEntry{
 		Command: any,
 		Term:    r.currentTerm,
 		Id:      commandID,
@@ -347,7 +347,7 @@ func (r *raft) Submit(command interface{}, commandID string, cmdType pb.CommandT
 	}
 	r.log = append(r.log, entry)
 
-	err = r.persistToStorage([]*pb.LogEntry{entry})
+	err = r.persistToStorage([]*pb.WalEntry{entry})
 	if err != nil {
 		return err
 	}
@@ -570,7 +570,7 @@ func (r *raft) startLeader() {
 	}(50 * time.Millisecond)
 }
 
-func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb.Peer, ni int64, entries []*pb.LogEntry) {
+func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb.Peer, ni int64, entries []*pb.WalEntry) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	reply := resp.(*pb.AppendEntryReply)
@@ -629,7 +629,7 @@ func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb
 	}
 }
 
-func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string) (*pb.AppendEntryRequest, int64, []*pb.LogEntry) {
+func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string) (*pb.AppendEntryRequest, int64, []*pb.WalEntry) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -725,7 +725,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 
 				r.log = append(r.log[:logInsertIndex], request.Entries[newEntriesIndex:]...)
 
-				if r.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
+				if r.logger.IsLevelEnabled(logrus.DebugLevel) {
 					ids := make([]string, 0)
 					for _, l := range r.log {
 						ids = append(ids, l.Id)
@@ -781,7 +781,7 @@ func (r *raft) becomeFollower(term int64) {
 	}()
 }
 
-func (r *raft) applyCommittedEntry(entry *pb.LogEntry) error {
+func (r *raft) applyCommittedEntry(entry *pb.WalEntry) error {
 
 	err := r.StorageManager().Apply(entry)
 	if err != nil {
@@ -798,7 +798,7 @@ func (r *raft) commitChanSender() {
 		// Find which entries we have to Apply.
 		r.mutex.Lock()
 		savedLastApplied := r.lastApplied
-		var entries []*pb.LogEntry
+		var entries []*pb.WalEntry
 		if r.commitIndex > r.lastApplied {
 			entries = r.log[r.lastApplied+1 : r.commitIndex+1]
 			r.lastApplied = r.commitIndex
@@ -829,13 +829,13 @@ func (r *raft) lastLogIndexAndTerm() (int64, int64) {
 	return -1, -1
 }
 
-func (r *raft) persistToStorage(entries []*pb.LogEntry) error {
-	err := r.pLog.WriteState(r.currentTerm, r.votedFor)
+func (r *raft) persistToStorage(entries []*pb.WalEntry) error {
+	err := r.wal.WriteState(r.currentTerm, r.votedFor)
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
-		err := r.pLog.Append(entry)
+		err := r.wal.Append(entry)
 		if err != nil {
 			return err
 		}

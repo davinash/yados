@@ -11,7 +11,7 @@ import (
 //WaitForEvents helper function to wait for event on all the members of the cluster
 func WaitForEvents(members []server.Server, wg *sync.WaitGroup, evCount int) {
 	for _, s := range members {
-		s.EventHandler().PersistEntryChan = make(chan *pb.LogEntry)
+		s.EventHandler().PersistEntryChan = make(chan *pb.WalEntry)
 	}
 	for _, member := range members {
 		wg.Add(1)
