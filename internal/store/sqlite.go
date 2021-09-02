@@ -15,7 +15,7 @@ import (
 
 type storeSqlite struct {
 	db        *sql.DB
-	logger    *logrus.Entry
+	logger    *logrus.Logger
 	storeType pb.StoreType
 	name      string
 }
@@ -27,7 +27,7 @@ func NewSqliteStore(args *Args) (SQLStore, error) {
 		storeType: args.StoreType,
 		name:      args.Name,
 	}
-	dbPath := filepath.Join(args.PLogDir, fmt.Sprintf("%s.db", args.Name))
+	dbPath := filepath.Join(args.WALDir, fmt.Sprintf("%s.db", args.Name))
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, err

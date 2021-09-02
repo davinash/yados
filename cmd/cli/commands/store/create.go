@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//CreateCommand PLog create command
+//CreateCommand WAL create command
 func CreateCommand(rootCmd *cobra.Command) {
 	arg := server.CreateCommandArgs{}
 	cmd := &cobra.Command{

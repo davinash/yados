@@ -1,4 +1,4 @@
-package plog
+package wal
 
 import (
 	"encoding/binary"
@@ -21,25 +21,25 @@ import (
 
 //PersistentLogFile name of the log file
 var (
-	PersistentLogFile = "pLog.bin"
+	PersistentLogFile = "wal.bin"
 	StateFile         = "state.bin"
 )
 
-//PLog represents the pLog
-type PLog interface {
+//Wal represents the wal
+type Wal interface {
 	Open() error
 	Close() error
-	Append(entry *pb.LogEntry) error
+	Append(entry *pb.WalEntry) error
 	Size() int
-	PLogFileName() string
+	WALFileName() string
 	Iterator() (Iterator, error)
 	WriteState(int64, string) error
 	ReadState() (int64, string, error)
 }
 
-//NewPLog Creates new storage
-func NewPLog(logDir string, logger *logrus.Entry, ev *events.Events, isTestMode bool) (PLog, error) {
-	ms := &plog{
+//NewWAL Creates new storage
+func NewWAL(logDir string, logger *logrus.Logger, ev *events.Events, isTestMode bool) (Wal, error) {
+	ms := &wal{
 		logDir:     logDir,
 		logger:     logger,
 		ev:         ev,
@@ -48,44 +48,44 @@ func NewPLog(logDir string, logger *logrus.Entry, ev *events.Events, isTestMode 
 	return ms, nil
 }
 
-//plog represents temporary memory store
-type plog struct {
+//wal represents temporary memory store
+type wal struct {
 	mutex         sync.RWMutex
 	logDir        string
-	logger        *logrus.Entry
+	logger        *logrus.Logger
 	storeFileName string
-	pLogFH        *os.File
+	walFH         *os.File
 	size          int
 	ev            *events.Events
 	isTestMode    bool
 }
 
-func (m *plog) PLogFileName() string {
+func (m *wal) WALFileName() string {
 	return m.storeFileName
 }
 
-//Open Open the pLog
-func (m *plog) Open() error {
+//Open Open the wal
+func (m *wal) Open() error {
 	m.storeFileName = filepath.Join(m.logDir, PersistentLogFile)
 	file, err := os.OpenFile(m.storeFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		return err
 	}
-	m.pLogFH = file
+	m.walFH = file
 	return nil
 }
 
 //Close function to close the file handle of the log
-func (m *plog) Close() error {
-	err := m.pLogFH.Close()
+func (m *wal) Close() error {
+	err := m.walFH.Close()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-//Append Append a new value in the pLog
-func (m *plog) Append(entry *pb.LogEntry) error {
+//Append Append a new value in the wal
+func (m *wal) Append(entry *pb.WalEntry) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -95,11 +95,11 @@ func (m *plog) Append(entry *pb.LogEntry) error {
 	}
 	var buf [binary.MaxVarintLen32]byte
 	encodedLength := binary.PutUvarint(buf[:], uint64(len(buffer)))
-	_, err = m.pLogFH.Write(buf[:encodedLength])
+	_, err = m.walFH.Write(buf[:encodedLength])
 	if err != nil {
 		return err
 	}
-	_, err = m.pLogFH.Write(buffer)
+	_, err = m.walFH.Write(buffer)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ type State struct {
 	VotedFor string `json:"VotedFor"`
 }
 
-func (m *plog) WriteState(term int64, votedFor string) error {
+func (m *wal) WriteState(term int64, votedFor string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -158,7 +158,7 @@ func (m *plog) WriteState(term int64, votedFor string) error {
 	return nil
 }
 
-func (m *plog) ReadState() (int64, string, error) {
+func (m *wal) ReadState() (int64, string, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -189,7 +189,7 @@ func (m *plog) ReadState() (int64, string, error) {
 	return state.Term, state.VotedFor, nil
 }
 
-func (m *plog) Size() int {
+func (m *wal) Size() int {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -198,21 +198,21 @@ func (m *plog) Size() int {
 
 //Iterator interface for persistent logs iterator
 type Iterator interface {
-	Next() (*pb.LogEntry, error)
+	Next() (*pb.WalEntry, error)
 	Close() error
 }
 
-type pLogIterator struct {
-	pLog    PLog
+type walIterator struct {
+	wal     Wal
 	storeRH *os.File
 }
 
 //Iterator creates a new instance of the iterator
-func (m *plog) Iterator() (Iterator, error) {
-	iter := pLogIterator{
-		pLog: m,
+func (m *wal) Iterator() (Iterator, error) {
+	iter := walIterator{
+		wal: m,
 	}
-	storeRH, err := os.Open(m.PLogFileName())
+	storeRH, err := os.Open(m.WALFileName())
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func (m *plog) Iterator() (Iterator, error) {
 //ErrInvalidVarint error when the data is corrupt
 var ErrInvalidVarint = errors.New("invalid varint32 encountered")
 
-func (p *pLogIterator) Next() (*pb.LogEntry, error) {
+func (p *walIterator) Next() (*pb.WalEntry, error) {
 
 	var headerBuf [binary.MaxVarintLen32]byte
 	var bytesRead, varIntBytes int
@@ -251,7 +251,7 @@ func (p *pLogIterator) Next() (*pb.LogEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	entry := pb.LogEntry{}
+	entry := pb.WalEntry{}
 	err = proto.Unmarshal(messageBuf, &entry)
 	if err != nil {
 		return nil, err
@@ -276,7 +276,7 @@ func decodeVarint(buf []byte) (x uint64, n int) {
 	return 0, 0
 }
 
-func (p *pLogIterator) Close() error {
+func (p *walIterator) Close() error {
 	err := p.storeRH.Close()
 	if err != nil {
 		return err

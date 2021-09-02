@@ -276,7 +276,7 @@ func (x *VoteReply) GetTerm() int64 {
 	return 0
 }
 
-type LogEntry struct {
+type WalEntry struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -288,8 +288,8 @@ type LogEntry struct {
 	CmdType CommandType `protobuf:"varint,5,opt,name=CmdType,proto3,enum=CommandType" json:"CmdType,omitempty"`
 }
 
-func (x *LogEntry) Reset() {
-	*x = LogEntry{}
+func (x *WalEntry) Reset() {
+	*x = WalEntry{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_service_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -297,13 +297,13 @@ func (x *LogEntry) Reset() {
 	}
 }
 
-func (x *LogEntry) String() string {
+func (x *WalEntry) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LogEntry) ProtoMessage() {}
+func (*WalEntry) ProtoMessage() {}
 
-func (x *LogEntry) ProtoReflect() protoreflect.Message {
+func (x *WalEntry) ProtoReflect() protoreflect.Message {
 	mi := &file_service_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -315,40 +315,40 @@ func (x *LogEntry) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LogEntry.ProtoReflect.Descriptor instead.
-func (*LogEntry) Descriptor() ([]byte, []int) {
+// Deprecated: Use WalEntry.ProtoReflect.Descriptor instead.
+func (*WalEntry) Descriptor() ([]byte, []int) {
 	return file_service_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *LogEntry) GetTerm() int64 {
+func (x *WalEntry) GetTerm() int64 {
 	if x != nil {
 		return x.Term
 	}
 	return 0
 }
 
-func (x *LogEntry) GetIndex() int64 {
+func (x *WalEntry) GetIndex() int64 {
 	if x != nil {
 		return x.Index
 	}
 	return 0
 }
 
-func (x *LogEntry) GetCommand() *anypb.Any {
+func (x *WalEntry) GetCommand() *anypb.Any {
 	if x != nil {
 		return x.Command
 	}
 	return nil
 }
 
-func (x *LogEntry) GetId() string {
+func (x *WalEntry) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *LogEntry) GetCmdType() CommandType {
+func (x *WalEntry) GetCmdType() CommandType {
 	if x != nil {
 		return x.CmdType
 	}
@@ -365,7 +365,7 @@ type AppendEntryRequest struct {
 	Leader       *Peer       `protobuf:"bytes,3,opt,name=Leader,proto3" json:"Leader,omitempty"`
 	PrevLogIndex int64       `protobuf:"varint,4,opt,name=PrevLogIndex,proto3" json:"PrevLogIndex,omitempty"`
 	PrevLogTerm  int64       `protobuf:"varint,5,opt,name=PrevLogTerm,proto3" json:"PrevLogTerm,omitempty"`
-	Entries      []*LogEntry `protobuf:"bytes,6,rep,name=Entries,proto3" json:"Entries,omitempty"`
+	Entries      []*WalEntry `protobuf:"bytes,6,rep,name=Entries,proto3" json:"Entries,omitempty"`
 	LeaderCommit int64       `protobuf:"varint,7,opt,name=LeaderCommit,proto3" json:"LeaderCommit,omitempty"`
 	NextIndex    int64       `protobuf:"varint,8,opt,name=NextIndex,proto3" json:"NextIndex,omitempty"`
 }
@@ -437,7 +437,7 @@ func (x *AppendEntryRequest) GetPrevLogTerm() int64 {
 	return 0
 }
 
-func (x *AppendEntryRequest) GetEntries() []*LogEntry {
+func (x *AppendEntryRequest) GetEntries() []*WalEntry {
 	if x != nil {
 		return x.Entries
 	}
@@ -2162,7 +2162,7 @@ var file_service_proto_rawDesc = []byte{
 	0x64, 0x69, 0x64, 0x61, 0x74, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09,
 	0x52, 0x0d, 0x43, 0x61, 0x6e, 0x64, 0x69, 0x64, 0x61, 0x74, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12,
 	0x12, 0x0a, 0x04, 0x54, 0x65, 0x72, 0x6d, 0x18, 0x04, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x54,
-	0x65, 0x72, 0x6d, 0x22, 0x9c, 0x01, 0x0a, 0x08, 0x4c, 0x6f, 0x67, 0x45, 0x6e, 0x74, 0x72, 0x79,
+	0x65, 0x72, 0x6d, 0x22, 0x9c, 0x01, 0x0a, 0x08, 0x57, 0x61, 0x6c, 0x45, 0x6e, 0x74, 0x72, 0x79,
 	0x12, 0x12, 0x0a, 0x04, 0x54, 0x65, 0x72, 0x6d, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04,
 	0x54, 0x65, 0x72, 0x6d, 0x12, 0x14, 0x0a, 0x05, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x18, 0x02, 0x20,
 	0x01, 0x28, 0x03, 0x52, 0x05, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x12, 0x2e, 0x0a, 0x07, 0x43, 0x6f,
@@ -2183,7 +2183,7 @@ var file_service_proto_rawDesc = []byte{
 	0x12, 0x20, 0x0a, 0x0b, 0x50, 0x72, 0x65, 0x76, 0x4c, 0x6f, 0x67, 0x54, 0x65, 0x72, 0x6d, 0x18,
 	0x05, 0x20, 0x01, 0x28, 0x03, 0x52, 0x0b, 0x50, 0x72, 0x65, 0x76, 0x4c, 0x6f, 0x67, 0x54, 0x65,
 	0x72, 0x6d, 0x12, 0x23, 0x0a, 0x07, 0x45, 0x6e, 0x74, 0x72, 0x69, 0x65, 0x73, 0x18, 0x06, 0x20,
-	0x03, 0x28, 0x0b, 0x32, 0x09, 0x2e, 0x4c, 0x6f, 0x67, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x07,
+	0x03, 0x28, 0x0b, 0x32, 0x09, 0x2e, 0x57, 0x61, 0x6c, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x07,
 	0x45, 0x6e, 0x74, 0x72, 0x69, 0x65, 0x73, 0x12, 0x22, 0x0a, 0x0c, 0x4c, 0x65, 0x61, 0x64, 0x65,
 	0x72, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x18, 0x07, 0x20, 0x01, 0x28, 0x03, 0x52, 0x0c, 0x4c,
 	0x65, 0x61, 0x64, 0x65, 0x72, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x12, 0x1c, 0x0a, 0x09, 0x4e,
@@ -2384,7 +2384,7 @@ var file_service_proto_goTypes = []interface{}{
 	(StoreType)(0),               // 1: StoreType
 	(*VoteRequest)(nil),          // 2: VoteRequest
 	(*VoteReply)(nil),            // 3: VoteReply
-	(*LogEntry)(nil),             // 4: LogEntry
+	(*WalEntry)(nil),             // 4: WalEntry
 	(*AppendEntryRequest)(nil),   // 5: AppendEntryRequest
 	(*AppendEntryReply)(nil),     // 6: AppendEntryReply
 	(*Peer)(nil),                 // 7: Peer
@@ -2419,10 +2419,10 @@ var file_service_proto_goTypes = []interface{}{
 	(*anypb.Any)(nil),            // 36: google.protobuf.Any
 }
 var file_service_proto_depIdxs = []int32{
-	36, // 0: LogEntry.Command:type_name -> google.protobuf.Any
-	0,  // 1: LogEntry.CmdType:type_name -> CommandType
+	36, // 0: WalEntry.Command:type_name -> google.protobuf.Any
+	0,  // 1: WalEntry.CmdType:type_name -> CommandType
 	7,  // 2: AppendEntryRequest.Leader:type_name -> Peer
-	4,  // 3: AppendEntryRequest.Entries:type_name -> LogEntry
+	4,  // 3: AppendEntryRequest.Entries:type_name -> WalEntry
 	7,  // 4: NewPeerRequest.NewPeer:type_name -> Peer
 	7,  // 5: RemovePeerRequest.peer:type_name -> Peer
 	7,  // 6: StatusReply.server:type_name -> Peer
@@ -2495,7 +2495,7 @@ func file_service_proto_init() {
 			}
 		}
 		file_service_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*LogEntry); i {
+			switch v := v.(*WalEntry); i {
 			case 0:
 				return &v.state
 			case 1:

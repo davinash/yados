@@ -1,18 +1,18 @@
 package tests
 
 import (
-	"github.com/davinash/yados/internal/plog"
 	pb "github.com/davinash/yados/internal/proto/gen"
+	"github.com/davinash/yados/internal/wal"
 	"github.com/google/uuid"
 )
 
-func (suite *YadosTestSuite) TestPLogIterator() {
+func (suite *YadosTestSuite) TestWALIterator() {
 	WaitForLeaderElection(suite.cluster)
 	numOfEntries := 100
 	ids := make([]string, 0)
 	for i := 0; i < numOfEntries; i++ {
 		id := uuid.New().String()
-		err := suite.cluster.members[0].PLog().Append(&pb.LogEntry{
+		err := suite.cluster.members[0].WAL().Append(&pb.WalEntry{
 			Term:    0,
 			Index:   0,
 			Command: nil,
@@ -24,12 +24,12 @@ func (suite *YadosTestSuite) TestPLogIterator() {
 		}
 		ids = append(ids, id)
 	}
-	iter, err := suite.cluster.members[0].PLog().Iterator()
+	iter, err := suite.cluster.members[0].WAL().Iterator()
 	if err != nil {
 		suite.T().Fatal(err)
 	}
 
-	defer func(iter plog.Iterator) {
+	defer func(iter wal.Iterator) {
 		err := iter.Close()
 		if err != nil {
 			suite.T().Fatal(err)
@@ -59,14 +59,14 @@ func (suite *YadosTestSuite) TestPLogIterator() {
 
 }
 
-func (suite *YadosTestSuite) TestPLogIteratorEmpty() {
+func (suite *YadosTestSuite) TestWALIteratorEmpty() {
 	WaitForLeaderElection(suite.cluster)
 
-	iter, err := suite.cluster.members[0].PLog().Iterator()
+	iter, err := suite.cluster.members[0].WAL().Iterator()
 	if err != nil {
 		suite.T().Fatal(err)
 	}
-	defer func(iter plog.Iterator) {
+	defer func(iter wal.Iterator) {
 		err := iter.Close()
 		if err != nil {
 			suite.T().Fatal(err)

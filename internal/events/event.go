@@ -7,7 +7,7 @@ type Events struct {
 	CommitEntryChan   chan interface{}
 	LeaderChangeChan  chan interface{}
 	EventSubscription chan interface{}
-	PersistEntryChan  chan *pb.LogEntry
+	PersistEntryChan  chan *pb.WalEntry
 }
 
 //NewEvents creates new object of Event interface

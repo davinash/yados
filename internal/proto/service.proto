@@ -33,7 +33,7 @@ message VoteReply {
 }
 
 
-message LogEntry {
+message WalEntry {
   int64 Term = 1;
   int64 Index = 2;
   google.protobuf.Any Command = 3;
@@ -47,7 +47,7 @@ message AppendEntryRequest {
   Peer Leader = 3;
   int64 PrevLogIndex = 4;
   int64 PrevLogTerm = 5;
-  repeated LogEntry Entries = 6;
+  repeated WalEntry Entries = 6;
   int64 LeaderCommit = 7;
   int64 NextIndex = 8;
 }

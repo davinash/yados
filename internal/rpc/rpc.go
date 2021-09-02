@@ -30,14 +30,14 @@ type Server interface {
 
 type rpcServer struct {
 	grpcServer *grpc.Server
-	logger     *logrus.Entry
+	logger     *logrus.Logger
 	srvName    string
 	address    string
 	port       int32
 }
 
 //NewRPCServer creates a new instance of rpc server
-func NewRPCServer(srvName string, address string, port int32, logger *logrus.Entry) Server {
+func NewRPCServer(srvName string, address string, port int32, logger *logrus.Logger) Server {
 	rpc := &rpcServer{
 		grpcServer: grpc.NewServer(),
 		logger:     logger,

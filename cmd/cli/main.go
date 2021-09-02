@@ -10,7 +10,7 @@ var rootCmd = &cobra.Command{
 	Use:   "yadosctl",
 	Short: "yadosctl",
 	Long: `
-yadosct is a cli to manage and monitor Yet Another Distributed Object PLog (YADOS) cluster`,
+yadosct is a cli to manage and monitor Yet Another Distributed Object WAL (YADOS) cluster`,
 }
 
 //Execute main driver function form Cobra commands
