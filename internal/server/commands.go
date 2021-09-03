@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/davinash/yados/internal/rpc"
@@ -22,7 +23,7 @@ type StatusArgs struct {
 func ExecuteCmdStatus(args *StatusArgs) (*pb.ClusterStatusReply, error) {
 	peerConn, rpcClient, err := rpc.GetPeerConn(args.Address, args.Port)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get peer connection, error = %w", err)
 	}
 	defer func(peerConn *grpc.ClientConn) {
 		err := peerConn.Close()
@@ -33,7 +34,7 @@ func ExecuteCmdStatus(args *StatusArgs) (*pb.ClusterStatusReply, error) {
 
 	clusterStatus, err := rpcClient.ClusterStatus(context.Background(), &pb.ClusterStatusRequest{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get ClusterStatus, error = %w", err)
 	}
 	return clusterStatus, err
 }

@@ -20,7 +20,7 @@ type StartSrvArgs struct {
 	port     int32
 	peers    []string
 	logLevel string
-	logDir   string
+	walDir   string
 	httpPort int
 }
 
@@ -30,6 +30,23 @@ func StartCommands(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "create and start a new server",
+		Long: `For Example
+
+Starting server with default options
+./yadosctl server start --name Server1 --wal-dir /tmp
+
+Starting server with options
+./yadosctl server start --name Server1 --listen-address 127.0.0.1 --wal-dir /tmp --port 9191 --log-level info
+
+Starting server with options with http server
+./yadosctl server start --name Server1 --listen-address 127.0.0.1 --wal-dir /tmp --port 9191 --log-level info --http-port 8181
+
+Starting second server and join the cluster
+./yadosctl server start --name server2 --listen-address 127.0.0.1 --wal-dir /tmp --port 9192  --peer server1:127.0.0.1:9191
+
+Starting third server and join the cluster
+./yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp --port 9193 --log-level info --peer server1:127.0.0.1:9191 --peer server2:127.0.0.1:9192
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			oSSignalCh := make(chan os.Signal, 1)
 			signal.Notify(oSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -39,7 +56,7 @@ func StartCommands(rootCmd *cobra.Command) {
 				Address:  srvStartArgs.address,
 				Port:     srvStartArgs.port,
 				Loglevel: srvStartArgs.logLevel,
-				LogDir:   srvStartArgs.logDir,
+				WalDir:   srvStartArgs.walDir,
 				HTTPPort: srvStartArgs.httpPort,
 			}
 			srv, err := server.NewServer(srvArgs)
@@ -65,12 +82,12 @@ func StartCommands(rootCmd *cobra.Command) {
 			}
 			err = srv.Serve(peers)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to start the server, error = %w", err)
 			}
 			<-oSSignalCh
 			err = srv.Stop()
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to stop the server, error = %w", err)
 			}
 			return nil
 		},
@@ -96,9 +113,9 @@ func StartCommands(rootCmd *cobra.Command) {
 	cmd.Flags().StringVar(&srvStartArgs.logLevel, "log-level", "info", "Log level "+
 		"[info|debug|warn|trace|error]")
 
-	cmd.Flags().StringVar(&srvStartArgs.logDir, "log-dir", "info",
-		"Location for replicated log storage")
-	err = cmd.MarkFlagRequired("log-dir")
+	cmd.Flags().StringVar(&srvStartArgs.walDir, "wal-dir", "info",
+		"Location for replicated write ahead log")
+	err = cmd.MarkFlagRequired("wal-dir")
 	if err != nil {
 		panic(err)
 	}

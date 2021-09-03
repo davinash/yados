@@ -8,7 +8,7 @@ func (suite *YadosTestSuite) TestServerNewLeader() {
 	_ = WaitForLeaderElection(suite.cluster)
 
 	for i := 4; i < 7; i++ {
-		srv, _, err := AddNewServer(i, suite.cluster.members, suite.logDir, "info", false)
+		srv, _, err := AddNewServer(i, suite.cluster.members, suite.walDir, "info", false)
 		if err != nil {
 			suite.T().Fail()
 		}
