@@ -13,7 +13,12 @@ func CreateGetCommand(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "get a value for a key from a store ",
-		Long:  ``,
+		Long: `
+For Example
+
+Get a value of the key
+./yadosctl store kv get --store-name KvStore --key key1
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			reply, err := server.ExecuteCmdGet(&getArg)
 			if err != nil {

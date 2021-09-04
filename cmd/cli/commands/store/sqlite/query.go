@@ -1,4 +1,4 @@
-package sql
+package sqlite
 
 import (
 	"encoding/json"
@@ -24,7 +24,12 @@ func CreateQueryCommand(rootCmd *cobra.Command) {
 	queryArg := server.QueryArgs{}
 	cmd := &cobra.Command{
 		Use:   "query",
-		Short: "execute sql query on the store ( DML )",
+		Short: "execute sql query on the store",
+		Long: `
+For Example:
+
+./yadosctl store sqlite query --store-name SqlStore1 --sql "select * from employee"
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			result, err := server.ExecuteCmdSQLQuery(&queryArg)
 			if err != nil {

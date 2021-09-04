@@ -30,8 +30,8 @@ func (h *HTTPHandler) Router() *gin.Engine {
 	router.GET("/api/v1/stores", h.getStores)
 	router.POST("/api/v1/kv/put", h.put)
 	router.GET("/api/v1/kv/get/:storeName/:key", h.get)
-	router.POST("/api/v1/sql/execute", h.execute)
-	router.POST("/api/v1/sql/query", h.query)
+	router.POST("/api/v1/sqlite/execute", h.execute)
+	router.POST("/api/v1/sqlite/query", h.query)
 
 	return router
 }

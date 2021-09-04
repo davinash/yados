@@ -195,7 +195,7 @@ func ExecuteCmdPut(args *PutArgs) error {
 type QueryArgs struct {
 	Address   string `json:"address,omitempty"`
 	Port      int32  `json:"port,omitempty"`
-	SQLStr    string `json:"sql"`
+	SQLStr    string `json:"sqlite"`
 	StoreName string `json:"storeName"`
 }
 

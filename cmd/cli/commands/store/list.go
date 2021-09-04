@@ -20,7 +20,7 @@ func CreateListCommand(rootCmd *cobra.Command) {
 			if err != nil {
 				return err
 			}
-			marshal, err := json.MarshalIndent(storeList.Name, "", "  ")
+			marshal, err := json.MarshalIndent(storeList.Stores, "", "  ")
 			if err != nil {
 				return err
 			}

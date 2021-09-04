@@ -2,7 +2,7 @@ package store
 
 import (
 	"github.com/davinash/yados/cmd/cli/commands/store/kv"
-	"github.com/davinash/yados/cmd/cli/commands/store/sql"
+	"github.com/davinash/yados/cmd/cli/commands/store/sqlite"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func AddCommands(rootCmd *cobra.Command) {
 	CreateDeleteCommand(cmd)
 
 	kv.AddCommands(cmd)
-	sql.AddCommands(cmd)
+	sqlite.AddCommands(cmd)
 
 	rootCmd.AddCommand(cmd)
 }

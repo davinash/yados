@@ -204,8 +204,11 @@ func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRepl
 
 func (srv *server) ListStores(ctx context.Context, request *pb.ListStoreRequest) (*pb.ListStoreReply, error) {
 	reply := &pb.ListStoreReply{}
-	for k := range srv.StoreManager().Stores() {
-		reply.Name = append(reply.Name, k)
+	for k, v := range srv.StoreManager().Stores() {
+		reply.Stores = append(reply.Stores, &pb.StoreDescription{
+			Name:      k,
+			StoreType: v.Type(),
+		})
 	}
 	return reply, nil
 }

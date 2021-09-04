@@ -24,7 +24,7 @@ type storeSqlite struct {
 func NewSqliteStore(args *Args) (SQLStore, error) {
 	s := &storeSqlite{
 		logger:    args.Logger,
-		storeType: args.StoreType,
+		storeType: pb.StoreType_Sqlite,
 		name:      args.Name,
 	}
 	dbPath := filepath.Join(args.WALDir, fmt.Sprintf("%s.db", args.Name))
