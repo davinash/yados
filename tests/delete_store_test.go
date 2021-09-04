@@ -24,8 +24,8 @@ func (suite *YadosTestSuite) TestDeleteStore() {
 		suite.T().Fatal(err)
 	}
 
-	if len(listStore.Name) != 1 {
-		suite.T().Fatalf("Store count mismatch Expected 1, Actual %d", len(listStore.Name))
+	if len(listStore.Stores) != 1 {
+		suite.T().Fatalf("Store count mismatch Expected 1, Actual %d", len(listStore.Stores))
 	}
 
 	err = store.ExecuteCmdDeleteStore(&store.DeleteArgs{
@@ -37,7 +37,7 @@ func (suite *YadosTestSuite) TestDeleteStore() {
 		suite.T().Fatal(err)
 	}
 
-	if len(listStore.Name) == 0 {
-		suite.T().Fatalf("Store count mismatch Expected 0, Actual %d", len(listStore.Name))
+	if len(listStore.Stores) == 0 {
+		suite.T().Fatalf("Store count mismatch Expected 0, Actual %d", len(listStore.Stores))
 	}
 }

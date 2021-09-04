@@ -11,6 +11,18 @@ func CreateCommand(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "create new store",
+		Long: `
+For Example:
+
+Creating store with default type
+./yadosctl store create --store-name store1
+
+Creating store with specifying type 
+./yadosctl store create --store-name store1 --store-type kv
+
+Creating store with Sqlite. Internally yados will be using sqlite to store the data
+./yadosctl store create --store-name SqlStore1 --store-type sqlite
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return server.ExecuteCmdCreateStore(&arg)
 		},

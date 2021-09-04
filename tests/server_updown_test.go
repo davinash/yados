@@ -46,7 +46,9 @@ func (suite *YadosTestSuite) TestRandomServerDown() {
 	if err != nil {
 		suite.T().Fatal(err)
 	}
+
 	WaitForLeaderElection(suite.cluster)
+
 	if err := performPut(suite.cluster.members[1], 10, storeName, "AfterOneNodeDown"); err != nil {
 		suite.T().Fatal(err)
 	}

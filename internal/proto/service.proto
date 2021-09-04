@@ -137,8 +137,13 @@ message ListStoreRequest {
 
 }
 
+message StoreDescription {
+  string name = 1;
+  StoreType storeType = 2;
+}
+
 message ListStoreReply {
-  repeated string name = 1;
+  repeated StoreDescription stores = 1;
 }
 
 message PutRequest {

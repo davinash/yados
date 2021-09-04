@@ -44,6 +44,8 @@ Flags:
 ### Creating a store
 ```shell
 ./yadosctl store create --name store1
+./yadosctl store create --name store1 --type kv
+./yadosctl store create --name store1 --type sqlite
 ```
 ### Listing stores
 ```shell

@@ -56,7 +56,11 @@ func (suite *YadosTestSuite) TestStoreList() {
 		suite.T().Fatal(err)
 	}
 
-	if len(storeList.Name) != 5 {
+	if len(storeList.Stores) != 5 {
 		suite.T().Fatal(err)
+	}
+
+	for _, s := range storeList.Stores {
+		suite.T().Logf("Type => %v", s.StoreType)
 	}
 }
