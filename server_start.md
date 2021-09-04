@@ -6,19 +6,19 @@ create and start a new server
 
 For Example
 
-Starting server with default options
+# Starting server with default options
 ./yadosctl server start --name Server1 --wal-dir /tmp
 
-Starting server with options
+# Starting server with options
 ./yadosctl server start --name Server1 --listen-address 127.0.0.1 --wal-dir /tmp --port 9191 --log-level info
 
-Starting server with options with http server
+# Starting server with options with http server
 ./yadosctl server start --name Server1 --listen-address 127.0.0.1 --wal-dir /tmp --port 9191 --log-level info --http-port 8181
 
-Starting second server and join the cluster
+# Starting second server and join the cluster
 ./yadosctl server start --name server2 --listen-address 127.0.0.1 --wal-dir /tmp --port 9192  --peer server1:127.0.0.1:9191
 
-Starting third server and join the cluster
+# Starting third server and join the cluster
 ./yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp --port 9193 --log-level info --peer server1:127.0.0.1:9191 --peer server2:127.0.0.1:9192
 
 
