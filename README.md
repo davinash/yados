@@ -37,6 +37,8 @@ Flags:
       --port int32              Port to use for communication (default 9191)
       --wal-dir string          Location for replicated write ahead log (default "info")
 ```
+### Using YADOS with docker
+
 ### Listing the members in the cluster
 ```shell
 ./yadosctl  server list --server 127.0.0.1 --port 9191
