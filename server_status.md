@@ -2,6 +2,13 @@
 
 status of the servers in cluster
 
+### Synopsis
+
+
+### Get the status of the cluster
+yadosctl server status
+
+
 ```
 server status [flags]
 ```
