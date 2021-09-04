@@ -21,3 +21,19 @@ func AddCommands(rootCmd *cobra.Command) {
 
 	rootCmd.AddCommand(cmd)
 }
+
+//NewStoreCommands commands related to server
+func NewStoreCommands() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "store",
+		Short: "manage and monitor store",
+	}
+	CreateCommand(cmd)
+	CreateListCommand(cmd)
+	CreateDeleteCommand(cmd)
+
+	kv.AddCommands(cmd)
+	sql.AddCommands(cmd)
+
+	return cmd
+}
