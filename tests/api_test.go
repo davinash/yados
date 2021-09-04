@@ -4,7 +4,7 @@ package tests
 //	WaitForLeaderElection(suite.cluster)
 //
 //	httpServer, port, err := AddNewServer(len(suite.cluster.members)+1, suite.cluster.members,
-//		suite.logDir, "debug", true)
+//		suite.walDir, "debug", true)
 //	if err != nil {
 //		suite.T().Fatal(err)
 //	}

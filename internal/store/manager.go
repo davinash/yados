@@ -55,14 +55,14 @@ type manager struct {
 	mutex  sync.Mutex
 	stores map[string]Store
 	logger *logrus.Logger
-	logDir string
+	walDir string
 }
 
 //NewStoreManger new instance of storage manager
-func NewStoreManger(logger *logrus.Logger, logDir string) Manager {
+func NewStoreManger(logger *logrus.Logger, walDir string) Manager {
 	m := &manager{
 		logger: logger,
-		logDir: logDir,
+		walDir: walDir,
 	}
 	m.stores = make(map[string]Store)
 	return m
@@ -75,7 +75,7 @@ func (sm *manager) Create(request *pb.StoreCreateRequest) error {
 	if request.Type == pb.StoreType_Sqlite {
 		s, err := NewSqliteStore(&Args{
 			Name:   request.Name,
-			WALDir: sm.logDir,
+			WALDir: sm.walDir,
 			Logger: sm.logger,
 		})
 		if err != nil {

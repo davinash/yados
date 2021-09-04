@@ -57,7 +57,7 @@ type server struct {
 	rpcServer rpc.Server
 	self      *pb.Peer
 	logger    *logrus.Logger
-	logDir    string
+	walDir    string
 	wal       wal.Wal
 	ev        *events.Events
 
@@ -75,7 +75,7 @@ type NewServerArgs struct {
 	Address    string
 	Port       int32
 	Loglevel   string
-	LogDir     string
+	WalDir     string
 	IsTestMode bool
 	HTTPPort   int
 }
@@ -90,7 +90,7 @@ func NewServer(args *NewServerArgs) (Server, error) {
 		Address: args.Address,
 		Port:    args.Port,
 	}
-	srv.logDir = args.LogDir
+	srv.walDir = args.WalDir
 
 	logger := &logrus.Logger{
 		Out: os.Stderr,
@@ -117,22 +117,20 @@ func NewServer(args *NewServerArgs) (Server, error) {
 func (srv *server) Serve(peers []*pb.Peer) error {
 	err := srv.GetOrCreateWAL()
 	if err != nil {
-		return err
+		return fmt.Errorf("GetOrCreateWAL failed, error %w", err)
 	}
-	srv.logger.Infof("Starting Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 
 	srv.rpcServer = rpc.NewRPCServer(srv.Name(), srv.self.Address, srv.self.Port, srv.logger)
 
 	pb.RegisterYadosServiceServer(srv.rpcServer.GrpcServer(), srv)
 
-	err = srv.rpcServer.Start()
-	if err != nil {
-		srv.logger.Fatalf("failed to start the rpc, error = %v", err)
+	if err = srv.rpcServer.Start(); err != nil {
+		return fmt.Errorf("failed to start the rpc server, error = %w", err)
 	}
 
-	srv.storageMgr = store.NewStoreManger(srv.logger, srv.logDir)
+	srv.storageMgr = store.NewStoreManger(srv.logger, srv.walDir)
 
-	args := raft.Args{
+	if srv.raft, err = raft.NewRaft(&raft.Args{
 		IsTestMode:   srv.isTestMode,
 		Logger:       srv.logger,
 		PstLog:       srv.wal,
@@ -140,12 +138,8 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		Server:       srv.Self(),
 		EventHandler: srv.EventHandler(),
 		StorageMgr:   srv.StoreManager(),
-	}
-
-	srv.raft, err = raft.NewRaft(&args)
-	if err != nil {
-		err := srv.RPCServer().Stop()
-		if err != nil {
+	}); err != nil {
+		if err := srv.RPCServer().Stop(); err != nil {
 			return err
 		}
 		return err
@@ -161,47 +155,41 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 			},
 		})
 		if err != nil {
-			srv.logger.Fatalf("failed add peer , err = %v", err)
+			return fmt.Errorf("failed to send request,  error = %w", err)
 		}
 		// add this peer to self
 		err = srv.raft.AddPeer(p)
 		if err != nil {
-			srv.logger.Fatalf("failed add peer , err = %v", err)
+			return fmt.Errorf("failed add peer, error = %w", err)
 		}
 	}
 	srv.raft.Start()
 
-	err = srv.StartHTTPServer()
-	if err != nil {
-		return err
+	if err = srv.StartHTTPServer(); err != nil {
+		return fmt.Errorf("failed to start http server, error = %w", err)
 	}
-
+	srv.logger.Infof("Started Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 	return nil
 }
 
 func (srv *server) GetOrCreateWAL() error {
-	d := filepath.Join(srv.logDir, srv.Name(), "log")
-	err := os.MkdirAll(d, os.ModePerm)
-	if err != nil {
+	d := filepath.Join(srv.walDir, srv.Name(), "log")
+	if err := os.MkdirAll(d, os.ModePerm); err != nil {
 		return err
 	}
-	srv.logDir = d
+	srv.walDir = d
 
-	s, err1 := wal.NewWAL(srv.logDir, srv.logger, srv.EventHandler(), srv.isTestMode)
-	if err1 != nil {
-		return err1
+	s, err := wal.NewWAL(srv.walDir, srv.logger, srv.EventHandler(), srv.isTestMode)
+	if err != nil {
+		return err
 	}
 	srv.wal = s
-	err = srv.wal.Open()
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return srv.wal.Open()
 }
 
 func (srv *server) WALDir() string {
-	return srv.logDir
+	return srv.walDir
 }
 
 func (srv *server) Name() string {

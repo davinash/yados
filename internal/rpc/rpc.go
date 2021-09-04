@@ -79,7 +79,7 @@ func (rpc *rpcServer) Stop() error {
 func GetPeerConn(address string, port int32) (*grpc.ClientConn, pb.YadosServiceClient, error) {
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", address, port), grpc.WithInsecure())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to connect with peer[%s:%d], error = %w", address, port, err)
 	}
 	peer := pb.NewYadosServiceClient(conn)
 	return conn, peer, nil

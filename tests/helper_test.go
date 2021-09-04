@@ -27,7 +27,7 @@ type TestCluster struct {
 type YadosTestSuite struct {
 	suite.Suite
 	cluster *TestCluster
-	logDir  string
+	walDir  string
 }
 
 //GetFreePort Get the next free port ( Only for test purpose )
@@ -58,7 +58,7 @@ func GetFreePorts(n int) ([]int, error) {
 	return ports, nil
 }
 
-func AddNewServer(suffix int, members []server.Server, logDir string, logLevel string, isWithHTTP bool) (server.Server, int, error) {
+func AddNewServer(suffix int, members []server.Server, walDir string, logLevel string, isWithHTTP bool) (server.Server, int, error) {
 	freePorts, err := GetFreePorts(1)
 	if err != nil {
 		return nil, -1, err
@@ -72,7 +72,7 @@ func AddNewServer(suffix int, members []server.Server, logDir string, logLevel s
 		Address:    "127.0.0.1",
 		Port:       int32(freePorts[0]),
 		Loglevel:   logLevel,
-		LogDir:     logDir,
+		WalDir:     walDir,
 		IsTestMode: true,
 		HTTPPort:   -1,
 	}
@@ -96,15 +96,15 @@ func AddNewServer(suffix int, members []server.Server, logDir string, logLevel s
 	return srv, srvArgs.HTTPPort, nil
 }
 
-func CreateNewClusterEx(numOfServers int, cluster *TestCluster, logDir string, logLevel string) error {
-	srv, _, err := AddNewServer(0, cluster.members, logDir, logLevel, false)
+func CreateNewClusterEx(numOfServers int, cluster *TestCluster, walDir string, logLevel string) error {
+	srv, _, err := AddNewServer(0, cluster.members, walDir, logLevel, false)
 	if err != nil {
 		panic(err)
 	}
 	cluster.members = append(cluster.members, srv)
 
 	for i := 1; i < numOfServers; i++ {
-		srv, _, err := AddNewServer(i, cluster.members, logDir, logLevel, false)
+		srv, _, err := AddNewServer(i, cluster.members, walDir, logLevel, false)
 		if err != nil {
 			panic(err)
 		}
@@ -119,7 +119,7 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 		members:      make([]server.Server, 0),
 		numOfServers: numOfServers,
 	}
-	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.logDir, "info")
+	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.walDir, "info")
 	if err != nil {
 		return err
 	}
@@ -145,21 +145,21 @@ func StopCluster(cluster *TestCluster) {
 }
 
 func SetupDataDirectory() string {
-	logDir, err := ioutil.TempDir("", "YadosLogStorage")
+	walDir, err := ioutil.TempDir("", "YadosWALStorage")
 	if err != nil {
 		panic(err)
 	}
-	err = os.MkdirAll(filepath.Join(logDir), os.ModePerm)
+	err = os.MkdirAll(filepath.Join(walDir), os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
-	return logDir
+	return walDir
 }
 
 func (suite *YadosTestSuite) SetupTest() {
 	suite.T().Log("Running SetupTest")
 
-	suite.logDir = SetupDataDirectory()
+	suite.walDir = SetupDataDirectory()
 
 	err := suite.CreateNewCluster(3)
 	if err != nil {
@@ -191,14 +191,14 @@ func WaitForLeaderElection(cluster *TestCluster) *pb.Peer {
 	return peer
 }
 
-func Cleanup(logDir string) {
-	_ = os.RemoveAll(logDir)
+func Cleanup(walDir string) {
+	_ = os.RemoveAll(walDir)
 }
 
 func (suite *YadosTestSuite) TearDownTest() {
 	suite.T().Log("Running TearDownTest")
 	StopCluster(suite.cluster)
-	Cleanup(suite.logDir)
+	Cleanup(suite.walDir)
 }
 
 func TestAgentTestSuite(t *testing.T) {

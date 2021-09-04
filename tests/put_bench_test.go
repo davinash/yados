@@ -51,9 +51,9 @@ func benchmarkPut(numOfPuts int, b *testing.B, cluster *TestCluster, storeName s
 
 func BenchmarkPut(b *testing.B) {
 	cluster := &TestCluster{}
-	logDir := SetupDataDirectory()
+	walDir := SetupDataDirectory()
 
-	err := CreateNewClusterEx(3, cluster, logDir, "info")
+	err := CreateNewClusterEx(3, cluster, walDir, "info")
 	if err != nil {
 		b.Fail()
 	}
@@ -61,7 +61,7 @@ func BenchmarkPut(b *testing.B) {
 
 	defer func() {
 		StopCluster(cluster)
-		Cleanup(logDir)
+		Cleanup(walDir)
 	}()
 
 	b.Run("ABC", func(b *testing.B) {

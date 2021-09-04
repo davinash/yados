@@ -34,7 +34,7 @@ func (suite *YadosTestSuite) TestRestart() {
 		members:      make([]server.Server, 0),
 		numOfServers: 3,
 	}
-	err = CreateNewClusterEx(3, suite.cluster, suite.logDir, "info")
+	err = CreateNewClusterEx(3, suite.cluster, suite.walDir, "info")
 	if err != nil {
 		return
 	}

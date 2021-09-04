@@ -11,7 +11,6 @@ func AddCommands(rootCmd *cobra.Command) {
 		Short: "YADOS server manage and monitor commands",
 	}
 	StartCommands(cmd)
-	StopCommands(cmd)
 	StatusCommands(cmd)
 
 	rootCmd.AddCommand(cmd)

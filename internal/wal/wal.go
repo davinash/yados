@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -38,9 +39,9 @@ type Wal interface {
 }
 
 //NewWAL Creates new storage
-func NewWAL(logDir string, logger *logrus.Logger, ev *events.Events, isTestMode bool) (Wal, error) {
+func NewWAL(walDir string, logger *logrus.Logger, ev *events.Events, isTestMode bool) (Wal, error) {
 	ms := &wal{
-		logDir:     logDir,
+		walDir:     walDir,
 		logger:     logger,
 		ev:         ev,
 		isTestMode: isTestMode,
@@ -51,7 +52,7 @@ func NewWAL(logDir string, logger *logrus.Logger, ev *events.Events, isTestMode 
 //wal represents temporary memory store
 type wal struct {
 	mutex         sync.RWMutex
-	logDir        string
+	walDir        string
 	logger        *logrus.Logger
 	storeFileName string
 	walFH         *os.File
@@ -64,12 +65,12 @@ func (m *wal) WALFileName() string {
 	return m.storeFileName
 }
 
-//Open Open the wal
+//Open wal open
 func (m *wal) Open() error {
-	m.storeFileName = filepath.Join(m.logDir, PersistentLogFile)
+	m.storeFileName = filepath.Join(m.walDir, PersistentLogFile)
 	file, err := os.OpenFile(m.storeFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		return err
+		return fmt.Errorf("OpenFile Failed %w", err)
 	}
 	m.walFH = file
 	return nil
@@ -123,7 +124,7 @@ func (m *wal) WriteState(term int64, votedFor string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	stateFileName := filepath.Join(m.logDir, StateFile)
+	stateFileName := filepath.Join(m.walDir, StateFile)
 
 	if _, err := os.Stat(stateFileName); err == nil {
 		err := os.Truncate(stateFileName, 0)
@@ -162,7 +163,7 @@ func (m *wal) ReadState() (int64, string, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	stateFileName := filepath.Join(m.logDir, StateFile)
+	stateFileName := filepath.Join(m.walDir, StateFile)
 	file, err := os.Open(stateFileName)
 	if err != nil {
 		if os.IsNotExist(err) {
