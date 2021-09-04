@@ -38,7 +38,12 @@ Flags:
       --wal-dir string          Location for replicated write ahead log (default "info")
 ```
 ### Using YADOS with docker
-
+```shell
+wget https://raw.githubusercontent.com/davinash/yados/main/docker-compose.yaml
+docker-compose up -d
+docker ps -a 
+Above command should show three container instances with name yados-1, yados-2 and yados-3 running
+```
 ### Listing the members in the cluster
 ```shell
 ./yadosctl  server list --server 127.0.0.1 --port 9191
