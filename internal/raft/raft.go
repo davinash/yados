@@ -409,7 +409,7 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 		if reply.VoteGranted {
 			*votesReceived++
 			if *votesReceived*2 > len(r.peers)+1 {
-				r.logger.Infof("wins election with %d votes", *votesReceived)
+				r.logger.Infof("[%s] wins election with %d votes", r.server.Name, *votesReceived)
 				r.startLeader()
 				return
 			}
@@ -447,7 +447,7 @@ func (r *raft) startElection() {
 			// Send request vote to all peer
 			resp, err := r.rpcServer.Send(peer, "RPC.RequestVote", &args)
 			if err != nil {
-				r.logger.Errorf("failed to send RequestVote to %s, Error = %v", peer.Name, err)
+				r.logger.Errorf("[%s] failed to send RequestVote to %s, Error = %v", r.server.Name, peer.Name, err)
 				return
 			}
 			reply := resp.(*pb.VoteReply)

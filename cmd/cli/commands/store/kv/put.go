@@ -10,7 +10,7 @@ func CreatePutCommand(rootCmd *cobra.Command) {
 	putArg := server.PutArgs{}
 	cmd := &cobra.Command{
 		Use:   "put",
-		Short: "put a key/value in a store",
+		Short: "puts a key/value in a store",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return server.ExecuteCmdPut(&putArg)
 		},
