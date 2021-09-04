@@ -31,6 +31,7 @@ func GetLeader(address string, port int32) (*pb.Peer, error) {
 	for _, peer := range clusterStatus.PeerStatus {
 		if peer.IsLeader {
 			return &pb.Peer{
+				Name:    peer.Server.Name,
 				Address: peer.Server.Address,
 				Port:    peer.Server.Port,
 			}, nil

@@ -181,10 +181,12 @@ func WaitForLeaderElection(cluster *TestCluster) *pb.Peer {
 
 	var set []reflect.SelectCase
 	for _, s := range cluster.members {
-		set = append(set, reflect.SelectCase{
-			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(s.EventHandler().LeaderChangeChan),
-		})
+		if s.State() != raft.Dead {
+			set = append(set, reflect.SelectCase{
+				Dir:  reflect.SelectRecv,
+				Chan: reflect.ValueOf(s.EventHandler().LeaderChangeChan),
+			})
+		}
 	}
 	_, valValue, _ := reflect.Select(set)
 	peer := valValue.Interface().(*pb.Peer)

@@ -164,6 +164,8 @@ func ExecuteCmdPut(args *PutArgs) error {
 		return err
 	}
 
+	log.Printf("sending request to leader [%s:%s:%d]", leader.Name, leader.Address, leader.Port)
+
 	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
 	if err1 != nil {
 		return err1
