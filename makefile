@@ -23,6 +23,9 @@ TAG ?= "davinash/yados:$(VERSION)"
 
 build: getdeps format lint buildx
 
+gen-docs:
+	go run doc/generate.go
+
 format:
 	go mod tidy
 	go fmt ./...

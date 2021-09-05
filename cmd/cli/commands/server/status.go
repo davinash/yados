@@ -15,6 +15,10 @@ func StatusCommands(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "status of the servers in cluster",
+		Long: `
+### Get the status of the cluster
+yadosctl server status
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterStatus, err := server.ExecuteCmdStatus(arg)
 			if err != nil {

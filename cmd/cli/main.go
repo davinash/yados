@@ -26,7 +26,10 @@ func init() {
 }
 
 func main() {
-	server.AddCommands(rootCmd)
-	store.AddCommands(rootCmd)
+	serverCommands := server.NewServerCommands()
+	rootCmd.AddCommand(serverCommands)
+
+	storeCommands := store.NewStoreCommands()
+	rootCmd.AddCommand(storeCommands)
 	Execute()
 }
