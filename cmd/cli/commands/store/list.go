@@ -14,6 +14,11 @@ func CreateListCommand(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List stores",
+		Long: `
+
+### To list all the stores
+yadosctl store list
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			storeList, err := server.ExecuteCmdListStore(&listArg)

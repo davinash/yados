@@ -11,6 +11,14 @@ func CreateCommand(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "create new store",
+		Long: `
+
+### Create Store of type sqlite
+yadosctl store create --store-name store-sqlite --store-type sqlite
+
+### Create store of type KV
+yadosctl store create --store-name store-kv
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return server.ExecuteCmdCreateStore(&arg)
 		},

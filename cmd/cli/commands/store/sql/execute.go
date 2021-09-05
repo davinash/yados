@@ -13,7 +13,17 @@ func CreateExecuteQueryCommand(rootCmd *cobra.Command) {
 	queryArg := server.QueryArgs{}
 	cmd := &cobra.Command{
 		Use:   "execute",
-		Short: "execute sql query on the store ( DDL ) ",
+		Short: "execute sql query on the store",
+		Long: `
+### Execute SQL command
+yadosctl store sqlite execute --store-name SqlStore1 --sql "create table employee(empid integer,name varchar(20),title varchar(10))"
+yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(101,'John Smith','CEO')" 
+yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(102,'Raj Reddy','Sysadmin')" 
+yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(103,'Jason Bourne','Developer')" 
+yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(104,'Jane Smith','Sale Manager')"
+yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(105,'Rita Patel','DBA')"
+`,
+
 		RunE: func(cmd *cobra.Command, args []string) error {
 			reply, err := server.ExecuteCmdQuery(&queryArg)
 			if err != nil {

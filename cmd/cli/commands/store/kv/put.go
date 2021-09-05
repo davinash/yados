@@ -11,6 +11,10 @@ func CreatePutCommand(rootCmd *cobra.Command) {
 	cmd := &cobra.Command{
 		Use:   "put",
 		Short: "puts a key/value in a store",
+		Long: `
+### Insert a value in a kv store
+yadosctl store kv put --store-name KvStore --key key1 --value value1
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return server.ExecuteCmdPut(&putArg)
 		},
