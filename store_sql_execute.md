@@ -6,11 +6,17 @@ execute sql query on the store
 
 
 ### Execute SQL command
+#### Create a table
 yadosctl store sqlite execute --store-name SqlStore1 --sql "create table employee(empid integer,name varchar(20),title varchar(10))"
+#### Insert
 yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(101,'John Smith','CEO')" 
+#### Insert
 yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(102,'Raj Reddy','Sysadmin')" 
+#### Insert
 yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(103,'Jason Bourne','Developer')" 
+#### Insert
 yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(104,'Jane Smith','Sale Manager')"
+#### Insert
 yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee values(105,'Rita Patel','DBA')"
 
 
