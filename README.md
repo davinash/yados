@@ -7,6 +7,8 @@ Yet Another Distributed Object Store
 
 [![Docker Image CI](https://github.com/davinash/yados/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/davinash/yados/actions/workflows/docker-image.yml)
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/davinash/yados)](https://goreportcard.com/report/github.com/davinash/yados)
+
 ## Command Line Interface
 * [Server Commands](server.md)
 * [Store Commands](store.md)
