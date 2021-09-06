@@ -19,6 +19,9 @@ docker ps -a
 Above command should show three container instances with name yados-1, yados-2 and yados-3 running
 ```
 
+### REST API Documentation
+[REST API](https://davinash.github.io/yados/index.html#/)
+
 ## Developer Notes
 ### How to build
 ```shell
