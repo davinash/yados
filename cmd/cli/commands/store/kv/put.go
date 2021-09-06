@@ -7,6 +7,8 @@ import (
 
 //CreatePutCommand cobra command for listing stores
 func CreatePutCommand(rootCmd *cobra.Command) {
+	var address string
+	var port int32
 	putArg := server.PutArgs{}
 	cmd := &cobra.Command{
 		Use:   "put",
@@ -16,11 +18,11 @@ func CreatePutCommand(rootCmd *cobra.Command) {
 yadosctl store kv put --store-name KvStore --key key1 --value value1
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return server.ExecuteCmdPut(&putArg)
+			return server.ExecuteCmdPut(&putArg, address, port)
 		},
 	}
-	cmd.Flags().StringVar(&putArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
-	cmd.Flags().Int32Var(&putArg.Port, "port", 9191, "Port to use for communication")
+	cmd.Flags().StringVar(&address, "address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().Int32Var(&port, "port", 9191, "Port to use for communication")
 
 	cmd.Flags().StringVar(&putArg.Key, "key", "", "Key name")
 	err := cmd.MarkFlagRequired("key")

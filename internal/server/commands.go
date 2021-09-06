@@ -20,8 +20,8 @@ type StatusArgs struct {
 }
 
 //ExecuteCmdStatus helper function to execute grpc call to get the status
-func ExecuteCmdStatus(args *StatusArgs) (*pb.ClusterStatusReply, error) {
-	peerConn, rpcClient, err := rpc.GetPeerConn(args.Address, args.Port)
+func ExecuteCmdStatus(address string, port int32) (*pb.ClusterStatusReply, error) {
+	peerConn, rpcClient, err := rpc.GetPeerConn(address, port)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get peer connection, error = %w", err)
 	}
@@ -41,15 +41,13 @@ func ExecuteCmdStatus(args *StatusArgs) (*pb.ClusterStatusReply, error) {
 
 //CreateCommandArgs argument structure for this command
 type CreateCommandArgs struct {
-	Address string `json:"address,omitempty"`
-	Port    int32  `json:"port,omitempty"`
-	Name    string `json:"name"`
-	Type    string `json:"type"`
+	Name string `json:"name"`
+	Type string `json:"type"`
 }
 
 //ExecuteCmdCreateStore helper function to executed create store command
-func ExecuteCmdCreateStore(args *CreateCommandArgs) error {
-	leader, err := GetLeader(args.Address, args.Port)
+func ExecuteCmdCreateStore(args *CreateCommandArgs, address string, port int32) error {
+	leader, err := GetLeader(address, port)
 	if err != nil {
 		return err
 	}
@@ -83,15 +81,13 @@ func ExecuteCmdCreateStore(args *CreateCommandArgs) error {
 
 //GetArgs argument structure for this command
 type GetArgs struct {
-	Address   string
-	Port      int32
-	Key       string
-	StoreName string
+	Key       string `json:"key"`
+	StoreName string `json:"storeName"`
 }
 
 //ExecuteCmdGet helper function to perform put command
-func ExecuteCmdGet(args *GetArgs) (*pb.GetReply, error) {
-	leader, err := GetLeader(args.Address, args.Port)
+func ExecuteCmdGet(args *GetArgs, address string, port int32) (*pb.GetReply, error) {
+	leader, err := GetLeader(address, port)
 	if err != nil {
 		return nil, err
 	}
@@ -117,15 +113,9 @@ func ExecuteCmdGet(args *GetArgs) (*pb.GetReply, error) {
 	return reply, nil
 }
 
-//ListArgs argument structure for this command
-type ListArgs struct {
-	Address string
-	Port    int32
-}
-
 //ExecuteCmdListStore executes the list command for a store
-func ExecuteCmdListStore(args *ListArgs) (*pb.ListStoreReply, error) {
-	leader, err := GetLeader(args.Address, args.Port)
+func ExecuteCmdListStore(address string, port int32) (*pb.ListStoreReply, error) {
+	leader, err := GetLeader(address, port)
 	if err != nil {
 		return nil, err
 	}
@@ -150,16 +140,14 @@ func ExecuteCmdListStore(args *ListArgs) (*pb.ListStoreReply, error) {
 
 //PutArgs argument structure for this command
 type PutArgs struct {
-	Address   string `json:"address,omitempty"`
-	Port      int32  `json:"port,omitempty"`
 	Key       string `json:"key"`
 	Value     string `json:"value"`
 	StoreName string `json:"storeName"`
 }
 
 //ExecuteCmdPut helper function to perform put command
-func ExecuteCmdPut(args *PutArgs) error {
-	leader, err := GetLeader(args.Address, args.Port)
+func ExecuteCmdPut(args *PutArgs, address string, port int32) error {
+	leader, err := GetLeader(address, port)
 	if err != nil {
 		return err
 	}
@@ -191,15 +179,13 @@ func ExecuteCmdPut(args *PutArgs) error {
 
 //QueryArgs arguments for the query command
 type QueryArgs struct {
-	Address   string `json:"address,omitempty"`
-	Port      int32  `json:"port,omitempty"`
 	SQLStr    string `json:"sql"`
 	StoreName string `json:"storeName"`
 }
 
 //ExecuteCmdQuery executes the query on the store
-func ExecuteCmdQuery(args *QueryArgs) (*pb.ExecuteQueryReply, error) {
-	leader, err := GetLeader(args.Address, args.Port)
+func ExecuteCmdQuery(args *QueryArgs, address string, port int32) (*pb.ExecuteQueryReply, error) {
+	leader, err := GetLeader(address, port)
 	if err != nil {
 		return nil, err
 	}
@@ -229,8 +215,8 @@ func ExecuteCmdQuery(args *QueryArgs) (*pb.ExecuteQueryReply, error) {
 }
 
 //ExecuteCmdSQLQuery executes the query on the store
-func ExecuteCmdSQLQuery(args *QueryArgs) (*pb.QueryReply, error) {
-	leader, err := GetLeader(args.Address, args.Port)
+func ExecuteCmdSQLQuery(args *QueryArgs, address string, port int32) (*pb.QueryReply, error) {
+	leader, err := GetLeader(address, port)
 	if err != nil {
 		return nil, err
 	}

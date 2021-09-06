@@ -64,22 +64,18 @@ func (suite *YadosTestSuite) TestWALAppend() {
 	}()
 
 	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
-		Address: suite.cluster.members[0].Address(),
-		Port:    suite.cluster.members[0].Port(),
-		Name:    storeName,
-	})
+		Name: storeName,
+	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
 		suite.T().Fatal(err)
 	}
 
 	for i := 0; i < numOfPuts; i++ {
 		err := server.ExecuteCmdPut(&server.PutArgs{
-			Address:   suite.cluster.members[0].Address(),
-			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
 			Value:     fmt.Sprintf("Value-%d", i),
 			StoreName: storeName,
-		})
+		}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 		if err != nil {
 			suite.T().Fatal(err)
 		}
@@ -129,22 +125,18 @@ func (suite *YadosTestSuite) TestWALAppendVerifyEntries() {
 	}()
 
 	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
-		Address: suite.cluster.members[0].Address(),
-		Port:    suite.cluster.members[0].Port(),
-		Name:    storeName,
-	})
+		Name: storeName,
+	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
 		suite.T().Fatal(err)
 	}
 
 	for i := 0; i < numOfPuts; i++ {
 		err := server.ExecuteCmdPut(&server.PutArgs{
-			Address:   suite.cluster.members[0].Address(),
-			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
 			Value:     fmt.Sprintf("Value-%d", i),
 			StoreName: storeName,
-		})
+		}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 		if err != nil {
 			suite.T().Fatal(err)
 		}

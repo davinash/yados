@@ -9,6 +9,8 @@ import (
 
 //CreateGetCommand cobra command for listing stores
 func CreateGetCommand(rootCmd *cobra.Command) {
+	var address string
+	var port int32
 	getArg := server.GetArgs{}
 	cmd := &cobra.Command{
 		Use:   "get",
@@ -18,7 +20,7 @@ func CreateGetCommand(rootCmd *cobra.Command) {
 yadosctl store kv get --store-name KvStore --key key1
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			reply, err := server.ExecuteCmdGet(&getArg)
+			reply, err := server.ExecuteCmdGet(&getArg, address, port)
 			if err != nil {
 				return err
 			}
@@ -26,8 +28,8 @@ yadosctl store kv get --store-name KvStore --key key1
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&getArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
-	cmd.Flags().Int32Var(&getArg.Port, "port", 9191, "Port to use for communication")
+	cmd.Flags().StringVar(&address, "address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().Int32Var(&port, "port", 9191, "Port to use for communication")
 
 	cmd.Flags().StringVar(&getArg.Key, "key", "", "Key name")
 	err := cmd.MarkFlagRequired("key")

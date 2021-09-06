@@ -9,21 +9,17 @@ import (
 
 func createStore(srv server.Server, storeName string) error {
 	return server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
-		Address: srv.Address(),
-		Port:    srv.Port(),
-		Name:    storeName,
-	})
+		Name: storeName,
+	}, srv.Address(), srv.Port())
 }
 
 func performPut(srv server.Server, numOfPuts int, storeName string, prefix string) error {
 	for i := 0; i < numOfPuts; i++ {
 		err := server.ExecuteCmdPut(&server.PutArgs{
-			Address:   srv.Address(),
-			Port:      srv.Port(),
 			Key:       fmt.Sprintf("%s-Key-%d", prefix, i),
 			Value:     fmt.Sprintf("%s-Value-%d", prefix, i),
 			StoreName: storeName,
-		})
+		}, srv.Address(), srv.Port())
 		if err != nil {
 			return err
 		}

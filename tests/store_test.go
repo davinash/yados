@@ -17,10 +17,8 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 	}()
 
 	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
-		Address: suite.cluster.members[0].Address(),
-		Port:    suite.cluster.members[0].Port(),
-		Name:    "TestStoreCreate",
-	})
+		Name: "TestStoreCreate",
+	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
 		suite.T().Fatal(err)
 	}
@@ -38,20 +36,15 @@ func (suite *YadosTestSuite) TestStoreList() {
 
 	for i := 0; i < 5; i++ {
 		err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
-			Address: suite.cluster.members[0].Address(),
-			Port:    suite.cluster.members[0].Port(),
-			Name:    fmt.Sprintf("TestStoreList-%d", i),
-		})
+			Name: fmt.Sprintf("TestStoreList-%d", i),
+		}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 		if err != nil {
 			suite.T().Fatal(err)
 		}
 	}
 	wg.Wait()
 
-	storeList, err := server.ExecuteCmdListStore(&server.ListArgs{
-		Address: suite.cluster.members[0].Address(),
-		Port:    suite.cluster.members[0].Port(),
-	})
+	storeList, err := server.ExecuteCmdListStore(suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
 		suite.T().Fatal(err)
 	}

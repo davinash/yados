@@ -10,7 +10,8 @@ import (
 
 //CreateListCommand cobra command for listing stores
 func CreateListCommand(rootCmd *cobra.Command) {
-	listArg := server.ListArgs{}
+	var address string
+	var port int32
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List stores",
@@ -21,7 +22,7 @@ yadosctl store list
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			storeList, err := server.ExecuteCmdListStore(&listArg)
+			storeList, err := server.ExecuteCmdListStore(address, port)
 			if err != nil {
 				return err
 			}
@@ -33,8 +34,8 @@ yadosctl store list
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&listArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
-	cmd.Flags().Int32Var(&listArg.Port, "port", 9191, "Port to use for communication")
+	cmd.Flags().StringVar(&address, "address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().Int32Var(&port, "port", 9191, "Port to use for communication")
 
 	rootCmd.AddCommand(cmd)
 

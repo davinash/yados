@@ -9,21 +9,17 @@ import (
 func (suite *YadosTestSuite) TestRestart() {
 	WaitForLeaderElection(suite.cluster)
 	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
-		Address: suite.cluster.members[0].Address(),
-		Port:    suite.cluster.members[0].Port(),
-		Name:    "TestRestart",
-	})
+		Name: "TestRestart",
+	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
 		suite.T().Fatal(err)
 	}
 	for i := 0; i < 10; i++ {
 		err = server.ExecuteCmdPut(&server.PutArgs{
-			Address:   suite.cluster.members[0].Address(),
-			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
 			Value:     fmt.Sprintf("Value-%d", i),
 			StoreName: "TestRestart",
-		})
+		}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 		if err != nil {
 			suite.T().Fatal(err)
 		}
@@ -42,11 +38,9 @@ func (suite *YadosTestSuite) TestRestart() {
 
 	for i := 0; i < 10; i++ {
 		reply, err := server.ExecuteCmdGet(&server.GetArgs{
-			Address:   suite.cluster.members[0].Address(),
-			Port:      suite.cluster.members[0].Port(),
 			Key:       fmt.Sprintf("Key-%d", i),
 			StoreName: "TestRestart",
-		})
+		}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 		if err != nil {
 			suite.T().Fatal(err)
 		}
