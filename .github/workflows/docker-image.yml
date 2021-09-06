@@ -24,4 +24,4 @@ jobs:
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag davinash/yados:1.0.0
     - name: Push Image to docker hub
-      run: docker push ${{secrets.DOCKER_USER_NAME}}/yados
+      run: docker push ${{secrets.DOCKER_USER_NAME}}/yados:1.0.0
