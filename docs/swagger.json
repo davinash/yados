@@ -1,0 +1,256 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "Yados Swagger API",
+        "contact": {
+            "name": "Avinash Dongre",
+            "email": "dongre.avinash@gmail.com"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "basePath": "/api/v1",
+    "paths": {
+        "/kv/get": {
+            "get": {
+                "description": "Gets value of a key",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Gets value of a key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "storeName",
+                        "name": "storeName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "key",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/kv/put": {
+            "post": {
+                "description": "Perform put operation in KV type of store",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Perform put operation in KV type of store",
+                "parameters": [
+                    {
+                        "description": "PutArgs",
+                        "name": "PutArgs",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.PutArgs"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/sqlite/execute": {
+            "post": {
+                "description": "Perform sql execute operation in sqlite type of store",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Perform sql execute operation in sqlite type of store",
+                "parameters": [
+                    {
+                        "description": "QueryArgs",
+                        "name": "QueryArgs",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.QueryArgs"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/sqlite/query": {
+            "post": {
+                "description": "Perform sql query operation in sqlite type of store",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Perform sql query operation in sqlite type of store",
+                "parameters": [
+                    {
+                        "description": "QueryArgs",
+                        "name": "QueryArgs",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.QueryArgs"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/status": {
+            "get": {
+                "description": "Get the status of the cluster",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Get the status of the cluster",
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/store": {
+            "post": {
+                "description": "Create new store in a cluster",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Create new store in a cluster",
+                "parameters": [
+                    {
+                        "description": "CreateCommandArgs",
+                        "name": "CreateCommandArgs",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.CreateCommandArgs"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/stores": {
+            "get": {
+                "description": "Get all the store in a cluster",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Get all the store in a cluster",
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "server.CreateCommandArgs": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "server.PutArgs": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "storeName": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "server.QueryArgs": {
+            "type": "object",
+            "properties": {
+                "sql": {
+                    "type": "string"
+                },
+                "storeName": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,166 @@
+basePath: /api/v1
+definitions:
+  server.CreateCommandArgs:
+    properties:
+      name:
+        type: string
+      type:
+        type: string
+    type: object
+  server.PutArgs:
+    properties:
+      key:
+        type: string
+      storeName:
+        type: string
+      value:
+        type: string
+    type: object
+  server.QueryArgs:
+    properties:
+      sql:
+        type: string
+      storeName:
+        type: string
+    type: object
+info:
+  contact:
+    email: dongre.avinash@gmail.com
+    name: Avinash Dongre
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Yados Swagger API
+  version: "1.0"
+paths:
+  /kv/get:
+    get:
+      consumes:
+      - application/json
+      description: Gets value of a key
+      parameters:
+      - description: storeName
+        in: path
+        name: storeName
+        required: true
+        type: string
+      - description: key
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+      summary: Gets value of a key
+  /kv/put:
+    post:
+      consumes:
+      - application/json
+      description: Perform put operation in KV type of store
+      parameters:
+      - description: PutArgs
+        in: body
+        name: PutArgs
+        required: true
+        schema:
+          $ref: '#/definitions/server.PutArgs'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+      summary: Perform put operation in KV type of store
+  /sqlite/execute:
+    post:
+      consumes:
+      - application/json
+      description: Perform sql execute operation in sqlite type of store
+      parameters:
+      - description: QueryArgs
+        in: body
+        name: QueryArgs
+        required: true
+        schema:
+          $ref: '#/definitions/server.QueryArgs'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+      summary: Perform sql execute operation in sqlite type of store
+  /sqlite/query:
+    post:
+      consumes:
+      - application/json
+      description: Perform sql query operation in sqlite type of store
+      parameters:
+      - description: QueryArgs
+        in: body
+        name: QueryArgs
+        required: true
+        schema:
+          $ref: '#/definitions/server.QueryArgs'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+      summary: Perform sql query operation in sqlite type of store
+  /status:
+    get:
+      consumes:
+      - application/json
+      description: Get the status of the cluster
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+      summary: Get the status of the cluster
+  /store:
+    post:
+      consumes:
+      - application/json
+      description: Create new store in a cluster
+      parameters:
+      - description: CreateCommandArgs
+        in: body
+        name: CreateCommandArgs
+        required: true
+        schema:
+          $ref: '#/definitions/server.CreateCommandArgs'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+      summary: Create new store in a cluster
+  /stores:
+    get:
+      consumes:
+      - application/json
+      description: Get all the store in a cluster
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+      summary: Get all the store in a cluster
+swagger: "2.0"
