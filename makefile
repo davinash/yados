@@ -18,11 +18,16 @@ else
 endif
 
 TEST_COUNT=1
+ERROR_CHK_PKGS  = $(shell go list ./... | grep -v doc)
 
 TAG ?= "davinash/yados:$(VERSION)"
 
 build: getdeps format lint buildx
 
+gen-http-docs:
+	${GOPATH}/bin/swag init --dir internal/server
+show:
+	@echo "ERROR PACKAGES = $(ERROR_CHK_PKGS)"
 gen-docs:
 	go run doc/generate.go
 
@@ -30,7 +35,7 @@ format:
 	go mod tidy
 	go fmt ./...
 	${GOPATH}/bin/goimports -l -w .
-	${GOPATH}/bin/errcheck -ignoretests -blank ./...
+	@${GOPATH}/bin/errcheck -ignoretests -blank $(ERROR_CHK_PKGS)
 
 buildx:
 	@echo "Building the product"
@@ -52,7 +57,7 @@ generate: getdeps
 lint:
 	@echo "Running $@ check"
 	GO111MODULE=on ${GOPATH}/bin/golangci-lint cache clean
-	GO111MODULE=on ${GOPATH}/bin/golangci-lint run --build-tags kqueue --timeout=10m --skip-dirs internal/proto/gen --config ./.golangci.yml
+	GO111MODULE=on ${GOPATH}/bin/golangci-lint run --build-tags kqueue --timeout=10m --config ./.golangci.yml
 	@echo "Running vet"
 	go list ./... | grep -v gen | xargs go vet
 

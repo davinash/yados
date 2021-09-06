@@ -11,7 +11,7 @@ import (
 
 //StatusCommands command for showing the status of one more servers
 func StatusCommands(rootCmd *cobra.Command) {
-	arg := &server.StatusArgs{}
+	statusArgs := &server.StatusArgs{}
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "status of the servers in cluster",
@@ -20,7 +20,7 @@ func StatusCommands(rootCmd *cobra.Command) {
 yadosctl server status
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			clusterStatus, err := server.ExecuteCmdStatus(arg)
+			clusterStatus, err := server.ExecuteCmdStatus(statusArgs.Address, statusArgs.Port)
 			if err != nil {
 				return err
 			}
@@ -33,7 +33,7 @@ yadosctl server status
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&arg.Address, "address", "127.0.0.1", "server to connect in the cluster")
-	cmd.Flags().Int32Var(&arg.Port, "port", 9191, "Port to use for communication")
+	cmd.Flags().StringVar(&statusArgs.Address, "address", "127.0.0.1", "server to connect in the cluster")
+	cmd.Flags().Int32Var(&statusArgs.Port, "port", 9191, "Port to use for communication")
 	rootCmd.AddCommand(cmd)
 }

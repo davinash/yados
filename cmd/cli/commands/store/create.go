@@ -7,6 +7,8 @@ import (
 
 //CreateCommand WAL create command
 func CreateCommand(rootCmd *cobra.Command) {
+	var address string
+	var port int32
 	arg := server.CreateCommandArgs{}
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -20,11 +22,11 @@ yadosctl store create --store-name store-sqlite --store-type sqlite
 yadosctl store create --store-name store-kv
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return server.ExecuteCmdCreateStore(&arg)
+			return server.ExecuteCmdCreateStore(&arg, address, port)
 		},
 	}
-	cmd.Flags().StringVar(&arg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
-	cmd.Flags().Int32Var(&arg.Port, "port", 9191, "Port to use for communication")
+	cmd.Flags().StringVar(&address, "address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().Int32Var(&port, "port", 9191, "Port to use for communication")
 
 	cmd.Flags().StringVar(&arg.Name, "store-name", "", "Name of the store to create")
 	err := cmd.MarkFlagRequired("store-name")

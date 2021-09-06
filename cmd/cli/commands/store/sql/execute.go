@@ -10,6 +10,8 @@ import (
 
 //CreateExecuteQueryCommand cobra command construction of query
 func CreateExecuteQueryCommand(rootCmd *cobra.Command) {
+	var address string
+	var port int32
 	queryArg := server.QueryArgs{}
 	cmd := &cobra.Command{
 		Use:   "execute",
@@ -31,7 +33,7 @@ yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee
 `,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			reply, err := server.ExecuteCmdQuery(&queryArg)
+			reply, err := server.ExecuteCmdQuery(&queryArg, address, port)
 			if err != nil {
 				return err
 			}
@@ -43,8 +45,8 @@ yadosctl store sqlite execute --store-name SqlStore1 --sql "insert into employee
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&queryArg.Address, "address", "127.0.0.1", "Server to connect in the cluster")
-	cmd.Flags().Int32Var(&queryArg.Port, "port", 9191, "Port to use for communication")
+	cmd.Flags().StringVar(&address, "address", "127.0.0.1", "Server to connect in the cluster")
+	cmd.Flags().Int32Var(&port, "port", 9191, "Port to use for communication")
 
 	cmd.Flags().StringVar(&queryArg.SQLStr, "sql", "", "SQL statement to execute")
 	err := cmd.MarkFlagRequired("sql")

@@ -9,7 +9,9 @@ Yet Another Distributed Object Store
 * [Server Commands](server.md)
 * [Store Commands](store.md)
 
-### Using YADOS with docker
+### Quick Start
+Using Docker Compose is basically a two-step process:
+
 ```shell
 wget https://raw.githubusercontent.com/davinash/yados/main/docker-compose.yaml
 docker-compose up -d

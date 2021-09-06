@@ -9,17 +9,12 @@ func (suite *YadosTestSuite) TestDeleteStore() {
 	WaitForLeaderElection(suite.cluster)
 	storeName := "TestDeleteStore"
 	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
-		Address: suite.cluster.members[0].Address(),
-		Port:    suite.cluster.members[0].Port(),
-		Name:    storeName,
-	})
+		Name: storeName,
+	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
 		suite.T().Fatal(err)
 	}
-	listStore, err := server.ExecuteCmdListStore(&server.ListArgs{
-		Address: suite.cluster.members[0].Address(),
-		Port:    suite.cluster.members[0].Port(),
-	})
+	listStore, err := server.ExecuteCmdListStore(suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
 		suite.T().Fatal(err)
 	}

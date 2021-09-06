@@ -24,6 +24,13 @@ linters:
     - unconvert
     - varcheck
 
+skip-dirs:
+  - internal/proto/gen
+  - docs
+
+skip-files:
+  - internal/server/main.go
+
 issues:
   exclude-use-default: false
   exclude:
