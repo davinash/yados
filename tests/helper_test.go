@@ -119,7 +119,7 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 		members:      make([]server.Server, 0),
 		numOfServers: numOfServers,
 	}
-	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.walDir, "info")
+	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.walDir, "debug")
 	if err != nil {
 		return err
 	}
