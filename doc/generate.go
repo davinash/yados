@@ -11,12 +11,12 @@ import (
 
 func main() {
 	serverCommands := server.NewServerCommands()
-	err := doc.GenMarkdownTree(serverCommands, "./")
+	err := doc.GenMarkdownTree(serverCommands, "doc/")
 	if err != nil {
 		log.Fatal(err)
 	}
 	storeCommands := store.NewStoreCommands()
-	err = doc.GenMarkdownTree(storeCommands, "./")
+	err = doc.GenMarkdownTree(storeCommands, "doc/")
 	if err != nil {
 		log.Fatal(err)
 	}

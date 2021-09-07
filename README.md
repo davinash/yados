@@ -10,8 +10,8 @@ Yet Another Distributed Object Store
 [![Go Report Card](https://goreportcard.com/badge/github.com/davinash/yados)](https://goreportcard.com/report/github.com/davinash/yados)
 
 ## Command Line Interface
-* [Server Commands](server.md)
-* [Store Commands](store.md)
+* [Server Commands](doc/server.md)
+* [Store Commands](doc/store.md)
 
 ### Quick Start
 Using Docker Compose is basically a two-step process:

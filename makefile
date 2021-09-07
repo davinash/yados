@@ -39,7 +39,7 @@ format:
 
 buildx:
 	@echo "Building the product"
-	GO111MODULE=on go build -ldflags "-X main.Version=$(VERSION)" -o out/yadosctl$(EXE)  cmd/cli/main.go
+	GO111MODULE=on CGO_ENABLED=0 go build -ldflags "-X main.Version=$(VERSION)" -o out/yadosctl$(EXE)  cmd/cli/main.go
 
 getdeps:
 	@echo "Checking dependencies"
@@ -73,7 +73,7 @@ test-single:
 run-bench:
 	go test -v github.com/davinash/yados/tests  -run $(BENCH_NAME)  -bench=.
 
-build-docker-image:
+build-docker-image: build
 	@echo "Building YADOS container"
 	@docker build --no-cache -t $(TAG) . -f Dockerfile
 
