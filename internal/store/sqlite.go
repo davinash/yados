@@ -53,6 +53,7 @@ func (ss *storeSqlite) Execute(request *pb.ExecuteQueryRequest) (*pb.ExecuteQuer
 
 	result, err := ss.db.Exec(request.SqlQuery)
 	if err != nil {
+		//panic(err)
 		reply.Error = err.Error()
 		return reply, err
 	}

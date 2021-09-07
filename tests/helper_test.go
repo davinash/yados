@@ -192,7 +192,7 @@ func WaitForLeaderElection(cluster *TestCluster) *pb.Peer {
 }
 
 func Cleanup(walDir string) {
-	_ = os.RemoveAll(walDir)
+	//_ = os.RemoveAll(walDir)
 }
 
 func (suite *YadosTestSuite) TearDownTest() {
