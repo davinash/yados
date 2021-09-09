@@ -32,7 +32,7 @@ type Server interface {
 	Peers() map[string]*pb.Peer
 	Logger() *logrus.Logger
 	SetLogLevel(level string)
-	Serve([]*pb.Peer) error
+	Serve([]*pb.Peer)
 	RPCServer() rpc.Server
 	Raft() raft.Raft
 	Self() *pb.Peer
@@ -40,13 +40,12 @@ type Server interface {
 	WALDir() string
 	WAL() wal.Wal
 	HTTPPort() int
-	StartHTTPServer() error
+	StartHTTPServer()
 	StopHTTPServer() error
+	StoreManager() store.Manager
 
 	// EventHandler for test purpose
 	EventHandler() *events.Events
-
-	StoreManager() store.Manager
 }
 
 type server struct {
@@ -81,7 +80,7 @@ type NewServerArgs struct {
 }
 
 //NewServer creates new instance of a server
-func NewServer(args *NewServerArgs) (Server, error) {
+func NewServer(args *NewServerArgs) Server {
 	srv := &server{
 		isTestMode: false,
 	}
@@ -111,26 +110,18 @@ func NewServer(args *NewServerArgs) (Server, error) {
 		srv.ev = events.NewEvents()
 	}
 
-	return srv, nil
+	return srv
 }
 
-func (srv *server) Serve(peers []*pb.Peer) error {
-	err := srv.GetOrCreateWAL()
-	if err != nil {
-		return fmt.Errorf("GetOrCreateWAL failed, error %w", err)
-	}
-
+func (srv *server) Serve(peers []*pb.Peer) {
+	srv.GetOrCreateWAL()
 	srv.rpcServer = rpc.NewRPCServer(srv.Name(), srv.self.Address, srv.self.Port, srv.logger)
-
 	pb.RegisterYadosServiceServer(srv.rpcServer.GrpcServer(), srv)
-
-	if err = srv.rpcServer.Start(); err != nil {
-		return fmt.Errorf("failed to start the rpc server, error = %w", err)
-	}
+	srv.rpcServer.Start()
 
 	srv.storageMgr = store.NewStoreManger(srv.logger, srv.walDir)
 
-	if srv.raft, err = raft.NewRaft(&raft.Args{
+	raft, err := raft.NewRaft(&raft.Args{
 		IsTestMode:   srv.isTestMode,
 		Logger:       srv.logger,
 		PstLog:       srv.wal,
@@ -138,54 +129,43 @@ func (srv *server) Serve(peers []*pb.Peer) error {
 		Server:       srv.Self(),
 		EventHandler: srv.EventHandler(),
 		StorageMgr:   srv.StoreManager(),
-	}); err != nil {
-		if err := srv.RPCServer().Stop(); err != nil {
-			return err
-		}
-		return err
+	})
+	if err != nil {
+		panic(err)
 	}
+	srv.raft = raft
 
 	for _, p := range peers {
 		_, err := srv.RPCServer().Send(p, "server.AddNewMember", &pb.NewPeerRequest{
-			Id: uuid.New().String(),
-			NewPeer: &pb.Peer{
-				Name:    srv.Name(),
-				Address: srv.Address(),
-				Port:    srv.Port(),
-			},
+			Id:      uuid.New().String(),
+			NewPeer: srv.Self(),
 		})
 		if err != nil {
-			return fmt.Errorf("failed to send request,  error = %w", err)
+			panic(err)
 		}
 		// add this peer to self
 		err = srv.raft.AddPeer(p)
 		if err != nil {
-			return fmt.Errorf("failed add peer, error = %w", err)
+			panic(err)
 		}
 	}
-	srv.raft.Start()
 
-	if err = srv.StartHTTPServer(); err != nil {
-		return fmt.Errorf("failed to start http server, error = %w", err)
-	}
+	srv.raft.Start()
+	srv.StartHTTPServer()
+
 	srv.logger.Infof("Started Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
-	return nil
 }
 
-func (srv *server) GetOrCreateWAL() error {
-	d := filepath.Join(srv.walDir, srv.Name(), "log")
+func (srv *server) GetOrCreateWAL() {
+	d := filepath.Join(srv.walDir, srv.Name(), "wal")
 	if err := os.MkdirAll(d, os.ModePerm); err != nil {
-		return err
+		panic(err)
 	}
 	srv.walDir = d
+	s := wal.NewWAL(srv.walDir, srv.logger, srv.EventHandler(), srv.isTestMode)
 
-	s, err := wal.NewWAL(srv.walDir, srv.logger, srv.EventHandler(), srv.isTestMode)
-	if err != nil {
-		return err
-	}
 	srv.wal = s
-
-	return srv.wal.Open()
+	srv.wal.Open()
 }
 
 func (srv *server) WALDir() string {
@@ -268,17 +248,18 @@ func (srv *server) Stop() error {
 		return err
 	}
 
-	err = srv.StoreManager().Close()
-	if err != nil {
-		return err
-	}
-
 	srv.Raft().Stop()
 	err = srv.RPCServer().Stop()
 	if err != nil {
 		srv.logger.Errorf("failed to stop grpc server, Error = %v", err)
 		return err
 	}
+
+	err = srv.StoreManager().Close()
+	if err != nil {
+		return err
+	}
+
 	err = srv.WAL().Close()
 	if err != nil {
 		srv.logger.Errorf("failed to close the wal, Error = %v", err)
@@ -289,9 +270,9 @@ func (srv *server) Stop() error {
 	return nil
 }
 
-func (srv *server) StartHTTPServer() error {
+func (srv *server) StartHTTPServer() {
 	if srv.HTTPPort() == -1 {
-		return nil
+		return
 	}
 	httpHandler := NewHTTPHandler(srv)
 	// Start HTTP server (and proxy calls to gRPC server endpoint)
@@ -303,12 +284,10 @@ func (srv *server) StartHTTPServer() error {
 	go func() {
 		defer srv.httpServerWait.Done()
 		if err := srv.httpSrv.ListenAndServe(); err != http.ErrServerClosed {
-			// unexpected error. Port in use?
-			srv.logger.Fatalf("ListenAndServe(): %v", err)
+			panic(err)
 		}
 	}()
 	srv.logger.Infof("Started HTTP server on %s:%d", srv.Self().Address, srv.HTTPPort())
-	return nil
 }
 
 func (srv *server) StopHTTPServer() error {

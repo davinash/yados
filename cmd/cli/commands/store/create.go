@@ -1,6 +1,8 @@
 package store
 
 import (
+	"fmt"
+
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +24,12 @@ yadosctl store create --store-name store-sqlite --store-type sqlite
 yadosctl store create --store-name store-kv
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return server.ExecuteCmdCreateStore(&arg, address, port)
+			resp, err := server.ExecuteCmdCreateStore(&arg, address, port)
+			if err != nil {
+				return err
+			}
+			fmt.Println(resp.Msg)
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&address, "address", "127.0.0.1", "Server to connect in the cluster")

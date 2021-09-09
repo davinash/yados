@@ -78,14 +78,14 @@ func (h *HTTPHandler) createStore(c *gin.Context) {
 		return
 	}
 
-	err := ExecuteCmdCreateStore(&request, h.srv.Self().Address, h.srv.Self().Port)
+	resp, err := ExecuteCmdCreateStore(&request, h.srv.Self().Address, h.srv.Self().Port)
 	if err != nil {
 		h.srv.Logger().Error(err)
 		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"message": "success",
+		"message": resp.Msg,
 	})
 }
 

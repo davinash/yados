@@ -12,7 +12,7 @@ func CreateSQLStoreAndWait(cluster *TestCluster, storeName string) error {
 	defer func() {
 		StopWaitForEvents(cluster.members)
 	}()
-	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,
 		Type: "sqlite",
 	}, cluster.members[0].Address(), cluster.members[0].Port())

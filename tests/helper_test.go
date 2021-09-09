@@ -31,38 +31,36 @@ type YadosTestSuite struct {
 }
 
 //GetFreePort Get the next free port ( Only for test purpose )
-func GetFreePort() (int, *net.TCPListener, error) {
+func GetFreePort() (int, *net.TCPListener) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
-		return 0, nil, err
+		panic(err)
 	}
 
 	l, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		return 0, nil, err
+		panic(err)
 	}
-	return l.Addr().(*net.TCPAddr).Port, l, nil
+	return l.Addr().(*net.TCPAddr).Port, l
 }
 
 // GetFreePorts allocates a batch of n TCP ports in one go to avoid collisions. ( Only for test purpose )
-func GetFreePorts(n int) ([]int, error) {
+func GetFreePorts(n int) []int {
 	ports := make([]int, 0)
 	for i := 0; i < n; i++ {
-		port, listener, err := GetFreePort()
+		port, listener := GetFreePort()
+		err := listener.Close()
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
-		listener.Close()
 		ports = append(ports, port)
 	}
-	return ports, nil
+	return ports
 }
 
 func AddNewServer(suffix int, members []server.Server, walDir string, logLevel string, isWithHTTP bool) (server.Server, int, error) {
-	freePorts, err := GetFreePorts(1)
-	if err != nil {
-		return nil, -1, err
-	}
+	freePorts := GetFreePorts(1)
+
 	peers := make([]*pb.Peer, 0)
 	for _, p := range members {
 		peers = append(peers, p.Self())
@@ -78,21 +76,12 @@ func AddNewServer(suffix int, members []server.Server, walDir string, logLevel s
 	}
 
 	if isWithHTTP {
-		ports, err := GetFreePorts(1)
-		if err != nil {
-			return nil, -1, err
-		}
+		ports := GetFreePorts(1)
+
 		srvArgs.HTTPPort = ports[0]
 	}
-	srv, err := server.NewServer(srvArgs)
-	if err != nil {
-		return nil, -1, err
-	}
-
-	err = srv.Serve(peers)
-	if err != nil {
-		return nil, -1, err
-	}
+	srv := server.NewServer(srvArgs)
+	srv.Serve(peers)
 	return srv, srvArgs.HTTPPort, nil
 }
 

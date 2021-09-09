@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sync"
+	"fmt"
 
 	"github.com/davinash/yados/internal/store"
 
@@ -95,49 +95,23 @@ func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusR
 	return reply, nil
 }
 
-func (srv *server) SubmitToRaft(request interface{}, ID string, cmdType pb.CommandType) error {
-	err := srv.Raft().AddCommandListener(ID)
-	if err != nil {
-		return err
-	}
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		srv.Raft().WaitForCommandCompletion(ID)
-	}()
-
-	err = srv.Raft().Submit(request, ID, cmdType)
-	if err != nil {
-		return err
-	}
-	wg.Wait()
-	return nil
-}
-
 //ErrorStoreAlreadyExists error if store with this name already exists
 var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
 
 func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
+	srv.logger.Debugf("[%s] [%s] Received request CreateStore id=%v Name=%v, Type=%v",
+		srv.Name(), srv.State(), request.Id, request.Name, request.Type)
 	reply := &pb.StoreCreateReply{}
 	// Check if store with name already exists
 	if _, ok := srv.StoreManager().Stores()[request.Name]; ok {
-		reply.Error = ErrorStoreAlreadyExists.Error()
 		return reply, ErrorStoreAlreadyExists
 	}
 
-	if srv.logger.IsLevelEnabled(logrus.DebugLevel) {
-		marshal, err := json.Marshal(request)
-		if err != nil {
-			return nil, err
-		}
-		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
-	}
-
-	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_CreateStore)
+	err := srv.Raft().SubmitAndWait(request, request.Id, pb.CommandType_CreateStore)
 	if err != nil {
 		return reply, err
 	}
+	reply.Msg = fmt.Sprintf("Store = %s, Type = %s created", request.Name, request.Type.String())
 	return reply, nil
 }
 
@@ -157,7 +131,7 @@ func (srv *server) DeleteStore(ctx context.Context, request *pb.StoreDeleteReque
 		}
 		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
 	}
-	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_DeleteStore)
+	err := srv.Raft().SubmitAndWait(request, request.Id, pb.CommandType_DeleteStore)
 	if err != nil {
 		return reply, err
 	}
@@ -180,7 +154,7 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
 	}
 
-	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_Put)
+	err := srv.Raft().SubmitAndWait(request, request.Id, pb.CommandType_Put)
 	if err != nil {
 		return reply, err
 	}
@@ -211,18 +185,14 @@ func (srv *server) ListStores(ctx context.Context, request *pb.ListStoreRequest)
 }
 
 func (srv *server) ExecuteQuery(ctx context.Context, request *pb.ExecuteQueryRequest) (*pb.ExecuteQueryReply, error) {
-	reply := &pb.ExecuteQueryReply{}
+	reply := &pb.ExecuteQueryReply{Id: request.Id}
 
 	// Check if store with name exists
 	if _, ok := srv.StoreManager().Stores()[request.StoreName]; !ok {
 		return reply, ErrorStoreDoesExists
 	}
 
-	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_SqlDDL)
-	if err != nil {
-		return reply, err
-	}
-
+	err := srv.Raft().SubmitAndWait(request, request.Id, pb.CommandType_SqlDDL)
 	return reply, err
 }
 
@@ -233,9 +203,5 @@ func (srv *server) Query(ctx context.Context, request *pb.QueryRequest) (*pb.Que
 	}
 
 	resp, err := (srv.StoreManager().Stores()[request.StoreName].(store.SQLStore)).Query(request)
-	if err != nil {
-		return reply, err
-	}
-
-	return resp, nil
+	return resp, err
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -28,7 +27,7 @@ var (
 
 //Wal represents the wal
 type Wal interface {
-	Open() error
+	Open()
 	Close() error
 	Append(entry *pb.WalEntry) error
 	Size() int
@@ -39,14 +38,14 @@ type Wal interface {
 }
 
 //NewWAL Creates new storage
-func NewWAL(walDir string, logger *logrus.Logger, ev *events.Events, isTestMode bool) (Wal, error) {
+func NewWAL(walDir string, logger *logrus.Logger, ev *events.Events, isTestMode bool) Wal {
 	ms := &wal{
 		walDir:     walDir,
 		logger:     logger,
 		ev:         ev,
 		isTestMode: isTestMode,
 	}
-	return ms, nil
+	return ms
 }
 
 //wal represents temporary memory store
@@ -66,14 +65,13 @@ func (m *wal) WALFileName() string {
 }
 
 //Open wal open
-func (m *wal) Open() error {
+func (m *wal) Open() {
 	m.storeFileName = filepath.Join(m.walDir, PersistentLogFile)
 	file, err := os.OpenFile(m.storeFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("OpenFile Failed %w", err)
+		panic(err)
 	}
 	m.walFH = file
-	return nil
 }
 
 //Close function to close the file handle of the log

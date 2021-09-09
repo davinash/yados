@@ -65,7 +65,7 @@ func BenchmarkPut(b *testing.B) {
 	b.Run("ABC", func(b *testing.B) {
 		storeName := "BenchmarkPut"
 		b.Log("Creating a store")
-		err = server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+		_, err = server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 			Name: storeName,
 		}, cluster.members[0].Address(), cluster.members[0].Port())
 		if err != nil {

@@ -8,7 +8,7 @@ import (
 func (suite *YadosTestSuite) TestDeleteStore() {
 	WaitForLeaderElection(suite.cluster)
 	storeName := "TestDeleteStore"
-	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,
 	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {

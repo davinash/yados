@@ -63,7 +63,7 @@ func (suite *YadosTestSuite) TestWALAppend() {
 		StopWaitForEvents(suite.cluster.members)
 	}()
 
-	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,
 	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
@@ -124,7 +124,7 @@ func (suite *YadosTestSuite) TestWALAppendVerifyEntries() {
 		StopWaitForEvents(suite.cluster.members)
 	}()
 
-	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,
 	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {

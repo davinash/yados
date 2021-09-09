@@ -8,7 +8,7 @@ import (
 
 func (suite *YadosTestSuite) TestRestart() {
 	WaitForLeaderElection(suite.cluster)
-	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: "TestRestart",
 	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {

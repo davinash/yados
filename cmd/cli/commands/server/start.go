@@ -59,10 +59,7 @@ yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp -
 				WalDir:   srvStartArgs.walDir,
 				HTTPPort: srvStartArgs.httpPort,
 			}
-			srv, err := server.NewServer(srvArgs)
-			if err != nil {
-				return err
-			}
+			srv := server.NewServer(srvArgs)
 			peers := make([]*pb.Peer, 0)
 			for _, p := range srvStartArgs.peers {
 				split := strings.Split(p, ":")
@@ -80,12 +77,10 @@ yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp -
 				}
 				peers = append(peers, peer)
 			}
-			err = srv.Serve(peers)
-			if err != nil {
-				return fmt.Errorf("failed to start the server, error = %w", err)
-			}
+			srv.Serve(peers)
+
 			<-oSSignalCh
-			err = srv.Stop()
+			err := srv.Stop()
 			if err != nil {
 				return fmt.Errorf("failed to stop the server, error = %w", err)
 			}
