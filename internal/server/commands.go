@@ -52,14 +52,14 @@ type CreateCommandArgs struct {
 //ExecuteCmdCreateStore helper function to executed create store command
 func ExecuteCmdCreateStore(args *CreateCommandArgs, address string, port int32) (*pb.StoreCreateReply, error) {
 	reply := &pb.StoreCreateReply{}
-	leader, err := GetLeader(address, port)
+	//leader, err := GetLeader(address, port)
+	//if err != nil {
+	//	return reply, err
+	//}
+
+	peerConn, rpcClient, err := rpc.GetPeerConn(address, port)
 	if err != nil {
 		return reply, err
-	}
-
-	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
-	if err1 != nil {
-		return reply, err1
 	}
 	defer func(peerConn *grpc.ClientConn) {
 		err := peerConn.Close()

@@ -69,7 +69,7 @@ func (rpc *rpcServer) Start() {
 func (rpc *rpcServer) Stop() error {
 	rpc.logger.Debugf("[%s] Stopping RPC server", rpc.srvName)
 	rpc.grpcServer.Stop()
-	rpc.logger.Debug("[%s] Stopped RPC server", rpc.srvName)
+	rpc.logger.Debugf("[%s] Stopped RPC server", rpc.srvName)
 	return nil
 }
 
@@ -104,16 +104,6 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 			request.Term, request.CandidateName)
 
 		reply, err := rpcClient.RequestVotes(context.Background(), request)
-		if err != nil {
-			return nil, err
-		}
-		return reply, nil
-	case "server.AddNewMember":
-		request := args.(*pb.NewPeerRequest)
-		rpc.logger.Debugf("[%s] [%s] Type = AddNewMember %s -----> %s  ",
-			rpc.srvName, request.Id, rpc.srvName, peer.Name)
-
-		reply, err := rpcClient.AddMember(context.Background(), request)
 		if err != nil {
 			return nil, err
 		}

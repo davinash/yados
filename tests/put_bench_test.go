@@ -51,7 +51,7 @@ func BenchmarkPut(b *testing.B) {
 	cluster := &TestCluster{}
 	walDir := SetupDataDirectory()
 
-	err := CreateNewClusterEx(3, cluster, walDir, "debug")
+	err := CreateNewClusterEx(3, cluster, walDir, "debug", nil)
 	if err != nil {
 		b.Fail()
 	}

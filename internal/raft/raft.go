@@ -53,7 +53,7 @@ const (
 //Raft raft interface
 type Raft interface {
 	Peers() map[string]*pb.Peer
-	AddPeer(peer *pb.Peer) error
+	AddPeer(peer *pb.Peer)
 	State() State
 	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
 	RemovePeer(*pb.RemovePeerRequest) error
@@ -66,12 +66,16 @@ type Raft interface {
 	WaitForCommandCompletion(string) error
 
 	Server() *pb.Peer
+	StorageManager() store.Manager
 
-	EventHandler() *events.Events
+	Leader() *pb.Peer
+	SetLeader(leader *pb.Peer)
 
 	IsTestMode() bool
+	EventHandler() *events.Events
 
-	StorageManager() store.Manager
+	//IsRunning for tests
+	IsRunning() bool
 }
 
 type raft struct {
@@ -107,6 +111,12 @@ type raft struct {
 	ev                 *events.Events
 	isTestMode         bool
 	storageMgr         store.Manager
+
+	leader *pb.Peer
+	ready  chan interface{}
+
+	// for tests
+	isRunning bool
 }
 
 //Args argument structure for Raft Instance
@@ -132,6 +142,8 @@ func NewRaft(args *Args) (Raft, error) {
 		ev:            args.EventHandler,
 		isTestMode:    args.IsTestMode,
 		storageMgr:    args.StorageMgr,
+		ready:         make(chan interface{}),
+		isRunning:     false,
 	}
 
 	r.peers = make(map[string]*pb.Peer)
@@ -192,12 +204,30 @@ func (r *raft) InitializeFromStorage() error {
 
 func (r *raft) Start() {
 	go func() {
+		<-r.ready
+		r.isRunning = true
 		r.mutex.Lock()
 		r.electionResetEvent = time.Now()
 		r.mutex.Unlock()
 		r.runElectionTimer()
 	}()
 	go r.commitChanSender()
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-r.quit:
+				return
+			case <-ticker.C:
+				if len(r.peers) >= 2 {
+					close(r.ready)
+					return
+				}
+			}
+		}
+	}()
 }
 
 func (r *raft) Stop() {
@@ -262,6 +292,10 @@ func (r *raft) IsTestMode() bool {
 	return r.isTestMode
 }
 
+func (r *raft) IsRunning() bool {
+	return r.isRunning
+}
+
 func (r *raft) AddCommandListener(id string) error {
 	r.commitsChanMap[id] = make(chan error)
 	return nil
@@ -275,12 +309,22 @@ func (r *raft) WaitForCommandCompletion(id string) error {
 	return err
 }
 
-func (r *raft) AddPeer(newPeer *pb.Peer) error {
+func (r *raft) Leader() *pb.Peer {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+	return r.leader
+}
 
-	r.peers[newPeer.Name] = newPeer
-	return nil
+func (r *raft) SetLeader(leader *pb.Peer) {
+	r.leader = leader
+}
+
+func (r *raft) AddPeer(newPeer *pb.Peer) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if _, ok := r.peers[newPeer.Name]; !ok {
+		r.peers[newPeer.Name] = newPeer
+	}
 }
 
 func (r *raft) RemovePeer(request *pb.RemovePeerRequest) error {
@@ -317,7 +361,9 @@ func (r *raft) RemoveSelf() error {
 }
 
 func (r *raft) electionTimeout() time.Duration {
-	return time.Duration(150+rand.Intn(150)) * time.Millisecond
+	t := time.Duration(150+rand.Intn(150)) * time.Millisecond
+	r.logger.Debugf("[%s] XXXX Election Timeout = %v", r.Server().Name, t)
+	return t
 }
 
 func (r *raft) runElectionTimer() {
@@ -342,21 +388,15 @@ func (r *raft) runElectionTimer() {
 func (r *raft) startOrIgnoreElection(termStarted int64, timeoutDuration time.Duration) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-
 	if r.state != Candidate && r.state != Follower {
-		//r.logger.Debugf("[%s] in election timer term state= %s;", r.Server().Name, r.state.String())
 		return
 	}
-
 	if termStarted != r.currentTerm {
-		//r.logger.Debugf("[%s] in election timer term changed from %d to %d, bailing out",
-		//r.Server().Name, termStarted, r.currentTerm)
 		return
 	}
-
 	if elapsed := time.Since(r.electionResetEvent); elapsed >= timeoutDuration {
-		r.logger.Debugf("[%s] Starting new election state=%v; currentTerm=%v;", r.Server().Name,
-			r.State(), r.currentTerm)
+		r.logger.Debugf("[%s] Starting new election state=%v; currentTerm=%v; elapsed= %v; timeoutDuration= %v ",
+			r.Server().Name, r.State(), r.currentTerm, elapsed, timeoutDuration)
 		r.startElection()
 		return
 	}
@@ -397,7 +437,8 @@ func (r *raft) startElection() {
 	r.votedFor = r.server.Name
 
 	votesReceived := 1
-	voteReqId := uuid.New().String()
+	voteReqID := uuid.New().String()
+
 	for _, peer := range r.peers {
 		r.wg.Add(1)
 		go func(peer *pb.Peer) {
@@ -412,7 +453,7 @@ func (r *raft) startElection() {
 				CandidateName: r.server.Name,
 				LastLogIndex:  savedLastLogIndex,
 				LastLogTerm:   savedLastLogTerm,
-				Id:            voteReqId,
+				Id:            voteReqID,
 			}
 			// Send request vote to all peer
 			resp, err := r.rpcServer.Send(peer, "RPC.RequestVote", &args)
@@ -488,6 +529,7 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 
 func (r *raft) startLeader() {
 	r.state = Leader
+	r.SetLeader(r.Server())
 
 	if r.IsTestMode() {
 		if r.ev.LeaderChangeChan != nil {
@@ -504,6 +546,7 @@ func (r *raft) startLeader() {
 
 	r.wg.Add(1)
 	go func(heartbeatTimeout time.Duration) {
+		//r.logger.Debugf("[%s] YYYY", r.Server().Name)
 		defer r.wg.Done()
 		// Immediately send AEs to peers.
 		r.leaderSendAEs()
@@ -642,9 +685,7 @@ func (r *raft) leaderSendAEs() {
 		r.wg.Add(1)
 		go func(peer *pb.Peer) {
 			defer r.wg.Done()
-
 			request, nextIndex, entries := r.createAERequest(peer, savedCurrentTerm, id)
-
 			resp, err := r.rpcServer.Send(peer, "RPC.AppendEntries", request)
 			if err != nil {
 				r.logger.Errorf("[%s] Sending AppendEntries failed, Error = %v", request.Id, err)
@@ -673,10 +714,12 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	}
 
 	if request.Term == r.currentTerm {
+		r.logger.Debugf("[%s] XXXXX Received AppendEntry From [%s]", r.Server().Name, request.Leader.Name)
 		if r.state != Follower {
 			r.becomeFollower(request.Term)
 		}
 		r.electionResetEvent = time.Now()
+		r.SetLeader(request.Leader)
 
 		if request.PrevLogIndex == -1 ||
 			(request.PrevLogIndex < int64(len(r.log)) && request.PrevLogTerm == r.log[request.PrevLogIndex].Term) {
@@ -745,7 +788,6 @@ func (r *raft) submit(command interface{}, commandID string, cmdType pb.CommandT
 	defer r.mutex.Unlock()
 
 	if r.state != Leader {
-		panic(ErrorNotALeader)
 		return ErrorNotALeader
 	}
 
@@ -786,8 +828,6 @@ func (r *raft) SubmitAndWait(request interface{}, ID string, cmdType pb.CommandT
 		defer r.wg.Done()
 		errChan <- r.WaitForCommandCompletion(ID)
 	}()
-
-	r.logger.Debugf("XXXXX [%s][%s] Request Id= [%s]", r.Server().Name, r.State(), ID)
 
 	err = r.submit(request, ID, cmdType)
 	if err != nil {

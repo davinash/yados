@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/davinash/yados/internal/controller"
+
 	"github.com/davinash/yados/internal/raft"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
@@ -26,8 +28,9 @@ type TestCluster struct {
 
 type YadosTestSuite struct {
 	suite.Suite
-	cluster *TestCluster
-	walDir  string
+	cluster    *TestCluster
+	controller *controller.Controller
+	walDir     string
 }
 
 //GetFreePort Get the next free port ( Only for test purpose )
@@ -58,13 +61,9 @@ func GetFreePorts(n int) []int {
 	return ports
 }
 
-func AddNewServer(suffix int, members []server.Server, walDir string, logLevel string, isWithHTTP bool) (server.Server, int, error) {
+func AddNewServer(suffix int, members []server.Server, walDir string, logLevel string, isWithHTTP bool,
+	controller *controller.Controller) (server.Server, int, error) {
 	freePorts := GetFreePorts(1)
-
-	peers := make([]*pb.Peer, 0)
-	for _, p := range members {
-		peers = append(peers, p.Self())
-	}
 	srvArgs := &server.NewServerArgs{
 		Name:       fmt.Sprintf("Server-%d", suffix),
 		Address:    "127.0.0.1",
@@ -77,23 +76,27 @@ func AddNewServer(suffix int, members []server.Server, walDir string, logLevel s
 
 	if isWithHTTP {
 		ports := GetFreePorts(1)
-
 		srvArgs.HTTPPort = ports[0]
 	}
-	srv := server.NewServer(srvArgs)
-	srv.Serve(peers)
-	return srv, srvArgs.HTTPPort, nil
+	srvArgs.Controllers = make([]string, 0)
+	srvArgs.Controllers = append(srvArgs.Controllers, fmt.Sprintf("%s:%d", controller.Address(), controller.Port()))
+	srv, err := server.NewServer(srvArgs)
+	if err != nil {
+		return nil, -1, err
+	}
+	return srv, srvArgs.HTTPPort, srv.Serve()
 }
 
-func CreateNewClusterEx(numOfServers int, cluster *TestCluster, walDir string, logLevel string) error {
-	srv, _, err := AddNewServer(0, cluster.members, walDir, logLevel, false)
+func CreateNewClusterEx(numOfServers int, cluster *TestCluster, walDir string, logLevel string,
+	controller *controller.Controller) error {
+	srv, _, err := AddNewServer(0, cluster.members, walDir, logLevel, false, controller)
 	if err != nil {
 		panic(err)
 	}
 	cluster.members = append(cluster.members, srv)
 
 	for i := 1; i < numOfServers; i++ {
-		srv, _, err := AddNewServer(i, cluster.members, walDir, logLevel, false)
+		srv, _, err := AddNewServer(i, cluster.members, walDir, logLevel, false, controller)
 		if err != nil {
 			panic(err)
 		}
@@ -108,10 +111,15 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 		members:      make([]server.Server, 0),
 		numOfServers: numOfServers,
 	}
-	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.walDir, "debug")
+	ports := GetFreePorts(1)
+	suite.controller = controller.NewController("127.0.0.1", int32(ports[0]), "debug")
+	suite.controller.Start()
+
+	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.walDir, "debug", suite.controller)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

@@ -4,24 +4,22 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 
-	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 	"github.com/spf13/cobra"
 )
 
 //StartSrvArgs represents the Start server Arguments
 type StartSrvArgs struct {
-	name     string
-	address  string
-	port     int32
-	peers    []string
-	logLevel string
-	walDir   string
-	httpPort int
+	name    string
+	address string
+	port    int32
+	//peers       []string
+	logLevel    string
+	walDir      string
+	httpPort    int
+	controllers []string
 }
 
 //StartCommands command for starting a server
@@ -33,7 +31,7 @@ func StartCommands(rootCmd *cobra.Command) {
 		Long: `Example of commands to start the server and create the cluster
 
 ### Starting server with default options
-yadosctl server start --name Server1 --wal-dir /tmp
+yadosctl server start --name Server1 --wal-dir /tmp --controller 127.0.0.1:9090
 
 ### Starting server with options
 yadosctl server start --name Server1 --listen-address 127.0.0.1 --wal-dir /tmp --port 9191 --log-level info
@@ -52,35 +50,24 @@ yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp -
 			signal.Notify(oSSignalCh, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 			srvArgs := &server.NewServerArgs{
-				Name:     srvStartArgs.name,
-				Address:  srvStartArgs.address,
-				Port:     srvStartArgs.port,
-				Loglevel: srvStartArgs.logLevel,
-				WalDir:   srvStartArgs.walDir,
-				HTTPPort: srvStartArgs.httpPort,
+				Name:        srvStartArgs.name,
+				Address:     srvStartArgs.address,
+				Port:        srvStartArgs.port,
+				Loglevel:    srvStartArgs.logLevel,
+				WalDir:      srvStartArgs.walDir,
+				HTTPPort:    srvStartArgs.httpPort,
+				Controllers: srvStartArgs.controllers,
 			}
-			srv := server.NewServer(srvArgs)
-			peers := make([]*pb.Peer, 0)
-			for _, p := range srvStartArgs.peers {
-				split := strings.Split(p, ":")
-				if len(split) != 3 {
-					return fmt.Errorf("invalid format for peers, use <name:ip-address:port>")
-				}
-				port, err := strconv.Atoi(split[2])
-				if err != nil {
-					return fmt.Errorf("invalid format for peers, use <name:ip-address:port>")
-				}
-				peer := &pb.Peer{
-					Name:    split[0],
-					Address: split[1],
-					Port:    int32(port),
-				}
-				peers = append(peers, peer)
+			srv, err := server.NewServer(srvArgs)
+			if err != nil {
+				return err
 			}
-			srv.Serve(peers)
-
+			err = srv.Serve()
+			if err != nil {
+				return err
+			}
 			<-oSSignalCh
-			err := srv.Stop()
+			err = srv.Stop()
 			if err != nil {
 				return fmt.Errorf("failed to stop the server, error = %w", err)
 			}
@@ -101,9 +88,9 @@ yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp -
 
 	cmd.Flags().Int32Var(&srvStartArgs.port, "port", 9191, "Port to use for communication")
 
-	cmd.Flags().StringSliceVar(&srvStartArgs.peers, "peer", []string{},
-		"peer to join <name:ip-address:port>, "+
-			"use multiple of this flag if want to join with multiple peers")
+	//cmd.Flags().StringSliceVar(&srvStartArgs.peers, "peer", []string{},
+	//	"peer to join <name:ip-address:port>, "+
+	//		"use multiple of this flag if want to join with multiple peers")
 
 	cmd.Flags().StringVar(&srvStartArgs.logLevel, "log-level", "info", "Log level "+
 		"[info|debug|warn|trace|error]")
@@ -115,6 +102,10 @@ yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp -
 		panic(err)
 	}
 	cmd.Flags().IntVar(&srvStartArgs.httpPort, "http-port", -1, "Port to use for http server")
+
+	cmd.Flags().StringSliceVar(&srvStartArgs.controllers, "controller", []string{},
+		"controller <ip-address:port>, "+
+			"use multiple of this flag if want to join with multiple controller")
 
 	rootCmd.AddCommand(cmd)
 }

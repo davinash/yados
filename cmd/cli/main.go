@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/davinash/yados/cmd/cli/commands/controller"
 	"github.com/davinash/yados/cmd/cli/commands/server"
 	"github.com/davinash/yados/cmd/cli/commands/store"
 	"github.com/spf13/cobra"
@@ -31,5 +32,9 @@ func main() {
 
 	storeCommands := store.NewStoreCommands()
 	rootCmd.AddCommand(storeCommands)
+
+	controllerCommands := controller.NewControllerCommands()
+	rootCmd.AddCommand(controllerCommands)
+
 	Execute()
 }

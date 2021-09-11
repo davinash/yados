@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+
+	"github.com/davinash/yados/internal/rpc"
+	"google.golang.org/grpc"
 
 	"github.com/davinash/yados/internal/store"
 
@@ -28,29 +32,30 @@ func (srv *server) AppendEntries(ctx context.Context, request *pb.AppendEntryReq
 	return srv.Raft().AppendEntries(ctx, request)
 }
 
-func (srv *server) AddMember(ctx context.Context, newPeer *pb.NewPeerRequest) (*pb.NewPeerReply, error) {
-	EmptyNewMemberReply := &pb.NewPeerReply{Id: newPeer.Id}
-	srv.logger.Debugf("[%s] Received AddMember", newPeer.Id)
-	srv.mutex.Lock()
-	defer srv.mutex.Unlock()
-	// 1. check if the member with this name already exists
-	for _, peer := range srv.Peers() {
-		if peer.Name == newPeer.NewPeer.Name {
-			return EmptyNewMemberReply, ErrorPeerAlreadyExists
-		}
-	}
-	// Add new member
-	err := srv.Raft().AddPeer(&pb.Peer{
-		Name:    newPeer.NewPeer.Name,
-		Address: newPeer.NewPeer.Address,
-		Port:    newPeer.NewPeer.Port,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return EmptyNewMemberReply, nil
-}
+//
+//func (srv *server) AddMember(ctx context.Context, newPeer *pb.NewPeerRequest) (*pb.NewPeerReply, error) {
+//	EmptyNewMemberReply := &pb.NewPeerReply{Id: newPeer.Id}
+//	srv.logger.Debugf("[%s] Received AddMember", newPeer.Id)
+//	srv.mutex.Lock()
+//	defer srv.mutex.Unlock()
+//	// 1. check if the member with this name already exists
+//	for _, peer := range srv.Peers() {
+//		if peer.Name == newPeer.NewPeer.Name {
+//			return EmptyNewMemberReply, ErrorPeerAlreadyExists
+//		}
+//	}
+//	// Add new member
+//	err := srv.Raft().AddPeer(&pb.Peer{
+//		Name:    newPeer.NewPeer.Name,
+//		Address: newPeer.NewPeer.Address,
+//		Port:    newPeer.NewPeer.Port,
+//	})
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return EmptyNewMemberReply, nil
+//}
 
 func (srv *server) RemovePeer(ctx context.Context, request *pb.RemovePeerRequest) (*pb.RemovePeerReply, error) {
 	EmptyRemovePeerReply := &pb.RemovePeerReply{Id: request.Id}
@@ -99,6 +104,20 @@ func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusR
 var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
 
 func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
+	if srv.Raft().State() != raft.Leader {
+		peerConn, rpcClient, err := rpc.GetPeerConn(srv.Raft().Leader().Address, srv.Raft().Leader().Port)
+		if err != nil {
+			return &pb.StoreCreateReply{}, err
+		}
+		defer func(peerConn *grpc.ClientConn) {
+			err := peerConn.Close()
+			if err != nil {
+				log.Printf("failed to close the connection, error = %v\n", err)
+			}
+		}(peerConn)
+		return rpcClient.CreateStore(ctx, request)
+	}
+
 	srv.logger.Debugf("[%s] [%s] Received request CreateStore id=%v Name=%v, Type=%v",
 		srv.Name(), srv.State(), request.Id, request.Name, request.Type)
 	reply := &pb.StoreCreateReply{}
@@ -204,4 +223,16 @@ func (srv *server) Query(ctx context.Context, request *pb.QueryRequest) (*pb.Que
 
 	resp, err := (srv.StoreManager().Stores()[request.StoreName].(store.SQLStore)).Query(request)
 	return resp, err
+}
+
+func (srv *server) AddPeers(ctx context.Context, peers *pb.AddPeersRequest) (*pb.AddPeersReply, error) {
+	srv.mutex.Lock()
+	defer srv.mutex.Unlock()
+
+	for _, p := range peers.GetPeers() {
+		if p.Name != srv.Name() {
+			srv.Raft().AddPeer(p)
+		}
+	}
+	return &pb.AddPeersReply{}, nil
 }

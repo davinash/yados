@@ -39,13 +39,13 @@ func (suite *YadosTestSuite) TestCmdCreateStoreKV() {
 		suite.T().Fatal(err)
 	}
 	fmt.Println(err)
-
 }
+
 func (suite *YadosTestSuite) TestCmdCreateStoreKVParallel() {
 	storeName := "TestCmdCreateStoreKVParallel"
 	WaitForLeaderElection(suite.cluster)
 	wg := sync.WaitGroup{}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(wg *sync.WaitGroup, index int) {
 			defer wg.Done()

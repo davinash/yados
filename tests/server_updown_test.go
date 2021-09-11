@@ -46,6 +46,6 @@ func (suite *YadosTestSuite) TestRandomServerDown() {
 	if err := performPut(suite.cluster.members[1], 10, storeName, "AfterOneNodeDown"); err != nil {
 		suite.T().Fatal(err)
 	}
-	suite.cluster.members[0].Serve([]*pb.Peer{suite.cluster.members[1].Self(),
-		suite.cluster.members[2].Self()})
+	suite.cluster.members[0].Serve( /*[]*pb.Peer{suite.cluster.members[1].Self(),
+	suite.cluster.members[2].Self()}*/)
 }
