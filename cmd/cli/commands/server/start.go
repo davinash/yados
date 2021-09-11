@@ -40,10 +40,10 @@ yadosctl server start --name Server1 --listen-address 127.0.0.1 --wal-dir /tmp -
 yadosctl server start --name Server1 --listen-address 127.0.0.1 --wal-dir /tmp --port 9191 --log-level info --http-port 8181
 
 ### Starting second server and join the cluster
-yadosctl server start --name server2 --listen-address 127.0.0.1 --wal-dir /tmp --port 9192  --peer server1:127.0.0.1:9191
+yadosctl server start --name server2 --listen-address 127.0.0.1 --wal-dir /tmp --port 9192 --controller 127.0.0.1:9090
 
 ### Starting third server and join the cluster
-yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp --port 9193 --log-level info --peer server1:127.0.0.1:9191 --peer server2:127.0.0.1:9192
+yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp --port 9193 --controller 127.0.0.1:9090
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			oSSignalCh := make(chan os.Signal, 1)
@@ -87,10 +87,6 @@ yadosctl server start --name server3 --listen-address 127.0.0.1 --wal-dir /tmp -
 			"that other server nodes use to connect to the new server")
 
 	cmd.Flags().Int32Var(&srvStartArgs.port, "port", 9191, "Port to use for communication")
-
-	//cmd.Flags().StringSliceVar(&srvStartArgs.peers, "peer", []string{},
-	//	"peer to join <name:ip-address:port>, "+
-	//		"use multiple of this flag if want to join with multiple peers")
 
 	cmd.Flags().StringVar(&srvStartArgs.logLevel, "log-level", "info", "Log level "+
 		"[info|debug|warn|trace|error]")

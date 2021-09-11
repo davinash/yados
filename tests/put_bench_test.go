@@ -58,7 +58,7 @@ func BenchmarkPut(b *testing.B) {
 	WaitForLeaderElection(cluster)
 
 	defer func() {
-		StopCluster(cluster)
+		StopCluster(cluster, nil)
 		Cleanup(walDir)
 	}()
 

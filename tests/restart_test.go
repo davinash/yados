@@ -24,7 +24,7 @@ func (suite *YadosTestSuite) TestRestart() {
 			suite.T().Fatal(err)
 		}
 	}
-	StopCluster(suite.cluster)
+	StopCluster(suite.cluster, suite.controller)
 
 	suite.cluster = &TestCluster{
 		members:      make([]server.Server, 0),

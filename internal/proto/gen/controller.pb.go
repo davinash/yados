@@ -7,11 +7,10 @@
 package gen
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -106,6 +105,91 @@ func (*RegisterReply) Descriptor() ([]byte, []int) {
 	return file_controller_proto_rawDescGZIP(), []int{1}
 }
 
+type GetLeaderRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *GetLeaderRequest) Reset() {
+	*x = GetLeaderRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_controller_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetLeaderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLeaderRequest) ProtoMessage() {}
+
+func (x *GetLeaderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLeaderRequest.ProtoReflect.Descriptor instead.
+func (*GetLeaderRequest) Descriptor() ([]byte, []int) {
+	return file_controller_proto_rawDescGZIP(), []int{2}
+}
+
+type GetLeaderReply struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Leader *Peer `protobuf:"bytes,1,opt,name=leader,proto3" json:"leader,omitempty"`
+}
+
+func (x *GetLeaderReply) Reset() {
+	*x = GetLeaderReply{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_controller_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetLeaderReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLeaderReply) ProtoMessage() {}
+
+func (x *GetLeaderReply) ProtoReflect() protoreflect.Message {
+	mi := &file_controller_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLeaderReply.ProtoReflect.Descriptor instead.
+func (*GetLeaderReply) Descriptor() ([]byte, []int) {
+	return file_controller_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetLeaderReply) GetLeader() *Peer {
+	if x != nil {
+		return x.Leader
+	}
+	return nil
+}
+
 var File_controller_proto protoreflect.FileDescriptor
 
 var file_controller_proto_rawDesc = []byte{
@@ -115,12 +199,19 @@ var file_controller_proto_rawDesc = []byte{
 	0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x06, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x0b, 0x32, 0x05, 0x2e, 0x50, 0x65, 0x65, 0x72, 0x52, 0x06, 0x73, 0x65, 0x72, 0x76,
 	0x65, 0x72, 0x22, 0x0f, 0x0a, 0x0d, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65,
-	0x70, 0x6c, 0x79, 0x32, 0x41, 0x0a, 0x11, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x6c, 0x65,
-	0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x2c, 0x0a, 0x08, 0x52, 0x65, 0x67, 0x69,
-	0x73, 0x74, 0x65, 0x72, 0x12, 0x10, 0x2e, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0e, 0x2e, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65,
-	0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x42, 0x06, 0x5a, 0x04, 0x2f, 0x67, 0x65, 0x6e, 0x62, 0x06,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x70, 0x6c, 0x79, 0x22, 0x12, 0x0a, 0x10, 0x47, 0x65, 0x74, 0x4c, 0x65, 0x61, 0x64, 0x65, 0x72,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x2f, 0x0a, 0x0e, 0x47, 0x65, 0x74, 0x4c, 0x65,
+	0x61, 0x64, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x1d, 0x0a, 0x06, 0x6c, 0x65, 0x61,
+	0x64, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x05, 0x2e, 0x50, 0x65, 0x65, 0x72,
+	0x52, 0x06, 0x6c, 0x65, 0x61, 0x64, 0x65, 0x72, 0x32, 0x72, 0x0a, 0x11, 0x43, 0x6f, 0x6e, 0x74,
+	0x72, 0x6f, 0x6c, 0x6c, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x2c, 0x0a,
+	0x08, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x12, 0x10, 0x2e, 0x52, 0x65, 0x67, 0x69,
+	0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0e, 0x2e, 0x52, 0x65,
+	0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x2f, 0x0a, 0x09, 0x47,
+	0x65, 0x74, 0x4c, 0x65, 0x61, 0x64, 0x65, 0x72, 0x12, 0x11, 0x2e, 0x47, 0x65, 0x74, 0x4c, 0x65,
+	0x61, 0x64, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0f, 0x2e, 0x47, 0x65,
+	0x74, 0x4c, 0x65, 0x61, 0x64, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x42, 0x06, 0x5a, 0x04,
+	0x2f, 0x67, 0x65, 0x6e, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -135,21 +226,26 @@ func file_controller_proto_rawDescGZIP() []byte {
 	return file_controller_proto_rawDescData
 }
 
-var file_controller_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_controller_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_controller_proto_goTypes = []interface{}{
-	(*RegisterRequest)(nil), // 0: RegisterRequest
-	(*RegisterReply)(nil),   // 1: RegisterReply
-	(*Peer)(nil),            // 2: Peer
+	(*RegisterRequest)(nil),  // 0: RegisterRequest
+	(*RegisterReply)(nil),    // 1: RegisterReply
+	(*GetLeaderRequest)(nil), // 2: GetLeaderRequest
+	(*GetLeaderReply)(nil),   // 3: GetLeaderReply
+	(*Peer)(nil),             // 4: Peer
 }
 var file_controller_proto_depIdxs = []int32{
-	2, // 0: RegisterRequest.server:type_name -> Peer
-	0, // 1: ControllerService.Register:input_type -> RegisterRequest
-	1, // 2: ControllerService.Register:output_type -> RegisterReply
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	4, // 0: RegisterRequest.server:type_name -> Peer
+	4, // 1: GetLeaderReply.leader:type_name -> Peer
+	0, // 2: ControllerService.Register:input_type -> RegisterRequest
+	2, // 3: ControllerService.GetLeader:input_type -> GetLeaderRequest
+	1, // 4: ControllerService.Register:output_type -> RegisterReply
+	3, // 5: ControllerService.GetLeader:output_type -> GetLeaderReply
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_controller_proto_init() }
@@ -183,6 +279,30 @@ func file_controller_proto_init() {
 				return nil
 			}
 		}
+		file_controller_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetLeaderRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_controller_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetLeaderReply); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -190,7 +310,7 @@ func file_controller_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_controller_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

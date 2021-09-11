@@ -124,7 +124,7 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 }
 
 //StopCluster To stop the cluster ( Only for Test Purpose )
-func StopCluster(cluster *TestCluster) {
+func StopCluster(cluster *TestCluster, controller *controller.Controller) {
 	var wg sync.WaitGroup
 	for _, srv := range cluster.members {
 		wg.Add(1)
@@ -139,6 +139,7 @@ func StopCluster(cluster *TestCluster) {
 		}(&wg, srv)
 	}
 	wg.Wait()
+	controller.Stop()
 }
 
 func SetupDataDirectory() string {
@@ -194,7 +195,7 @@ func Cleanup(walDir string) {
 
 func (suite *YadosTestSuite) TearDownTest() {
 	suite.T().Log("Running TearDownTest")
-	StopCluster(suite.cluster)
+	StopCluster(suite.cluster, suite.controller)
 	Cleanup(suite.walDir)
 }
 

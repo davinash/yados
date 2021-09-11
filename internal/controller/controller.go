@@ -3,10 +3,12 @@ package controller
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"log"
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/davinash/yados/internal/rpc"
 
@@ -27,11 +29,15 @@ type Controller struct {
 
 	members map[string]*pb.Peer
 	mutex   sync.Mutex
+	leader  *pb.Peer
+	wg      sync.WaitGroup
+	quit    chan interface{}
 }
 
 //NewController create new instance of controller
 func NewController(address string, port int32, loglevel string) *Controller {
 	controller := &Controller{
+		quit:       make(chan interface{}),
 		grpcServer: grpc.NewServer(),
 		address:    address,
 		port:       port,
@@ -91,12 +97,55 @@ func (c *Controller) Start() {
 			panic(err)
 		}
 	}()
+
+	c.wg.Add(1)
+	go func() {
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		defer c.wg.Done()
+		for {
+			select {
+			case <-c.quit:
+				return
+			case <-ticker.C:
+				for _, m := range c.members {
+					if c.IsLeader(m) {
+						c.mutex.Lock()
+						c.leader = m
+						c.mutex.Unlock()
+					}
+				}
+			}
+		}
+	}()
 }
 
 //Stop method to stop the controller
 func (c *Controller) Stop() error {
+	close(c.quit)
 	c.grpcServer.Stop()
+	c.wg.Wait()
 	return nil
+}
+
+func (c *Controller) IsLeader(member *pb.Peer) bool {
+	peerConn, rpcClient, err := rpc.GetPeerConn(member.Address, member.Port)
+	if err != nil {
+		return false
+	}
+	defer func(peerConn *grpc.ClientConn) {
+		err := peerConn.Close()
+		if err != nil {
+			c.logger.Warnf("failed to close the connection, error = %v\n", err)
+		}
+	}(peerConn)
+	request := &pb.StatusRequest{}
+	request.Id = uuid.New().String()
+	reply, err := rpcClient.PeerStatus(context.Background(), request)
+	if err != nil {
+		return false
+	}
+	return reply.IsLeader
 }
 
 //Register perform the registration activity
@@ -144,5 +193,14 @@ func (c *Controller) Register(ctx context.Context, request *pb.RegisterRequest) 
 		}(peerConn)
 	}
 
+	return reply, nil
+}
+
+//GetLeader returns the leader in the cluster at this point of time
+func (c *Controller) GetLeader(ctx context.Context, request *pb.GetLeaderRequest) (*pb.GetLeaderReply, error) {
+	reply := &pb.GetLeaderReply{}
+	c.mutex.Lock()
+	reply.Leader = c.leader
+	c.mutex.Unlock()
 	return reply, nil
 }

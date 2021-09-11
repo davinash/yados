@@ -214,7 +214,7 @@ func (r *raft) Start() {
 	go r.commitChanSender()
 
 	go func() {
-		ticker := time.NewTicker(10 * time.Millisecond)
+		ticker := time.NewTicker(5 * time.Millisecond)
 		defer ticker.Stop()
 		for {
 			select {
@@ -222,12 +222,23 @@ func (r *raft) Start() {
 				return
 			case <-ticker.C:
 				if len(r.peers) >= 2 {
+					r.logger.Debugf("[%s] Number of Peers = %d", r.Server().Name, len(r.peers))
 					close(r.ready)
 					return
 				}
 			}
 		}
 	}()
+}
+
+func (r *raft) AddPeer(newPeer *pb.Peer) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.logger.Debugf("[%s] Adding new Peer [%s:%s:%d]", r.Server().Name,
+		newPeer.Name, newPeer.Address, newPeer.Port)
+	if _, ok := r.peers[newPeer.Name]; !ok {
+		r.peers[newPeer.Name] = newPeer
+	}
 }
 
 func (r *raft) Stop() {
@@ -319,14 +330,6 @@ func (r *raft) SetLeader(leader *pb.Peer) {
 	r.leader = leader
 }
 
-func (r *raft) AddPeer(newPeer *pb.Peer) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	if _, ok := r.peers[newPeer.Name]; !ok {
-		r.peers[newPeer.Name] = newPeer
-	}
-}
-
 func (r *raft) RemovePeer(request *pb.RemovePeerRequest) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -362,7 +365,6 @@ func (r *raft) RemoveSelf() error {
 
 func (r *raft) electionTimeout() time.Duration {
 	t := time.Duration(150+rand.Intn(150)) * time.Millisecond
-	r.logger.Debugf("[%s] XXXX Election Timeout = %v", r.Server().Name, t)
 	return t
 }
 
@@ -371,7 +373,6 @@ func (r *raft) runElectionTimer() {
 	r.mutex.Lock()
 	termStarted := r.currentTerm
 	r.mutex.Unlock()
-	r.logger.Debugf("[%s] election timer started (%v), term=%d", r.Server().Name, timeoutDuration, termStarted)
 
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
@@ -714,7 +715,6 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	}
 
 	if request.Term == r.currentTerm {
-		r.logger.Debugf("[%s] XXXXX Received AppendEntry From [%s]", r.Server().Name, request.Leader.Name)
 		if r.state != Follower {
 			r.becomeFollower(request.Term)
 		}
@@ -849,7 +849,6 @@ func (r *raft) becomeFollower(term int64) {
 	go func() {
 		defer r.wg.Done()
 		r.runElectionTimer()
-		r.logger.Debug("runElectionTimer::becomeFollower")
 	}()
 }
 
