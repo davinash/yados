@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/davinash/yados/internal/server"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/raft"
 )
 
 func (suite *YadosTestSuite) TestController() {
-	_ = WaitForLeaderElection(suite.cluster)
+	_, err := server.GetLeader(suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
+	if err != nil {
+		suite.T().Fatalf("server.GetLeader failed, error = %v", err)
+	}
 
 	for _, m := range suite.cluster.members {
 		if m.Raft().IsRunning() == false {
@@ -48,7 +53,10 @@ func (suite *YadosTestSuite) TestController() {
 }
 
 func (suite *YadosTestSuite) TestControllerLeader() {
-	_ = WaitForLeaderElection(suite.cluster)
+	_, err := server.GetLeader(suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
+	if err != nil {
+		suite.T().Fatalf("server.GetLeader failed, error = %v", err)
+	}
 
 	time.Sleep(20 * time.Millisecond)
 	leader, err := suite.controller.GetLeader(context.Background(), &pb.GetLeaderRequest{})
@@ -65,17 +73,18 @@ func (suite *YadosTestSuite) TestControllerLeader() {
 		}
 	}
 
-	_ = WaitForLeaderElection(suite.cluster)
-	for i := 0; i < 5; i++ {
-		leader1, err := suite.controller.GetLeader(context.Background(), &pb.GetLeaderRequest{})
-		if err != nil {
-			return
-		}
-		fmt.Println(leader.Leader.Name, leader1.Leader.Name)
-		if leader.Leader.Name == leader1.Leader.Name && i == 4 {
-			suite.T().Fatalf("Leader should have changed")
-		}
-		time.Sleep(10 * time.Millisecond)
+TrayAgain:
+	leader1, err := suite.controller.GetLeader(context.Background(), &pb.GetLeaderRequest{})
+	if err != nil {
+		return
 	}
-
+	if leader1.Leader == nil {
+		time.Sleep(10 * time.Millisecond)
+		goto TrayAgain
+	}
+	fmt.Println(leader.Leader.Name, leader1.Leader.Name)
+	if leader.Leader.Name == leader1.Leader.Name {
+		suite.T().Fatalf("Leader should have changed")
+	}
+	time.Sleep(10 * time.Millisecond)
 }

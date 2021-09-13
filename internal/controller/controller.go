@@ -84,6 +84,17 @@ func (c *Controller) SetLogLevel(loglevel string) {
 	}
 }
 
+func (c *Controller) findLeader() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	for _, m := range c.members {
+		if c.IsLeader(m) {
+			c.leader = m
+			break
+		}
+	}
+}
+
 //Start method to start the controller
 func (c *Controller) Start() {
 	c.logger.Infof("Starting a controller on [%s:%d]", c.address, c.port)
@@ -109,13 +120,7 @@ func (c *Controller) Start() {
 			case <-c.quit:
 				return
 			case <-ticker.C:
-				for _, m := range c.members {
-					if c.IsLeader(m) {
-						c.mutex.Lock()
-						c.leader = m
-						c.mutex.Unlock()
-					}
-				}
+				c.findLeader()
 			}
 		}
 	}()
@@ -205,4 +210,18 @@ func (c *Controller) GetLeader(ctx context.Context, request *pb.GetLeaderRequest
 	reply.Leader = c.leader
 	c.mutex.Unlock()
 	return reply, nil
+}
+
+//UnRegister function to unregister the member from the cluster
+func (c *Controller) UnRegister(ctx context.Context, request *pb.UnRegisterRequest) (*pb.UnRegisterReply, error) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if _, ok := c.members[request.Server.Name]; !ok {
+		return &pb.UnRegisterReply{}, nil
+	}
+	c.leader = nil
+	delete(c.members, request.Server.Name)
+
+	return &pb.UnRegisterReply{}, nil
 }

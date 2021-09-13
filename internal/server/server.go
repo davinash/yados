@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -177,8 +178,8 @@ func (srv *server) Serve() error {
 			srv.logger.Warnf("[%s] Failed to close the connection, Error = %v", srv.Name(), err)
 		}
 	}
-	srv.StartHTTPServer()
 
+	srv.StartHTTPServer()
 	srv.raft.Start()
 	srv.logger.Infof("Started Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
 
@@ -276,6 +277,7 @@ func (srv *server) SetLogLevel(level string) {
 
 func (srv *server) Stop() error {
 	srv.logger.Infof("Stopping Server %s on [%s:%d]", srv.Name(), srv.Address(), srv.Port())
+
 	err := srv.StopHTTPServer()
 	if err != nil {
 		return err
@@ -287,6 +289,25 @@ func (srv *server) Stop() error {
 		srv.logger.Errorf("failed to stop grpc server, Error = %v", err)
 		return err
 	}
+
+	for _, controller := range srv.Controller() {
+		srv.logger.Debugf("[%s] UnRegistration with controller", srv.Name())
+		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", controller.address, controller.port), grpc.WithInsecure())
+		if err != nil {
+			return fmt.Errorf("[%s] failed to connect with controller[%s:%d], "+
+				"error = %w", srv.Name(), controller.address, controller.port, err)
+		}
+		controller := pb.NewControllerServiceClient(conn)
+		_, err = controller.UnRegister(context.Background(), &pb.UnRegisterRequest{Server: srv.self})
+		if err != nil {
+			return err
+		}
+		err = conn.Close()
+		if err != nil {
+			srv.logger.Warnf("[%s] Failed to close the connection, Error = %v", srv.Name(), err)
+		}
+	}
+	time.Sleep(10 * time.Millisecond)
 
 	err = srv.StoreManager().Close()
 	if err != nil {

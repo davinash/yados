@@ -27,26 +27,25 @@ func performPut(srv server.Server, numOfPuts int, storeName string, prefix strin
 	return nil
 }
 
-//
-//func (suite *YadosTestSuite) TestRandomServerDown() {
-//	storeName := "TestRandomServerDown"
-//	//WaitForLeaderElection(suite.cluster)
-//
-//	if _, err := createStore(suite.cluster.members[0], storeName); err != nil {
-//		suite.T().Fatal(err)
-//	}
-//	if err := performPut(suite.cluster.members[0], 10, storeName, "BeforeRestart"); err != nil {
-//		suite.T().Fatal(err)
-//	}
-//	// Let's stop Server
-//	err := suite.cluster.members[0].Stop()
-//	if err != nil {
-//		suite.T().Fatal(err)
-//	}
-//	//WaitForLeaderElection(suite.cluster)
-//	if err := performPut(suite.cluster.members[1], 10, storeName, "AfterOneNodeDown"); err != nil {
-//		suite.T().Fatal(err)
-//	}
-//	//suite.cluster.members[0].Serve( /*[]*pb.Peer{suite.cluster.members[1].Self(),
-//	//suite.cluster.members[2].Self()}*/)
-//}
+func (suite *YadosTestSuite) TestRandomServerDown() {
+	storeName := "TestRandomServerDown"
+	//WaitForLeaderElection(suite.cluster)
+
+	if _, err := createStore(suite.cluster.members[0], storeName); err != nil {
+		suite.T().Fatal(err)
+	}
+	if err := performPut(suite.cluster.members[0], 10, storeName, "BeforeRestart"); err != nil {
+		suite.T().Fatal(err)
+	}
+	// Let's stop Server
+	err := suite.cluster.members[0].Stop()
+	if err != nil {
+		suite.T().Fatal(err)
+	}
+	//WaitForLeaderElection(suite.cluster)
+	if err := performPut(suite.cluster.members[1], 10, storeName, "AfterOneNodeDown"); err != nil {
+		suite.T().Fatal(err)
+	}
+	//suite.cluster.members[0].Serve( /*[]*pb.Peer{suite.cluster.members[1].Self(),
+	//suite.cluster.members[2].Self()}*/)
+}

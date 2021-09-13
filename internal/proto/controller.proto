@@ -10,8 +10,15 @@ message RegisterRequest {
 message RegisterReply {
 }
 
+message UnRegisterRequest {
+  Peer server = 1;
+}
+
+message UnRegisterReply {
+}
 
 service ControllerService {
   rpc Register(RegisterRequest) returns (RegisterReply);
+  rpc UnRegister(UnRegisterRequest) returns (UnRegisterReply);
   rpc GetLeader(GetLeaderRequest) returns (GetLeaderReply);
 }

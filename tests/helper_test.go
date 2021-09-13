@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 	"testing"
 
@@ -167,26 +166,27 @@ func (suite *YadosTestSuite) SetupTest() {
 }
 
 func WaitForLeaderElection(cluster *TestCluster) *pb.Peer {
-	for _, s := range cluster.members {
-		s.EventHandler().LeaderChangeChan = make(chan interface{})
-	}
-	defer func() {
-		for _, s := range cluster.members {
-			close(s.EventHandler().LeaderChangeChan)
-			s.EventHandler().LeaderChangeChan = nil
-		}
-	}()
-
-	var set []reflect.SelectCase
-	for _, s := range cluster.members {
-		set = append(set, reflect.SelectCase{
-			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(s.EventHandler().LeaderChangeChan),
-		})
-	}
-	_, valValue, _ := reflect.Select(set)
-	peer := valValue.Interface().(*pb.Peer)
-	return peer
+	return nil
+	//for _, s := range cluster.members {
+	//	s.EventHandler().LeaderChangeChan = make(chan interface{})
+	//}
+	//defer func() {
+	//	for _, s := range cluster.members {
+	//		close(s.EventHandler().LeaderChangeChan)
+	//		s.EventHandler().LeaderChangeChan = nil
+	//	}
+	//}()
+	//
+	//var set []reflect.SelectCase
+	//for _, s := range cluster.members {
+	//	set = append(set, reflect.SelectCase{
+	//		Dir:  reflect.SelectRecv,
+	//		Chan: reflect.ValueOf(s.EventHandler().LeaderChangeChan),
+	//	})
+	//}
+	//_, valValue, _ := reflect.Select(set)
+	//peer := valValue.Interface().(*pb.Peer)
+	//return peer
 }
 
 func Cleanup(walDir string) {
