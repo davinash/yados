@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+
 	"github.com/davinash/yados/internal/server"
 )
 

@@ -129,6 +129,7 @@ func (c *Controller) Stop() error {
 	return nil
 }
 
+//IsLeader helper function to get the leader
 func (c *Controller) IsLeader(member *pb.Peer) bool {
 	peerConn, rpcClient, err := rpc.GetPeerConn(member.Address, member.Port)
 	if err != nil {

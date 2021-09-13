@@ -2,9 +2,10 @@ package server
 
 import (
 	"context"
-	"github.com/davinash/yados/internal/rpc"
 	"log"
 	"time"
+
+	"github.com/davinash/yados/internal/rpc"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/grpc"
