@@ -5,12 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-
-	"github.com/davinash/yados/internal/rpc"
-	"google.golang.org/grpc"
-
 	"github.com/davinash/yados/internal/store"
+	"google.golang.org/grpc"
 
 	"github.com/davinash/yados/internal/raft"
 
@@ -104,19 +100,19 @@ func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusR
 var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
 
 func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
-	if srv.Raft().State() != raft.Leader {
-		peerConn, rpcClient, err := rpc.GetPeerConn(srv.Raft().Leader().Address, srv.Raft().Leader().Port)
-		if err != nil {
-			return &pb.StoreCreateReply{}, err
-		}
-		defer func(peerConn *grpc.ClientConn) {
-			err := peerConn.Close()
-			if err != nil {
-				log.Printf("failed to close the connection, error = %v\n", err)
-			}
-		}(peerConn)
-		return rpcClient.CreateStore(ctx, request)
-	}
+	//if srv.Raft().State() != raft.Leader {
+	//	peerConn, rpcClient, err := rpc.GetPeerConn(srv.Raft().Leader().Address, srv.Raft().Leader().Port)
+	//	if err != nil {
+	//		return &pb.StoreCreateReply{}, err
+	//	}
+	//	defer func(peerConn *grpc.ClientConn) {
+	//		err := peerConn.Close()
+	//		if err != nil {
+	//			log.Printf("failed to close the connection, error = %v\n", err)
+	//		}
+	//	}(peerConn)
+	//	return rpcClient.CreateStore(ctx, request)
+	//}
 
 	srv.logger.Debugf("[%s] [%s] Received request CreateStore id=%v Name=%v, Type=%v",
 		srv.Name(), srv.State(), request.Id, request.Name, request.Type)
@@ -235,4 +231,26 @@ func (srv *server) AddPeers(ctx context.Context, peers *pb.AddPeersRequest) (*pb
 		}
 	}
 	return &pb.AddPeersReply{}, nil
+}
+
+func (srv *server) GetLeader(ctx context.Context, request *pb.GetLeaderRequest) (*pb.GetLeaderReply, error) {
+	controllers := srv.Controller()
+
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", controllers[0].address, controllers[0].port), grpc.WithInsecure())
+	if err != nil {
+		return &pb.GetLeaderReply{}, fmt.Errorf("failed to connect with controller[%s:%d], "+
+			"error = %w", controllers[0].address, controllers[0].port, err)
+	}
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			srv.logger.Warnf("failed to close the connection with controller, Error = %v", err)
+		}
+	}(conn)
+	controller := pb.NewControllerServiceClient(conn)
+	leader, err := controller.GetLeader(ctx, request)
+	if err != nil {
+		return &pb.GetLeaderReply{}, err
+	}
+	return leader, nil
 }

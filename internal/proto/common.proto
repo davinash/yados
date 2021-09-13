@@ -6,3 +6,11 @@ message Peer {
   string address = 2;
   int32  port = 3;
 }
+
+
+message GetLeaderRequest{
+}
+
+message GetLeaderReply{
+  Peer leader = 1;
+}

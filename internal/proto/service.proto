@@ -218,4 +218,5 @@ service YadosService {
   rpc DeleteStore(StoreDeleteRequest) returns (StoreDeleteReply) {}
   rpc ExecuteQuery(ExecuteQueryRequest) returns (ExecuteQueryReply) {}
   rpc Query(QueryRequest) returns (QueryReply) {}
+  rpc GetLeader(GetLeaderRequest) returns ( GetLeaderReply) {}
 }

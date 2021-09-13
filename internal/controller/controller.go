@@ -3,12 +3,13 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"log"
 	"net"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/davinash/yados/internal/rpc"
 

@@ -781,7 +781,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 }
 
 //ErrorNotALeader error returned where no server leader
-var ErrorNotALeader = errors.New("now a leader")
+var ErrorNotALeader = errors.New("not a leader")
 
 func (r *raft) submit(command interface{}, commandID string, cmdType pb.CommandType) error {
 	r.mutex.Lock()

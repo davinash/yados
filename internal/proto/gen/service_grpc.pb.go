@@ -31,6 +31,7 @@ type YadosServiceClient interface {
 	DeleteStore(ctx context.Context, in *StoreDeleteRequest, opts ...grpc.CallOption) (*StoreDeleteReply, error)
 	ExecuteQuery(ctx context.Context, in *ExecuteQueryRequest, opts ...grpc.CallOption) (*ExecuteQueryReply, error)
 	Query(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*QueryReply, error)
+	GetLeader(ctx context.Context, in *GetLeaderRequest, opts ...grpc.CallOption) (*GetLeaderReply, error)
 }
 
 type yadosServiceClient struct {
@@ -158,6 +159,15 @@ func (c *yadosServiceClient) Query(ctx context.Context, in *QueryRequest, opts .
 	return out, nil
 }
 
+func (c *yadosServiceClient) GetLeader(ctx context.Context, in *GetLeaderRequest, opts ...grpc.CallOption) (*GetLeaderReply, error) {
+	out := new(GetLeaderReply)
+	err := c.cc.Invoke(ctx, "/YadosService/GetLeader", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
@@ -175,6 +185,7 @@ type YadosServiceServer interface {
 	DeleteStore(context.Context, *StoreDeleteRequest) (*StoreDeleteReply, error)
 	ExecuteQuery(context.Context, *ExecuteQueryRequest) (*ExecuteQueryReply, error)
 	Query(context.Context, *QueryRequest) (*QueryReply, error)
+	GetLeader(context.Context, *GetLeaderRequest) (*GetLeaderReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -220,6 +231,9 @@ func (UnimplementedYadosServiceServer) ExecuteQuery(context.Context, *ExecuteQue
 }
 func (UnimplementedYadosServiceServer) Query(context.Context, *QueryRequest) (*QueryReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Query not implemented")
+}
+func (UnimplementedYadosServiceServer) GetLeader(context.Context, *GetLeaderRequest) (*GetLeaderReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLeader not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -468,6 +482,24 @@ func _YadosService_Query_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_GetLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLeaderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).GetLeader(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/GetLeader",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).GetLeader(ctx, req.(*GetLeaderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -526,6 +558,10 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Query",
 			Handler:    _YadosService_Query_Handler,
+		},
+		{
+			MethodName: "GetLeader",
+			Handler:    _YadosService_GetLeader_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

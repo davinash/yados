@@ -2,9 +2,9 @@ package server
 
 import (
 	"context"
-	"log"
-
 	"github.com/davinash/yados/internal/rpc"
+	"log"
+	"time"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"google.golang.org/grpc"
@@ -23,19 +23,14 @@ func GetLeader(address string, port int32) (*pb.Peer, error) {
 		}
 	}(peerConn)
 
-	clusterStatus, err1 := rpcClient.ClusterStatus(context.Background(), &pb.ClusterStatusRequest{})
-	if err1 != nil {
-		return &pb.Peer{}, err1
+TryLeaderQueryAgain:
+	leader, err := rpcClient.GetLeader(context.Background(), &pb.GetLeaderRequest{})
+	if err != nil {
+		return nil, err
 	}
-
-	for _, peer := range clusterStatus.PeerStatus {
-		if peer.IsLeader {
-			return &pb.Peer{
-				Address: peer.Server.Address,
-				Port:    peer.Server.Port,
-			}, nil
-		}
+	if leader.Leader == nil {
+		time.Sleep(10 * time.Millisecond)
+		goto TryLeaderQueryAgain
 	}
-
-	return &pb.Peer{}, nil
+	return leader.Leader, nil
 }

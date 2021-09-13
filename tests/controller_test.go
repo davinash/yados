@@ -3,9 +3,10 @@ package tests
 import (
 	"context"
 	"fmt"
+	"time"
+
 	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/raft"
-	"time"
 )
 
 func (suite *YadosTestSuite) TestController() {

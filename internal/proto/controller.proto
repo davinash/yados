@@ -10,12 +10,6 @@ message RegisterRequest {
 message RegisterReply {
 }
 
-message GetLeaderRequest{
-}
-
-message GetLeaderReply{
-  Peer leader = 1;
-}
 
 service ControllerService {
   rpc Register(RegisterRequest) returns (RegisterReply);
