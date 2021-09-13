@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"github.com/davinash/yados/internal/controller"
 
 	"github.com/davinash/yados/internal/server"
 )
@@ -30,7 +31,10 @@ func (suite *YadosTestSuite) TestRestart() {
 		members:      make([]server.Server, 0),
 		numOfServers: 3,
 	}
-	err = CreateNewClusterEx(3, suite.cluster, suite.walDir, "debug", nil)
+	ports := GetFreePorts(1)
+	suite.controller = controller.NewController("127.0.0.1", int32(ports[0]), "debug")
+	suite.controller.Start()
+	err = CreateNewClusterEx(3, suite.cluster, suite.walDir, "debug", suite.controller)
 	if err != nil {
 		return
 	}
