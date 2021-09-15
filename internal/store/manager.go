@@ -52,7 +52,7 @@ type Manager interface {
 }
 
 type manager struct {
-	mutex  sync.Mutex
+	mutex  sync.RWMutex
 	stores map[string]Store
 	logger *logrus.Logger
 	walDir string
@@ -84,7 +84,7 @@ func (sm *manager) Create(request *pb.StoreCreateRequest) error {
 		sm.Stores()[request.Name] = s
 	} else if request.Type == pb.StoreType_Memory {
 		s := NewStore(request.Name)
-		sm.Stores()[request.Name] = s
+		sm.stores[request.Name] = s
 	} else {
 		return fmt.Errorf("type not supported by store")
 	}
@@ -101,6 +101,8 @@ func (sm *manager) Delete(request *pb.StoreDeleteRequest) error {
 }
 
 func (sm *manager) Stores() map[string]Store {
+	//sm.mutex.RLock()
+	//defer sm.mutex.RUnlock()
 	return sm.stores
 }
 

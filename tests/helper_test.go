@@ -11,8 +11,6 @@ import (
 
 	"github.com/davinash/yados/internal/controller"
 
-	"github.com/davinash/yados/internal/raft"
-
 	"github.com/davinash/yados/internal/server"
 	"github.com/stretchr/testify/suite"
 )
@@ -123,11 +121,9 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 //StopCluster To stop the cluster ( Only for Test Purpose )
 func StopCluster(cluster *TestCluster, controller *controller.Controller) {
 	for _, srv := range cluster.members {
-		if srv.State() != raft.Dead {
-			err := srv.Stop()
-			if err != nil {
-				log.Printf("StopCluster -> %v", err)
-			}
+		err := srv.Stop()
+		if err != nil {
+			log.Printf("StopCluster -> %v", err)
 		}
 	}
 	controller.Stop()

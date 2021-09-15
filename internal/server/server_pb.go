@@ -45,9 +45,10 @@ func (srv *server) PeerStatus(ctx context.Context, request *pb.StatusRequest) (*
 		Id:       request.Id,
 		IsLeader: false,
 	}
+
 	reply.Server = srv.Self()
-	reply.Status = srv.State().String()
-	if srv.State() == raft.Leader {
+	reply.Status = srv.Raft().State().String()
+	if srv.Raft().State() == raft.Leader {
 		reply.IsLeader = true
 	}
 	return reply, nil

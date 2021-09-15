@@ -76,8 +76,9 @@ type Raft interface {
 }
 
 type raft struct {
-	mutex sync.Mutex
-	peers map[string]*pb.Peer
+	mutex    sync.Mutex
+	stateMtx sync.RWMutex
+	peers    map[string]*pb.Peer
 
 	// Persistent Raft state on all servers
 	currentTerm int64
@@ -143,7 +144,7 @@ func NewRaft(args *Args) (Raft, error) {
 	}
 
 	r.peers = make(map[string]*pb.Peer)
-	r.state = Follower
+	r.SetState(Follower)
 	r.commitIndex = -1
 	r.lastApplied = -1
 	r.nextIndex = make(map[string]int64)
@@ -201,7 +202,6 @@ func (r *raft) InitializeFromStorage() error {
 func (r *raft) Start() {
 	go func() {
 		<-r.ready
-		r.isRunning = true
 		r.mutex.Lock()
 		r.electionResetEvent = time.Now()
 		r.mutex.Unlock()
@@ -209,21 +209,6 @@ func (r *raft) Start() {
 	}()
 	go r.commitChanSender()
 
-	go func() {
-		ticker := time.NewTicker(5 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-r.quit:
-				return
-			case <-ticker.C:
-				if len(r.peers) >= 2 {
-					close(r.ready)
-					return
-				}
-			}
-		}
-	}()
 }
 
 func (r *raft) AddPeer(newPeer *pb.Peer) {
@@ -235,18 +220,22 @@ func (r *raft) AddPeer(newPeer *pb.Peer) {
 			newPeer.Name, newPeer.Address, newPeer.Port)
 		r.peers[newPeer.Name] = newPeer
 	}
+
+	if !r.isRunning && len(r.peers) >= 2 {
+		close(r.ready)
+		r.isRunning = true
+	}
 }
 
 func (r *raft) Stop() {
 	r.logger.Debugf("[%s] Stopping Raft Instance", r.server.Name)
-	if r.state == Dead {
+	if r.State() == Dead {
 		return
 	}
 	close(r.quit)
 	r.wg.Wait()
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.state = Dead
+
+	r.SetState(Dead)
 
 	r.logger.Debugf("[%s] Stopped Raft Instance", r.server.Name)
 }
@@ -275,7 +264,15 @@ func (r *raft) Log() []*pb.WalEntry {
 }
 
 func (r *raft) State() State {
+	r.stateMtx.RLock()
+	defer r.stateMtx.RUnlock()
 	return r.state
+}
+
+func (r *raft) SetState(state State) {
+	r.stateMtx.Lock()
+	defer r.stateMtx.Unlock()
+	r.state = state
 }
 
 func (r *raft) Peers() map[string]*pb.Peer {
@@ -354,7 +351,7 @@ func (r *raft) runElectionTimer() {
 func (r *raft) startOrIgnoreElection(termStarted int64, timeoutDuration time.Duration) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	if r.state != Candidate && r.state != Follower {
+	if r.State() != Candidate && r.State() != Follower {
 		return
 	}
 	if termStarted != r.currentTerm {
@@ -372,7 +369,7 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if r.state != Candidate {
+	if r.State() != Candidate {
 		return
 	}
 
@@ -394,7 +391,7 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 
 func (r *raft) startElection() {
 	// Make yourself candidate
-	r.state = Candidate
+	r.SetState(Candidate)
 	// Increase the current term
 	r.currentTerm++
 	savedCurrentTerm := r.currentTerm
@@ -450,7 +447,7 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if r.state == Dead {
+	if r.State() == Dead {
 		return EmptyVoteReply, nil
 	}
 	lastLogIndex, lastLogTerm := r.lastLogIndexAndTerm()
@@ -493,7 +490,7 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 }
 
 func (r *raft) startLeader() {
-	r.state = Leader
+	r.SetState(Leader)
 
 	if r.IsTestMode() {
 		if r.ev.LeaderChangeChan != nil {
@@ -540,7 +537,7 @@ func (r *raft) startLeader() {
 				t.Reset(heartbeatTimeout)
 			}
 			if doSend {
-				if r.state != Leader {
+				if r.State() != Leader {
 					return
 				}
 				r.leaderSendAEs()
@@ -559,7 +556,7 @@ func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb
 		r.becomeFollower(reply.Term)
 		return
 	}
-	if r.state == Leader && savedCurrentTerm == reply.Term {
+	if r.State() == Leader && savedCurrentTerm == reply.Term {
 		if reply.Success {
 			r.nextIndex[peer.Name] = ni + int64(len(entries))
 			r.matchIndex[peer.Name] = r.nextIndex[peer.Name] - 1
@@ -663,21 +660,21 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	reply := &pb.AppendEntryReply{Id: request.Id}
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	if r.state == Dead {
+	if r.State() == Dead {
 		return reply, nil
 	}
 
-	r.logger.Debugf("[%s][%s][%s] Received AppendEntries from [%s], current Term = %v", r.Server().Name, r.state,
+	r.logger.Debugf("[%s][%s][%s] Received AppendEntries from [%s], current Term = %v", r.Server().Name, r.State(),
 		request.Id, request.Leader.Name, r.currentTerm)
 
 	if request.Term > r.currentTerm {
 		r.logger.Debugf("[%s][%s][%s] request.Term = %v; currentTerm = %v; term out of date in AppendEntries",
-			r.Server().Name, r.state, request.Id, request.Term, r.currentTerm)
+			r.Server().Name, r.State(), request.Id, request.Term, r.currentTerm)
 		r.becomeFollower(request.Term)
 	}
 
 	if request.Term == r.currentTerm {
-		if r.state != Follower {
+		if r.State() != Follower {
 			r.becomeFollower(request.Term)
 		}
 		r.electionResetEvent = time.Now()
@@ -700,7 +697,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 				newEntriesIndex++
 			}
 			if newEntriesIndex < len(request.Entries) {
-				r.logger.Debugf("[%s] [%s] [%s] inserting entries %v from index %d", r.Server().Name, r.state,
+				r.logger.Debugf("[%s] [%s] [%s] inserting entries %v from index %d", r.Server().Name, r.State(),
 					request.Id, request.Entries[newEntriesIndex:], logInsertIndex)
 
 				r.log = append(r.log[:logInsertIndex], request.Entries[newEntriesIndex:]...)
@@ -713,7 +710,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 
 			if request.LeaderCommit > r.commitIndex {
 				r.commitIndex = intMin(request.LeaderCommit, int64(len(r.log)-1))
-				r.logger.Debugf("[%s] [%s] setting commitIndex=%d", r.state,
+				r.logger.Debugf("[%s] [%s] setting commitIndex=%d", r.State(),
 					request.Id, r.commitIndex)
 				r.newCommitReadyChan <- struct{}{}
 			}
@@ -736,7 +733,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	}
 	reply.Term = r.currentTerm
 	r.logger.Debugf("[%s] [%s] [%s] AppendEntries reply: Term = %v; ConflictTerm =%v; ConflictIndex =%v; "+
-		"Success =%v;", r.Server().Name, r.state, request.Id, reply.Term, reply.ConflictTerm,
+		"Success =%v;", r.Server().Name, r.State(), request.Id, reply.Term, reply.ConflictTerm,
 		reply.ConflictIndex, reply.Success)
 	return reply, nil
 }
@@ -747,7 +744,7 @@ var ErrorNotALeader = errors.New("not a leader")
 func (r *raft) submit(command interface{}, commandID string, cmdType pb.CommandType) error {
 	r.logger.Debugf("[%s] [%s] [%s] XXXXX1 submit ", r.Server().Name, commandID, r.State())
 
-	if r.state != Leader {
+	if r.State() != Leader {
 		r.logger.Debugf("[%s] [%s] [%s] ErrorNotALeader submit ", r.Server().Name, commandID, r.State())
 		return ErrorNotALeader
 	}
@@ -804,7 +801,7 @@ func (r *raft) SubmitAndWait(request interface{}, ID string, cmdType pb.CommandT
 
 func (r *raft) becomeFollower(term int64) {
 	r.logger.Debugf("[%s] becomes Follower with term=%d; log=%v", r.Server().Name, term, r.log)
-	r.state = Follower
+	r.SetState(Follower)
 	r.currentTerm = term
 	r.votedFor = ""
 	r.electionResetEvent = time.Now()
