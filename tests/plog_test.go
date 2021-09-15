@@ -53,7 +53,6 @@ import (
 //}
 
 func (suite *YadosTestSuite) TestWALAppend() {
-	WaitForLeaderElection(suite.cluster)
 	storeName := "TestWALAppend"
 	numOfPuts := 10
 
@@ -113,7 +112,6 @@ func (suite *YadosTestSuite) TestWALAppend() {
 }
 
 func (suite *YadosTestSuite) TestWALAppendVerifyEntries() {
-	WaitForLeaderElection(suite.cluster)
 	storeName := "TestWALAppendVerifyEntries"
 
 	numOfPuts := 10

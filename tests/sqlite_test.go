@@ -28,7 +28,6 @@ func CreateTableAndWaitFail(cluster *TestCluster, storeName string) error {
 }
 
 func (suite *YadosTestSuite) TestStoreSqlite_InvalidSQL() {
-	WaitForLeaderElection(suite.cluster)
 	storeName := "TestStoreSqlite_InvalidSQL"
 	if err := CreateSQLStoreAndWait(suite.cluster, storeName); err != nil {
 		suite.T().Fatal(err)

@@ -9,7 +9,6 @@ import (
 )
 
 func (suite *YadosTestSuite) TestRestart() {
-	WaitForLeaderElection(suite.cluster)
 	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: "TestRestart",
 	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
@@ -39,7 +38,6 @@ func (suite *YadosTestSuite) TestRestart() {
 	if err != nil {
 		return
 	}
-	WaitForLeaderElection(suite.cluster)
 
 	for i := 0; i < 10; i++ {
 		reply, err := server.ExecuteCmdGet(&server.GetArgs{

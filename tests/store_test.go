@@ -8,7 +8,6 @@ import (
 )
 
 func (suite *YadosTestSuite) TestStoreCreate() {
-	WaitForLeaderElection(suite.cluster)
 
 	wg := sync.WaitGroup{}
 	WaitForEvents(suite.cluster.members, &wg, 1)
@@ -26,7 +25,6 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 }
 
 func (suite *YadosTestSuite) TestStoreList() {
-	WaitForLeaderElection(suite.cluster)
 
 	wg := sync.WaitGroup{}
 	WaitForEvents(suite.cluster.members, &wg, 5)

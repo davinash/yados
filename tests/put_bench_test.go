@@ -55,7 +55,6 @@ func BenchmarkPut(b *testing.B) {
 	if err != nil {
 		b.Fail()
 	}
-	WaitForLeaderElection(cluster)
 
 	defer func() {
 		StopCluster(cluster, nil)

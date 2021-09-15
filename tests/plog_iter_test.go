@@ -7,7 +7,6 @@ import (
 )
 
 func (suite *YadosTestSuite) TestWALIterator() {
-	WaitForLeaderElection(suite.cluster)
 	numOfEntries := 100
 	ids := make([]string, 0)
 	for i := 0; i < numOfEntries; i++ {
@@ -60,7 +59,6 @@ func (suite *YadosTestSuite) TestWALIterator() {
 }
 
 func (suite *YadosTestSuite) TestWALIteratorEmpty() {
-	WaitForLeaderElection(suite.cluster)
 
 	iter, err := suite.cluster.members[0].WAL().Iterator()
 	if err != nil {

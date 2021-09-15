@@ -7,7 +7,6 @@ import (
 )
 
 func (suite *YadosTestSuite) TestPutGet() {
-	WaitForLeaderElection(suite.cluster)
 
 	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: "TestPut",
@@ -38,7 +37,6 @@ func (suite *YadosTestSuite) TestPutGet() {
 }
 
 func (suite *YadosTestSuite) TestPutGetMultiple() {
-	WaitForLeaderElection(suite.cluster)
 
 	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: "TestPut",

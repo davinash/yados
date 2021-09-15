@@ -7,14 +7,12 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	"github.com/davinash/yados/internal/controller"
 
 	"github.com/davinash/yados/internal/raft"
 
-	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 	"github.com/stretchr/testify/suite"
 )
@@ -124,20 +122,14 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 
 //StopCluster To stop the cluster ( Only for Test Purpose )
 func StopCluster(cluster *TestCluster, controller *controller.Controller) {
-	var wg sync.WaitGroup
 	for _, srv := range cluster.members {
-		wg.Add(1)
-		go func(wg *sync.WaitGroup, srv server.Server) {
-			defer wg.Done()
-			if srv.State() != raft.Dead {
-				err := srv.Stop()
-				if err != nil {
-					log.Printf("StopCluster -> %v", err)
-				}
+		if srv.State() != raft.Dead {
+			err := srv.Stop()
+			if err != nil {
+				log.Printf("StopCluster -> %v", err)
 			}
-		}(&wg, srv)
+		}
 	}
-	wg.Wait()
 	controller.Stop()
 }
 
@@ -163,30 +155,6 @@ func (suite *YadosTestSuite) SetupTest() {
 		suite.T().Fatal(err)
 	}
 
-}
-
-func WaitForLeaderElection(cluster *TestCluster) *pb.Peer {
-	return nil
-	//for _, s := range cluster.members {
-	//	s.EventHandler().LeaderChangeChan = make(chan interface{})
-	//}
-	//defer func() {
-	//	for _, s := range cluster.members {
-	//		close(s.EventHandler().LeaderChangeChan)
-	//		s.EventHandler().LeaderChangeChan = nil
-	//	}
-	//}()
-	//
-	//var set []reflect.SelectCase
-	//for _, s := range cluster.members {
-	//	set = append(set, reflect.SelectCase{
-	//		Dir:  reflect.SelectRecv,
-	//		Chan: reflect.ValueOf(s.EventHandler().LeaderChangeChan),
-	//	})
-	//}
-	//_, valValue, _ := reflect.Select(set)
-	//peer := valValue.Interface().(*pb.Peer)
-	//return peer
 }
 
 func Cleanup(walDir string) {

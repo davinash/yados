@@ -8,7 +8,6 @@ import (
 )
 
 func (suite *YadosTestSuite) TestCmdClusterStatus() {
-	WaitForLeaderElection(suite.cluster)
 	status, err := server.ExecuteCmdStatus(suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
 		suite.T().Fatal(err)
@@ -20,7 +19,6 @@ func (suite *YadosTestSuite) TestCmdClusterStatus() {
 
 func (suite *YadosTestSuite) TestCmdCreateStoreKV() {
 	storeName := "TestCmdCreateStoreKV"
-	WaitForLeaderElection(suite.cluster)
 	resp, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,
 		Type: "memory",
@@ -62,20 +60,14 @@ func (suite *YadosTestSuite) TestCmdCreateStoreKVParallel() {
 }
 
 func (suite *YadosTestSuite) TestCmdListStores() {
-	WaitForLeaderElection(suite.cluster)
 }
 func (suite *YadosTestSuite) TestCmdPut() {
-	WaitForLeaderElection(suite.cluster)
 }
 func (suite *YadosTestSuite) TestCmdGet() {
-	WaitForLeaderElection(suite.cluster)
 }
 func (suite *YadosTestSuite) TestCmdDeleteStore() {
-	WaitForLeaderElection(suite.cluster)
 }
 func (suite *YadosTestSuite) TestCmdExecuteQuery() {
-	WaitForLeaderElection(suite.cluster)
 }
 func (suite *YadosTestSuite) TestCmdQuery() {
-	WaitForLeaderElection(suite.cluster)
 }

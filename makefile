@@ -64,11 +64,17 @@ lint:
 test:
 	GOFLAGS="-count=1" CGO_ENABLED=1 go test github.com/davinash/yados/tests -v -failfast
 
+test-race:
+	GOFLAGS="-count=1" CGO_ENABLED=1 go test github.com/davinash/yados/tests -v -failfast -race
+
 test-with-cover:
 	GOFLAGS="-count=1" CGO_ENABLED=1 go test -coverprofile=tmp.cov --coverpkg $(COVERAGE_PACKAGES) github.com/davinash/yados/tests -v -failfast
 
 test-single:
 	CGO_ENABLED=1 go test -v github.com/davinash/yados/tests -testify.m $(TEST_NAME) -count $(TEST_COUNT)
+
+test-single-race:
+	CGO_ENABLED=1 go test -v github.com/davinash/yados/tests -testify.m $(TEST_NAME) -count $(TEST_COUNT) -race
 
 run-bench:
 	CGO_ENABLED=1 go test -v github.com/davinash/yados/tests  -run $(BENCH_NAME)  -bench=.

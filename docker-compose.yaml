@@ -1,8 +1,8 @@
 version: '3.9'
 
 services:
-  yados-1:
-    container_name: yados-1
+  yados-controller:
+    container_name: yados-controller
     image: davinash/yados:1.0.0
     command: "yadosctl server start --name yados-1 --listen-address 192.28.0.2 --wal-dir /data --port 9191 --http-port 8181"
     volumes:
@@ -12,6 +12,20 @@ services:
     networks:
       yados_network:
         ipv4_address: 192.28.0.2
+
+  yados-1:
+    container_name: yados-1
+    image: davinash/yados:1.0.0
+    command: "yadosctl server start --name yados-1 --listen-address 192.28.0.2 --wal-dir /data --port 9191 --http-port 8181"
+    volumes:
+      - ./data:/data
+    depends_on:
+      - yados-controller
+    ports:
+      - "8181:8181"
+    networks:
+      yados_network:
+        ipv4_address: 192.28.0.3
 
   yados-2:
     container_name: yados-2
@@ -23,7 +37,7 @@ services:
       - yados-1
     networks:
       yados_network:
-        ipv4_address: 192.28.0.3
+        ipv4_address: 192.28.0.4
 
   yados-3:
     container_name: yados-3
@@ -36,7 +50,7 @@ services:
       - yados-2
     networks:
       yados_network:
-        ipv4_address: 192.28.0.4
+        ipv4_address: 192.28.0.5
 
 networks:
   yados_network:

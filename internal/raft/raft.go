@@ -218,7 +218,6 @@ func (r *raft) Start() {
 				return
 			case <-ticker.C:
 				if len(r.peers) >= 2 {
-					r.logger.Debugf("[%s] Number of Peers = %d", r.Server().Name, len(r.peers))
 					close(r.ready)
 					return
 				}
@@ -230,9 +229,10 @@ func (r *raft) Start() {
 func (r *raft) AddPeer(newPeer *pb.Peer) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.logger.Debugf("[%s] Adding new Peer [%s:%s:%d]", r.Server().Name,
-		newPeer.Name, newPeer.Address, newPeer.Port)
+
 	if _, ok := r.peers[newPeer.Name]; !ok {
+		r.logger.Debugf("[%s] Adding new Peer [%s:%s:%d]", r.Server().Name,
+			newPeer.Name, newPeer.Address, newPeer.Port)
 		r.peers[newPeer.Name] = newPeer
 	}
 }
@@ -243,11 +243,6 @@ func (r *raft) Stop() {
 		return
 	}
 	close(r.quit)
-
-	err := r.RemoveSelf()
-	if err != nil {
-		return
-	}
 	r.wg.Wait()
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -325,32 +320,11 @@ func (r *raft) RemovePeer(request *pb.RemovePeerRequest) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	r.logger.Debugf("[%s] RemovePeer: Received Name = %s; Address = %s; Port = %d;",
-		request.Id, request.GetPeer().Name, request.GetPeer().Address, request.GetPeer().Port)
+	r.logger.Debugf("[%s] Removing Peer Before : [%s:%s:%d] => %d", request.Id,
+		request.GetPeer().Name, request.GetPeer().Address, request.GetPeer().Port, len(r.peers))
 
 	delete(r.peers, request.GetPeer().Name)
 
-	return nil
-}
-
-func (r *raft) RemoveSelf() error {
-	for _, peer := range r.peers {
-		r.wg.Add(1)
-		go func(peer *pb.Peer) {
-			defer r.wg.Done()
-			args := pb.RemovePeerRequest{
-				Peer: r.server,
-			}
-
-			resp, err := r.rpcServer.Send(peer, "RPC.RemoveSelf", &args)
-			if err != nil {
-				r.logger.Errorf("failed to send RemoveSelf to %s, Error = %v", peer.Name, err)
-				return
-			}
-			_ = resp.(*pb.RemovePeerReply)
-
-		}(peer)
-	}
 	return nil
 }
 

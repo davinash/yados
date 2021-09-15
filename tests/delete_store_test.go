@@ -6,7 +6,6 @@ import (
 )
 
 func (suite *YadosTestSuite) TestDeleteStore() {
-	WaitForLeaderElection(suite.cluster)
 	storeName := "TestDeleteStore"
 	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,

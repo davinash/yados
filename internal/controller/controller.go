@@ -218,6 +218,29 @@ func (c *Controller) UnRegister(ctx context.Context, request *pb.UnRegisterReque
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	for _, p := range c.members {
+		if p.Name != request.Server.Name {
+			peerConn, rpcClient, err := rpc.GetPeerConn(p.Address, p.Port)
+			if err != nil {
+				return &pb.UnRegisterReply{}, err
+			}
+			c.logger.Debugf("Removing peer [%s:%s:%d] from [%s:%s:%d]", request.Server.Name,
+				request.Server.Address, request.Server.Port, p.Name, p.Address, p.Port)
+			_, err = rpcClient.RemovePeer(ctx, &pb.RemovePeerRequest{
+				Peer: request.Server,
+				Id:   uuid.New().String(),
+			})
+			if err != nil {
+				return &pb.UnRegisterReply{}, err
+			}
+			err = peerConn.Close()
+			if err != nil {
+				c.logger.Warnf("failed to close the connection with [%s:%s:%d], "+
+					"Error= %v", p.Name, p.Address, p.Port, err)
+			}
+		}
+	}
+
 	if _, ok := c.members[request.Server.Name]; !ok {
 		return &pb.UnRegisterReply{}, nil
 	}
