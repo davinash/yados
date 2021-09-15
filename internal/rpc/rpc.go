@@ -111,10 +111,14 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 	case "RPC.AppendEntries":
 		request := args.(*pb.AppendEntryRequest)
 
-		rpc.logger.Debugf("[%s] [%s] Sending AppendEntries to [%s] : nextIndex= %d; Term= %v; LeaderName= "+
+		rpc.logger.Debugf("[%s] [%s] DDDDD Sending AppendEntries to [%s] : nextIndex= %d; Term= %v; LeaderName= "+
 			"%v; PrevLogTerm= %v; PrevLogIndex= %v; LeaderCommit= %v ", rpc.srvName, request.Id,
 			peer.Name, request.NextIndex, request.Term, request.Leader.Name, request.PrevLogTerm,
 			request.PrevLogIndex, request.LeaderCommit)
+
+		for _, e := range request.Entries {
+			rpc.logger.Debugf("[%s] [%s] rpcClient.AppendEntries", rpc.srvName, e.Id)
+		}
 
 		reply, err := rpcClient.AppendEntries(context.Background(), request)
 		if err != nil {

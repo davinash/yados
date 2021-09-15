@@ -128,6 +128,7 @@ func (c *Controller) Start() {
 
 //Stop method to stop the controller
 func (c *Controller) Stop() error {
+	c.logger.Debugf("Stopping the controller")
 	close(c.quit)
 	c.grpcServer.Stop()
 	c.wg.Wait()

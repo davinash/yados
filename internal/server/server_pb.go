@@ -101,21 +101,7 @@ func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusR
 var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
 
 func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
-	//if srv.Raft().State() != raft.Leader {
-	//	peerConn, rpcClient, err := rpc.GetPeerConn(srv.Raft().Leader().Address, srv.Raft().Leader().Port)
-	//	if err != nil {
-	//		return &pb.StoreCreateReply{}, err
-	//	}
-	//	defer func(peerConn *grpc.ClientConn) {
-	//		err := peerConn.Close()
-	//		if err != nil {
-	//			log.Printf("failed to close the connection, error = %v\n", err)
-	//		}
-	//	}(peerConn)
-	//	return rpcClient.CreateStore(ctx, request)
-	//}
-
-	srv.logger.Debugf("[%s] [%s] Received request CreateStore id=%v Name=%v, Type=%v",
+	srv.logger.Debugf("[%s] [%s] XXXXX Received request CreateStore id=%v Name=%v, Type=%v",
 		srv.Name(), srv.State(), request.Id, request.Name, request.Type)
 	reply := &pb.StoreCreateReply{}
 	// Check if store with name already exists

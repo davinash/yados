@@ -68,9 +68,6 @@ type Raft interface {
 	Server() *pb.Peer
 	StorageManager() store.Manager
 
-	Leader() *pb.Peer
-	SetLeader(leader *pb.Peer)
-
 	IsTestMode() bool
 	EventHandler() *events.Events
 
@@ -98,7 +95,7 @@ type raft struct {
 	matchIndex map[string]int64
 
 	triggerAEChan  chan struct{}
-	commitsChanMap map[string]chan error
+	commandErrChan map[string]chan error
 
 	quit chan interface{}
 	wg   sync.WaitGroup
@@ -112,8 +109,7 @@ type raft struct {
 	isTestMode         bool
 	storageMgr         store.Manager
 
-	leader *pb.Peer
-	ready  chan interface{}
+	ready chan interface{}
 
 	// for tests
 	isRunning bool
@@ -153,7 +149,7 @@ func NewRaft(args *Args) (Raft, error) {
 	r.nextIndex = make(map[string]int64)
 	r.matchIndex = make(map[string]int64)
 	r.newCommitReadyChan = make(chan struct{}, 16)
-	r.commitsChanMap = make(map[string]chan error)
+	r.commandErrChan = make(map[string]chan error)
 
 	err := r.InitializeFromStorage()
 	if err != nil {
@@ -308,26 +304,21 @@ func (r *raft) IsRunning() bool {
 }
 
 func (r *raft) AddCommandListener(id string) error {
-	r.commitsChanMap[id] = make(chan error)
+	r.commandErrChan[id] = make(chan error)
 	return nil
 }
 
 func (r *raft) WaitForCommandCompletion(id string) error {
+	r.logger.Debugf("[%s] WaitForCommandCompletion for %s", r.Server().Name, id)
 	var err error
-	if v, ok := r.commitsChanMap[id]; ok {
+	if v, ok := r.commandErrChan[id]; ok {
 		err = <-v
 	}
-	return err
-}
-
-func (r *raft) Leader() *pb.Peer {
 	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	return r.leader
-}
-
-func (r *raft) SetLeader(leader *pb.Peer) {
-	r.leader = leader
+	delete(r.commandErrChan, id)
+	r.mutex.Unlock()
+	r.logger.Debugf("[%s] COMPLETED WaitForCommandCompletion for %s", r.Server().Name, id)
+	return err
 }
 
 func (r *raft) RemovePeer(request *pb.RemovePeerRequest) error {
@@ -479,7 +470,6 @@ func (r *raft) startElection() {
 }
 
 func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error) {
-	//time.Sleep(time.Duration(1+rand.Intn(5)) * time.Millisecond)
 
 	EmptyVoteReply := &pb.VoteReply{Id: request.Id}
 
@@ -530,7 +520,6 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 
 func (r *raft) startLeader() {
 	r.state = Leader
-	r.SetLeader(r.Server())
 
 	if r.IsTestMode() {
 		if r.ev.LeaderChangeChan != nil {
@@ -547,7 +536,6 @@ func (r *raft) startLeader() {
 
 	r.wg.Add(1)
 	go func(heartbeatTimeout time.Duration) {
-		//r.logger.Debugf("[%s] YYYY", r.Server().Name)
 		defer r.wg.Done()
 		// Immediately send AEs to peers.
 		r.leaderSendAEs()
@@ -565,6 +553,7 @@ func (r *raft) startLeader() {
 				t.Stop()
 				t.Reset(heartbeatTimeout)
 			case _, ok := <-r.triggerAEChan:
+				r.logger.Debugf("[%s] Received entries on channel", r.Server().Name)
 				if ok {
 					doSend = true
 				} else {
@@ -577,12 +566,9 @@ func (r *raft) startLeader() {
 				t.Reset(heartbeatTimeout)
 			}
 			if doSend {
-				r.mutex.Lock()
 				if r.state != Leader {
-					r.mutex.Unlock()
 					return
 				}
-				r.mutex.Unlock()
 				r.leaderSendAEs()
 			}
 		}
@@ -662,6 +648,10 @@ func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string)
 	}
 	entries := r.log[nextIndex:]
 
+	for _, e := range entries {
+		r.logger.Debugf("[%s] [%s] createAERequest", r.Server().Name, e.Id)
+	}
+
 	request := pb.AppendEntryRequest{
 		Term:         savedCurrentTerm,
 		Leader:       r.server,
@@ -676,9 +666,7 @@ func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string)
 }
 
 func (r *raft) leaderSendAEs() {
-	r.mutex.Lock()
 	savedCurrentTerm := r.currentTerm
-	r.mutex.Unlock()
 
 	id := uuid.New().String()
 
@@ -719,7 +707,6 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 			r.becomeFollower(request.Term)
 		}
 		r.electionResetEvent = time.Now()
-		r.SetLeader(request.Leader)
 
 		if request.PrevLogIndex == -1 ||
 			(request.PrevLogIndex < int64(len(r.log)) && request.PrevLogTerm == r.log[request.PrevLogIndex].Term) {
@@ -739,7 +726,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 				newEntriesIndex++
 			}
 			if newEntriesIndex < len(request.Entries) {
-				r.logger.Debugf("[%s] [%s] inserting entries %v from index %d", r.state,
+				r.logger.Debugf("[%s] [%s] [%s] inserting entries %v from index %d", r.Server().Name, r.state,
 					request.Id, request.Entries[newEntriesIndex:], logInsertIndex)
 
 				r.log = append(r.log[:logInsertIndex], request.Entries[newEntriesIndex:]...)
@@ -784,10 +771,10 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 var ErrorNotALeader = errors.New("not a leader")
 
 func (r *raft) submit(command interface{}, commandID string, cmdType pb.CommandType) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.logger.Debugf("[%s] [%s] [%s] XXXXX1 submit ", r.Server().Name, commandID, r.State())
 
 	if r.state != Leader {
+		r.logger.Debugf("[%s] [%s] [%s] ErrorNotALeader submit ", r.Server().Name, commandID, r.State())
 		return ErrorNotALeader
 	}
 
@@ -811,14 +798,16 @@ func (r *raft) submit(command interface{}, commandID string, cmdType pb.CommandT
 
 	err = r.persistToStorage([]*pb.WalEntry{entry})
 	if err != nil {
+		r.logger.Debugf("[%s] [%s] [%s] submit error persistToStorage", r.Server().Name, commandID, r.State())
 		return err
 	}
-
+	r.logger.Debugf("[%s] [%s] [%s] submit sending to triggerAEChan", r.Server().Name, commandID, r.State())
 	r.triggerAEChan <- struct{}{}
 	return nil
 }
 
 func (r *raft) SubmitAndWait(request interface{}, ID string, cmdType pb.CommandType) error {
+	r.logger.Debugf("[%s] [%s] [%s] XXXXX SubmitAndWait ", r.Server().Name, ID, r.State())
 	err := r.AddCommandListener(ID)
 	if err != nil {
 		return err
@@ -835,6 +824,7 @@ func (r *raft) SubmitAndWait(request interface{}, ID string, cmdType pb.CommandT
 	}
 	r.wg.Add(1)
 	err = <-errChan
+	r.logger.Debugf("[%s] [%s] XXXXX SubmitAndWait DONE ", r.Server().Name, ID)
 	return err
 }
 
@@ -852,11 +842,15 @@ func (r *raft) becomeFollower(term int64) {
 	}()
 }
 
-func (r *raft) applyCommittedEntry(entry *pb.WalEntry) {
-	err := r.StorageManager().Apply(entry)
-	if c, ok := r.commitsChanMap[entry.Id]; ok {
+func (r *raft) reportCommandListener(id string, err error) {
+	if c, ok := r.commandErrChan[id]; ok {
 		c <- err
 	}
+}
+
+func (r *raft) applyCommittedEntry(entry *pb.WalEntry) {
+	err := r.StorageManager().Apply(entry)
+	r.reportCommandListener(entry.Id, err)
 }
 
 func (r *raft) commitChanSender() {
@@ -893,11 +887,13 @@ func (r *raft) lastLogIndexAndTerm() (int64, int64) {
 }
 
 func (r *raft) persistToStorage(entries []*pb.WalEntry) error {
+
 	err := r.wal.WriteState(r.currentTerm, r.votedFor)
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
+		r.logger.Debugf("[%s] [%s] PPPPP Persisting entry -> %s", r.Server().Name, r.State(), entry.Id)
 		err := r.wal.Append(entry)
 		if err != nil {
 			return err
