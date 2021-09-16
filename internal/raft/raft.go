@@ -78,6 +78,7 @@ type Raft interface {
 type raft struct {
 	mutex    sync.Mutex
 	stateMtx sync.RWMutex
+	peerMtx  sync.RWMutex
 	peers    map[string]*pb.Peer
 
 	// Persistent Raft state on all servers
@@ -212,8 +213,8 @@ func (r *raft) Start() {
 }
 
 func (r *raft) AddPeer(newPeer *pb.Peer) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.peerMtx.Lock()
+	defer r.peerMtx.Unlock()
 
 	if _, ok := r.peers[newPeer.Name]; !ok {
 		r.logger.Debugf("[%s] Adding new Peer [%s:%s:%d]", r.Server().Name,
@@ -276,6 +277,8 @@ func (r *raft) SetState(state State) {
 }
 
 func (r *raft) Peers() map[string]*pb.Peer {
+	r.peerMtx.RLock()
+	defer r.peerMtx.RUnlock()
 	return r.peers
 }
 
@@ -314,8 +317,8 @@ func (r *raft) WaitForCommandCompletion(id string) error {
 }
 
 func (r *raft) RemovePeer(request *pb.RemovePeerRequest) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.peerMtx.Lock()
+	defer r.peerMtx.Unlock()
 
 	r.logger.Debugf("[%s] Removing Peer Before : [%s:%s:%d] => %d", request.Id,
 		request.GetPeer().Name, request.GetPeer().Address, request.GetPeer().Port, len(r.peers))
@@ -637,8 +640,10 @@ func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string)
 }
 
 func (r *raft) leaderSendAEs() {
-	savedCurrentTerm := r.currentTerm
+	r.peerMtx.RLock()
+	defer r.peerMtx.RUnlock()
 
+	savedCurrentTerm := r.currentTerm
 	id := uuid.New().String()
 
 	for _, peer := range r.Peers() {

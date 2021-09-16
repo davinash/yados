@@ -71,7 +71,7 @@ func ExecuteCmdCreateStore(args *CreateCommandArgs, address string, port int32) 
 
 	req := &pb.StoreCreateRequest{
 		Name: args.Name,
-		Id:   args.Name,
+		Id:   uuid.New().String(),
 		Type: pb.StoreType_Memory,
 	}
 	if args.Type == "sqlite" {

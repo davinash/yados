@@ -17,6 +17,7 @@ func (suite *YadosTestSuite) TestCmdClusterStatus() {
 }
 
 func (suite *YadosTestSuite) TestCmdCreateStoreKV() {
+
 	storeName := "TestCmdCreateStoreKV"
 	resp, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,
@@ -36,6 +37,7 @@ func (suite *YadosTestSuite) TestCmdCreateStoreKV() {
 		suite.T().Fatal(err)
 	}
 	fmt.Println(err)
+
 }
 
 //
