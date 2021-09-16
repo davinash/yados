@@ -12,7 +12,7 @@ func CreateSQLStoreAndWait(cluster *TestCluster, storeName string) error {
 	defer func() {
 		StopWaitForEvents(cluster.members)
 	}()
-	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,
 		Type: "sqlite",
 	}, cluster.members[0].Address(), cluster.members[0].Port())
@@ -70,7 +70,6 @@ func InsertRowsAndWait(cluster *TestCluster, storeName string) error {
 }
 
 func (suite *YadosTestSuite) TestStoreCreateSqlite() {
-	WaitForLeaderElection(suite.cluster)
 	storeName := "TestStoreCreateSqlite"
 
 	if err := CreateSQLStoreAndWait(suite.cluster, storeName); err != nil {
@@ -85,7 +84,6 @@ func (suite *YadosTestSuite) TestStoreCreateSqlite() {
 }
 
 func (suite *YadosTestSuite) TestStoreSelectSqlite() {
-	WaitForLeaderElection(suite.cluster)
 	storeName := "TestStoreSelectSqlite"
 
 	if err := CreateSQLStoreAndWait(suite.cluster, storeName); err != nil {

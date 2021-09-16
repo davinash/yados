@@ -53,7 +53,7 @@ const (
 //Raft raft interface
 type Raft interface {
 	Peers() map[string]*pb.Peer
-	AddPeer(peer *pb.Peer) error
+	AddPeer(peer *pb.Peer)
 	State() State
 	RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error)
 	RemovePeer(*pb.RemovePeerRequest) error
@@ -61,22 +61,26 @@ type Raft interface {
 	Stop()
 	AppendEntries(ctx context.Context, request *pb.AppendEntryRequest) (*pb.AppendEntryReply, error)
 	Log() []*pb.WalEntry
-	Submit(interface{}, string, pb.CommandType) error
+	SubmitAndWait(interface{}, string, pb.CommandType) error
 	AddCommandListener(string) error
-	WaitForCommandCompletion(string)
+	WaitForCommandCompletion(string) error
 
 	Server() *pb.Peer
-
-	EventHandler() *events.Events
+	StorageManager() store.Manager
 
 	IsTestMode() bool
+	EventHandler() *events.Events
 
-	StorageManager() store.Manager
+	//IsRunning for tests
+	IsRunning() bool
 }
 
 type raft struct {
-	mutex sync.Mutex
-	peers map[string]*pb.Peer
+	mutex          sync.Mutex
+	stateMtx       sync.RWMutex
+	peerMtx        sync.RWMutex
+	cmdListenerMtx sync.RWMutex
+	peers          map[string]*pb.Peer
 
 	// Persistent Raft state on all servers
 	currentTerm int64
@@ -94,7 +98,7 @@ type raft struct {
 	matchIndex map[string]int64
 
 	triggerAEChan  chan struct{}
-	commitsChanMap map[string]chan struct{}
+	commandErrChan map[string]chan error
 
 	quit chan interface{}
 	wg   sync.WaitGroup
@@ -107,6 +111,11 @@ type raft struct {
 	ev                 *events.Events
 	isTestMode         bool
 	storageMgr         store.Manager
+
+	ready chan interface{}
+
+	// for tests
+	isRunning bool
 }
 
 //Args argument structure for Raft Instance
@@ -132,16 +141,18 @@ func NewRaft(args *Args) (Raft, error) {
 		ev:            args.EventHandler,
 		isTestMode:    args.IsTestMode,
 		storageMgr:    args.StorageMgr,
+		ready:         make(chan interface{}),
+		isRunning:     false,
 	}
 
 	r.peers = make(map[string]*pb.Peer)
-	r.state = Follower
+	r.SetState(Follower)
 	r.commitIndex = -1
 	r.lastApplied = -1
 	r.nextIndex = make(map[string]int64)
 	r.matchIndex = make(map[string]int64)
 	r.newCommitReadyChan = make(chan struct{}, 16)
-	r.commitsChanMap = make(map[string]chan struct{})
+	r.commandErrChan = make(map[string]chan error)
 
 	err := r.InitializeFromStorage()
 	if err != nil {
@@ -192,31 +203,43 @@ func (r *raft) InitializeFromStorage() error {
 
 func (r *raft) Start() {
 	go func() {
+		<-r.ready
 		r.mutex.Lock()
 		r.electionResetEvent = time.Now()
 		r.mutex.Unlock()
 		r.runElectionTimer()
 	}()
 	go r.commitChanSender()
+
+}
+
+func (r *raft) AddPeer(newPeer *pb.Peer) {
+	r.peerMtx.Lock()
+	defer r.peerMtx.Unlock()
+
+	if _, ok := r.peers[newPeer.Name]; !ok {
+		r.logger.Debugf("[%s] Adding new Peer [%s:%s:%d]", r.Server().Name,
+			newPeer.Name, newPeer.Address, newPeer.Port)
+		r.peers[newPeer.Name] = newPeer
+	}
+
+	if !r.isRunning && len(r.peers) >= 2 {
+		close(r.ready)
+		r.isRunning = true
+	}
 }
 
 func (r *raft) Stop() {
-	r.logger.Debug("Stopping Raft Instance")
-	if r.state == Dead {
+	r.logger.Debugf("[%s] Stopping Raft Instance", r.server.Name)
+	if r.State() == Dead {
 		return
 	}
 	close(r.quit)
-
-	err := r.RemoveSelf()
-	if err != nil {
-		return
-	}
 	r.wg.Wait()
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.state = Dead
 
-	r.logger.Debug("Stopped Raft Instance")
+	r.SetState(Dead)
+
+	r.logger.Debugf("[%s] Stopped Raft Instance", r.server.Name)
 }
 
 func (s State) String() string {
@@ -243,10 +266,20 @@ func (r *raft) Log() []*pb.WalEntry {
 }
 
 func (r *raft) State() State {
+	r.stateMtx.RLock()
+	defer r.stateMtx.RUnlock()
 	return r.state
 }
 
+func (r *raft) SetState(state State) {
+	r.stateMtx.Lock()
+	defer r.stateMtx.Unlock()
+	r.state = state
+}
+
 func (r *raft) Peers() map[string]*pb.Peer {
+	r.peerMtx.RLock()
+	defer r.peerMtx.RUnlock()
 	return r.peers
 }
 
@@ -262,98 +295,55 @@ func (r *raft) IsTestMode() bool {
 	return r.isTestMode
 }
 
+func (r *raft) IsRunning() bool {
+	return r.isRunning
+}
+
 func (r *raft) AddCommandListener(id string) error {
-	r.commitsChanMap[id] = make(chan struct{})
+	r.cmdListenerMtx.Lock()
+	defer r.cmdListenerMtx.Unlock()
+
+	r.commandErrChan[id] = make(chan error)
 	return nil
 }
 
-func (r *raft) WaitForCommandCompletion(id string) {
-	if v, ok := r.commitsChanMap[id]; ok {
-		<-v
+func (r *raft) DeleteCommandListener(id string) {
+	r.cmdListenerMtx.Lock()
+	delete(r.commandErrChan, id)
+	r.cmdListenerMtx.Unlock()
+}
+
+func (r *raft) WaitForCommandCompletion(id string) error {
+	r.logger.Debugf("[%s] WaitForCommandCompletion for %s", r.Server().Name, id)
+	var err error
+
+	r.cmdListenerMtx.Lock()
+	v, ok := r.commandErrChan[id]
+	r.cmdListenerMtx.Unlock()
+
+	if ok {
+		err = <-v
 	}
-}
 
-func (r *raft) AddPeer(newPeer *pb.Peer) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	r.peers[newPeer.Name] = newPeer
-	return nil
+	r.logger.Debugf("[%s] COMPLETED WaitForCommandCompletion for %s", r.Server().Name, id)
+	return err
 }
 
 func (r *raft) RemovePeer(request *pb.RemovePeerRequest) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.peerMtx.Lock()
+	defer r.peerMtx.Unlock()
 
-	r.logger.Debugf("[%s] RemovePeer: Received Name = %s; Address = %s; Port = %d;",
-		request.Id, request.GetPeer().Name, request.GetPeer().Address, request.GetPeer().Port)
+	r.logger.Debugf("[%s] Removing Peer Before : [%s:%s:%d] => %d", request.Id,
+		request.GetPeer().Name, request.GetPeer().Address, request.GetPeer().Port, len(r.peers))
 
 	delete(r.peers, request.GetPeer().Name)
 
 	return nil
 }
 
-func (r *raft) RemoveSelf() error {
-	for _, peer := range r.peers {
-		r.wg.Add(1)
-		go func(peer *pb.Peer) {
-			defer r.wg.Done()
-			args := pb.RemovePeerRequest{
-				Peer: r.server,
-			}
-
-			resp, err := r.rpcServer.Send(peer, "RPC.RemoveSelf", &args)
-			if err != nil {
-				r.logger.Errorf("failed to send RemoveSelf to %s, Error = %v", peer.Name, err)
-				return
-			}
-			_ = resp.(*pb.RemovePeerReply)
-
-		}(peer)
-	}
-	return nil
-}
-
 func (r *raft) electionTimeout() time.Duration {
-	return time.Duration(150+rand.Intn(150)) * time.Millisecond
-}
-
-//ErrorNotALeader error returned where no server leader
-var ErrorNotALeader = errors.New("now a leader")
-
-func (r *raft) Submit(command interface{}, commandID string, cmdType pb.CommandType) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	if r.state != Leader {
-		return ErrorNotALeader
-	}
-
-	pv, ok := command.(proto.Message)
-	if !ok {
-		panic(fmt.Sprintf("%v is not proto.Message", pv))
-	}
-
-	any, err := anypb.New(pv)
-	if err != nil {
-		return err
-	}
-
-	entry := &pb.WalEntry{
-		Command: any,
-		Term:    r.currentTerm,
-		Id:      commandID,
-		CmdType: cmdType,
-	}
-	r.log = append(r.log, entry)
-
-	err = r.persistToStorage([]*pb.WalEntry{entry})
-	if err != nil {
-		return err
-	}
-
-	r.triggerAEChan <- struct{}{}
-	return nil
+	t := time.Duration(150+rand.Intn(150)) * time.Millisecond
+	return t
 }
 
 func (r *raft) runElectionTimer() {
@@ -361,7 +351,6 @@ func (r *raft) runElectionTimer() {
 	r.mutex.Lock()
 	termStarted := r.currentTerm
 	r.mutex.Unlock()
-	r.logger.Tracef("election timer started (%v), term=%d", timeoutDuration, termStarted)
 
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
@@ -378,16 +367,15 @@ func (r *raft) runElectionTimer() {
 func (r *raft) startOrIgnoreElection(termStarted int64, timeoutDuration time.Duration) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-
-	if r.state != Candidate && r.state != Follower {
+	if r.State() != Candidate && r.State() != Follower {
 		return
 	}
-
 	if termStarted != r.currentTerm {
 		return
 	}
-
 	if elapsed := time.Since(r.electionResetEvent); elapsed >= timeoutDuration {
+		r.logger.Debugf("[%s] Starting new election state=%v; currentTerm=%v; elapsed= %v; timeoutDuration= %v ",
+			r.Server().Name, r.State(), r.currentTerm, elapsed, timeoutDuration)
 		r.startElection()
 		return
 	}
@@ -397,12 +385,12 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if r.state != Candidate {
+	if r.State() != Candidate {
 		return
 	}
 
 	if reply.Term > *savedCurrentTerm {
-		r.logger.Debugf("[%s] term out of date in RequestVoteReply", reply.Id)
+		r.logger.Debugf("[%s][%s] term out of date in RequestVoteReply", r.Server().Name, reply.Id)
 		r.becomeFollower(reply.Term)
 		return
 	} else if reply.Term == *savedCurrentTerm {
@@ -419,7 +407,7 @@ func (r *raft) processVotingReply(reply *pb.VoteReply, votesReceived *int, saved
 
 func (r *raft) startElection() {
 	// Make yourself candidate
-	r.state = Candidate
+	r.SetState(Candidate)
 	// Increase the current term
 	r.currentTerm++
 	savedCurrentTerm := r.currentTerm
@@ -428,6 +416,8 @@ func (r *raft) startElection() {
 	r.votedFor = r.server.Name
 
 	votesReceived := 1
+	voteReqID := uuid.New().String()
+
 	for _, peer := range r.peers {
 		r.wg.Add(1)
 		go func(peer *pb.Peer) {
@@ -442,7 +432,7 @@ func (r *raft) startElection() {
 				CandidateName: r.server.Name,
 				LastLogIndex:  savedLastLogIndex,
 				LastLogTerm:   savedLastLogTerm,
-				Id:            uuid.New().String(),
+				Id:            voteReqID,
 			}
 			// Send request vote to all peer
 			resp, err := r.rpcServer.Send(peer, "RPC.RequestVote", &args)
@@ -451,7 +441,8 @@ func (r *raft) startElection() {
 				return
 			}
 			reply := resp.(*pb.VoteReply)
-			r.logger.Debugf("[%s] received RequestVoteReply (%+v, %v)", reply.Id, reply.Term, reply.VoteGranted)
+			r.logger.Debugf("[%s] [%s] received RequestVoteReply from %v (%v, %v)", r.Server().Name,
+				reply.Id, peer.Name, reply.Term, reply.VoteGranted)
 
 			r.processVotingReply(reply, &votesReceived, &savedCurrentTerm)
 		}(peer)
@@ -466,23 +457,22 @@ func (r *raft) startElection() {
 }
 
 func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.VoteReply, error) {
-	time.Sleep(time.Duration(1+rand.Intn(5)) * time.Millisecond)
 
 	EmptyVoteReply := &pb.VoteReply{Id: request.Id}
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if r.state == Dead {
+	if r.State() == Dead {
 		return EmptyVoteReply, nil
 	}
 	lastLogIndex, lastLogTerm := r.lastLogIndexAndTerm()
-	r.logger.Debugf("[%s] RequestVote: Received currentTerm=%d; votedFor=%s; lastLogIndex=%v; lastLogTerm %v",
-		request.Id, r.currentTerm, r.votedFor, lastLogIndex, lastLogTerm)
+	r.logger.Debugf("[%s] [%s] Received RequestVote from=%s currentTerm=%d; votedFor=%s; lastLogIndex=%v; lastLogTerm %v",
+		r.Server().Name, request.Id, request.CandidateName, r.currentTerm, r.votedFor, lastLogIndex, lastLogTerm)
 
 	if request.Term > r.currentTerm {
-		r.logger.Debugf("[%s] RequestVote: request.Term =%v; r.currentTerm =%v; "+
-			"term out of date in RequestVote", request.Id, request.Term, r.currentTerm)
+		r.logger.Debugf("[%s] [%s] RequestVote: request.Term =%v; r.currentTerm =%v; "+
+			"term out of date in RequestVote", r.Server().Name, request.Id, request.Term, r.currentTerm)
 		r.becomeFollower(request.Term)
 	}
 	reply := &pb.VoteReply{Id: request.Id}
@@ -491,6 +481,10 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 		(r.votedFor == "" || r.votedFor == request.CandidateName) &&
 		(request.LastLogTerm > lastLogTerm ||
 			(request.LastLogTerm == lastLogTerm && request.LastLogIndex >= lastLogIndex)) {
+		r.logger.Debugf("[%s] r.currentTerm= %v; request.Term= %v; r.votedFor= %v; request.CandidateName= %v;"+
+			" request.LastLogTerm= %v; lastLogTerm=%v; request.LastLogIndex=%v; lastLogIndex=%v;",
+			r.Server().Name, r.currentTerm, request.Term, r.votedFor, request.CandidateName, request.LastLogTerm,
+			lastLogTerm, request.LastLogIndex, lastLogIndex)
 		reply.VoteGranted = true
 		r.votedFor = request.CandidateName
 		r.electionResetEvent = time.Now()
@@ -505,14 +499,14 @@ func (r *raft) RequestVotes(ctx context.Context, request *pb.VoteRequest) (*pb.V
 		return nil, err
 	}
 
-	r.logger.Debugf("[%s] RequestVote: Reply Term = %v; VoteGranted = %v; CandidateName = %s",
-		reply.Id, reply.Term, reply.VoteGranted, reply.CandidateName)
+	r.logger.Debugf("[%s] [%s] Replying RequestVote Term = %v; VoteGranted = %v; CandidateName = %s",
+		r.Server().Name, reply.Id, reply.Term, reply.VoteGranted, reply.CandidateName)
 
 	return reply, nil
 }
 
 func (r *raft) startLeader() {
-	r.state = Leader
+	r.SetState(Leader)
 
 	if r.IsTestMode() {
 		if r.ev.LeaderChangeChan != nil {
@@ -524,7 +518,7 @@ func (r *raft) startLeader() {
 		r.nextIndex[peer.Name] = int64(len(r.Log()))
 		r.matchIndex[peer.Name] = -1
 	}
-	r.logger.Debugf("becomes Leader; term=%d, nextIndex=%v, matchIndex=%v;", r.currentTerm,
+	r.logger.Debugf("[%s] becomes Leader; term=%d, nextIndex=%v, matchIndex=%v;", r.Server().Name, r.currentTerm,
 		r.nextIndex, r.matchIndex)
 
 	r.wg.Add(1)
@@ -538,7 +532,7 @@ func (r *raft) startLeader() {
 			doSend := false
 			select {
 			case <-r.quit:
-				r.logger.Debug("Stopping startLeader")
+				r.logger.Debugf("[%s] Stopping startLeader", r.server.Name)
 				return
 			case <-t.C:
 				doSend = true
@@ -546,6 +540,7 @@ func (r *raft) startLeader() {
 				t.Stop()
 				t.Reset(heartbeatTimeout)
 			case _, ok := <-r.triggerAEChan:
+				r.logger.Debugf("[%s] Received entries on channel", r.Server().Name)
 				if ok {
 					doSend = true
 				} else {
@@ -558,12 +553,9 @@ func (r *raft) startLeader() {
 				t.Reset(heartbeatTimeout)
 			}
 			if doSend {
-				r.mutex.Lock()
-				if r.state != Leader {
-					r.mutex.Unlock()
+				if r.State() != Leader {
 					return
 				}
-				r.mutex.Unlock()
 				r.leaderSendAEs()
 			}
 		}
@@ -580,7 +572,7 @@ func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb
 		r.becomeFollower(reply.Term)
 		return
 	}
-	if r.state == Leader && savedCurrentTerm == reply.Term {
+	if r.State() == Leader && savedCurrentTerm == reply.Term {
 		if reply.Success {
 			r.nextIndex[peer.Name] = ni + int64(len(entries))
 			r.matchIndex[peer.Name] = r.nextIndex[peer.Name] - 1
@@ -598,8 +590,9 @@ func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb
 					}
 				}
 			}
-			r.logger.Debugf("[%s] AppendEntries reply from %s success: nextIndex := %v, "+
-				"matchIndex := %v; commitIndex := %d", reply.Id, peer.Name, r.nextIndex, r.matchIndex, r.commitIndex)
+			r.logger.Debugf("[%s] [%s] AppendEntries reply from %s success: nextIndex := %v, "+
+				"matchIndex := %v; commitIndex := %d", r.Server().Name, reply.Id, peer.Name, r.nextIndex,
+				r.matchIndex, r.commitIndex)
 			if r.commitIndex != savedCommitIndex {
 				r.logger.Debugf("[%s] leader sets commitIndex := %d", reply.Id, r.commitIndex)
 				r.newCommitReadyChan <- struct{}{}
@@ -623,8 +616,8 @@ func (r *raft) processAEReply(resp interface{}, savedCurrentTerm int64, peer *pb
 			} else {
 				r.nextIndex[peer.Name] = reply.ConflictIndex
 			}
-			r.logger.Debugf("[%s] AppendEntries reply from %s !success: nextIndex := %d",
-				reply.Id, peer.Name, ni-1)
+			r.logger.Debugf("[%s] [%s] AppendEntries reply from %s !success: nextIndex := %d",
+				r.Server().Name, reply.Id, peer.Name, ni-1)
 		}
 	}
 }
@@ -642,6 +635,10 @@ func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string)
 	}
 	entries := r.log[nextIndex:]
 
+	for _, e := range entries {
+		r.logger.Debugf("[%s] [%s] createAERequest", r.Server().Name, e.Id)
+	}
+
 	request := pb.AppendEntryRequest{
 		Term:         savedCurrentTerm,
 		Leader:       r.server,
@@ -656,19 +653,17 @@ func (r *raft) createAERequest(peer *pb.Peer, savedCurrentTerm int64, id string)
 }
 
 func (r *raft) leaderSendAEs() {
-	r.mutex.Lock()
-	savedCurrentTerm := r.currentTerm
-	r.mutex.Unlock()
+	r.peerMtx.RLock()
+	defer r.peerMtx.RUnlock()
 
+	savedCurrentTerm := r.currentTerm
 	id := uuid.New().String()
 
 	for _, peer := range r.Peers() {
 		r.wg.Add(1)
 		go func(peer *pb.Peer) {
 			defer r.wg.Done()
-
 			request, nextIndex, entries := r.createAERequest(peer, savedCurrentTerm, id)
-
 			resp, err := r.rpcServer.Send(peer, "RPC.AppendEntries", request)
 			if err != nil {
 				r.logger.Errorf("[%s] Sending AppendEntries failed, Error = %v", request.Id, err)
@@ -683,21 +678,21 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 	reply := &pb.AppendEntryReply{Id: request.Id}
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	if r.state == Dead {
+	if r.State() == Dead {
 		return reply, nil
 	}
 
-	r.logger.Debugf("[%s] [%s]  Received AppendEntries, current Term = %v", r.state,
-		request.Id, r.currentTerm)
+	r.logger.Debugf("[%s][%s][%s] Received AppendEntries from [%s], current Term = %v", r.Server().Name, r.State(),
+		request.Id, request.Leader.Name, r.currentTerm)
 
 	if request.Term > r.currentTerm {
-		r.logger.Debugf("[%s] [%s] request.Term = %v; currentTerm = %v; term out of date in AppendEntries",
-			r.state, request.Id, request.Term, r.currentTerm)
+		r.logger.Debugf("[%s][%s][%s] request.Term = %v; currentTerm = %v; term out of date in AppendEntries",
+			r.Server().Name, r.State(), request.Id, request.Term, r.currentTerm)
 		r.becomeFollower(request.Term)
 	}
 
 	if request.Term == r.currentTerm {
-		if r.state != Follower {
+		if r.State() != Follower {
 			r.becomeFollower(request.Term)
 		}
 		r.electionResetEvent = time.Now()
@@ -720,17 +715,11 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 				newEntriesIndex++
 			}
 			if newEntriesIndex < len(request.Entries) {
-				r.logger.Debugf("[%s] [%s] inserting entries %v from index %d", r.state,
+				r.logger.Debugf("[%s] [%s] [%s] inserting entries %v from index %d", r.Server().Name, r.State(),
 					request.Id, request.Entries[newEntriesIndex:], logInsertIndex)
 
 				r.log = append(r.log[:logInsertIndex], request.Entries[newEntriesIndex:]...)
 
-				if r.logger.IsLevelEnabled(logrus.DebugLevel) {
-					ids := make([]string, 0)
-					for _, l := range r.log {
-						ids = append(ids, l.Id)
-					}
-				}
 				err := r.persistToStorage(request.Entries[newEntriesIndex:])
 				if err != nil {
 					return nil, err
@@ -739,7 +728,7 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 
 			if request.LeaderCommit > r.commitIndex {
 				r.commitIndex = intMin(request.LeaderCommit, int64(len(r.log)-1))
-				r.logger.Debugf("[%s] [%s] setting commitIndex=%d", r.state,
+				r.logger.Debugf("[%s] [%s] setting commitIndex=%d", r.State(),
 					request.Id, r.commitIndex)
 				r.newCommitReadyChan <- struct{}{}
 			}
@@ -761,14 +750,79 @@ func (r *raft) AppendEntries(ctx context.Context, request *pb.AppendEntryRequest
 		}
 	}
 	reply.Term = r.currentTerm
-	r.logger.Debugf("[%s] [%s] AppendEntries reply: Term = %v; ConflictTerm =%v; ConflictIndex =%v; Success =%v;",
-		r.state, request.Id, reply.Term, reply.ConflictTerm, reply.ConflictIndex, reply.Success)
+	r.logger.Debugf("[%s] [%s] [%s] AppendEntries reply: Term = %v; ConflictTerm =%v; ConflictIndex =%v; "+
+		"Success =%v;", r.Server().Name, r.State(), request.Id, reply.Term, reply.ConflictTerm,
+		reply.ConflictIndex, reply.Success)
 	return reply, nil
 }
 
+//ErrorNotALeader error returned where no server leader
+var ErrorNotALeader = errors.New("not a leader")
+
+func (r *raft) submit(command interface{}, commandID string, cmdType pb.CommandType) error {
+	r.logger.Debugf("[%s] [%s] [%s] XXXXX1 submit ", r.Server().Name, commandID, r.State())
+
+	if r.State() != Leader {
+		r.logger.Debugf("[%s] [%s] [%s] ErrorNotALeader submit ", r.Server().Name, commandID, r.State())
+		return ErrorNotALeader
+	}
+
+	pv, ok := command.(proto.Message)
+	if !ok {
+		panic(fmt.Sprintf("%v is not proto.Message", pv))
+	}
+
+	any, err := anypb.New(pv)
+	if err != nil {
+		return err
+	}
+
+	entry := &pb.WalEntry{
+		Command: any,
+		Term:    r.currentTerm,
+		Id:      commandID,
+		CmdType: cmdType,
+	}
+	r.mutex.Lock()
+	r.log = append(r.log, entry)
+	r.mutex.Unlock()
+
+	err = r.persistToStorage([]*pb.WalEntry{entry})
+	if err != nil {
+		r.logger.Debugf("[%s] [%s] [%s] submit error persistToStorage", r.Server().Name, commandID, r.State())
+		return err
+	}
+	r.logger.Debugf("[%s] [%s] [%s] submit sending to triggerAEChan", r.Server().Name, commandID, r.State())
+	r.triggerAEChan <- struct{}{}
+	return nil
+}
+
+func (r *raft) SubmitAndWait(request interface{}, ID string, cmdType pb.CommandType) error {
+	r.logger.Debugf("[%s] [%s] [%s] XXXXX SubmitAndWait ", r.Server().Name, ID, r.State())
+	err := r.AddCommandListener(ID)
+	if err != nil {
+		return err
+	}
+	errChan := make(chan error)
+	go func() {
+		defer r.wg.Done()
+		errChan <- r.WaitForCommandCompletion(ID)
+	}()
+
+	err = r.submit(request, ID, cmdType)
+	if err != nil {
+		return err
+	}
+	r.wg.Add(1)
+	err = <-errChan
+	r.DeleteCommandListener(ID)
+	r.logger.Debugf("[%s] [%s] XXXXX SubmitAndWait DONE ", r.Server().Name, ID)
+	return err
+}
+
 func (r *raft) becomeFollower(term int64) {
-	r.logger.Debugf("becomes Follower with term=%d; log=%v", term, r.log)
-	r.state = Follower
+	r.logger.Debugf("[%s] becomes Follower with term=%d; log=%v", r.Server().Name, term, r.log)
+	r.SetState(Follower)
 	r.currentTerm = term
 	r.votedFor = ""
 	r.electionResetEvent = time.Now()
@@ -777,20 +831,21 @@ func (r *raft) becomeFollower(term int64) {
 	go func() {
 		defer r.wg.Done()
 		r.runElectionTimer()
-		r.logger.Debug("runElectionTimer::becomeFollower")
 	}()
 }
 
-func (r *raft) applyCommittedEntry(entry *pb.WalEntry) error {
+func (r *raft) reportCommandListener(id string, err error) {
+	r.cmdListenerMtx.Lock()
+	c, ok := r.commandErrChan[id]
+	r.cmdListenerMtx.Unlock()
+	if ok {
+		c <- err
+	}
+}
 
+func (r *raft) applyCommittedEntry(entry *pb.WalEntry) {
 	err := r.StorageManager().Apply(entry)
-	if err != nil {
-		return err
-	}
-	if c, ok := r.commitsChanMap[entry.Id]; ok {
-		close(c)
-	}
-	return nil
+	r.reportCommandListener(entry.Id, err)
 }
 
 func (r *raft) commitChanSender() {
@@ -808,10 +863,7 @@ func (r *raft) commitChanSender() {
 		r.logger.Debugf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
 
 		for _, entry := range entries {
-			err := r.applyCommittedEntry(entry)
-			if err != nil {
-				return
-			}
+			r.applyCommittedEntry(entry)
 		}
 	}
 	r.logger.Debug("commitChanSender done")
@@ -830,11 +882,13 @@ func (r *raft) lastLogIndexAndTerm() (int64, int64) {
 }
 
 func (r *raft) persistToStorage(entries []*pb.WalEntry) error {
+
 	err := r.wal.WriteState(r.currentTerm, r.votedFor)
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
+		r.logger.Debugf("[%s] [%s] PPPPP Persisting entry -> %s", r.Server().Name, r.State(), entry.Id)
 		err := r.wal.Append(entry)
 		if err != nil {
 			return err

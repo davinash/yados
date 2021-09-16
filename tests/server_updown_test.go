@@ -7,7 +7,7 @@ import (
 	"github.com/davinash/yados/internal/server"
 )
 
-func createStore(srv server.Server, storeName string) error {
+func createStore(srv server.Server, storeName string) (*pb.StoreCreateReply, error) {
 	return server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,
 	}, srv.Address(), srv.Port())
@@ -29,9 +29,9 @@ func performPut(srv server.Server, numOfPuts int, storeName string, prefix strin
 
 func (suite *YadosTestSuite) TestRandomServerDown() {
 	storeName := "TestRandomServerDown"
-	WaitForLeaderElection(suite.cluster)
+	//WaitForLeaderElection(suite.cluster)
 
-	if err := createStore(suite.cluster.members[0], storeName); err != nil {
+	if _, err := createStore(suite.cluster.members[0], storeName); err != nil {
 		suite.T().Fatal(err)
 	}
 	if err := performPut(suite.cluster.members[0], 10, storeName, "BeforeRestart"); err != nil {
@@ -42,12 +42,10 @@ func (suite *YadosTestSuite) TestRandomServerDown() {
 	if err != nil {
 		suite.T().Fatal(err)
 	}
-	WaitForLeaderElection(suite.cluster)
+	//WaitForLeaderElection(suite.cluster)
 	if err := performPut(suite.cluster.members[1], 10, storeName, "AfterOneNodeDown"); err != nil {
 		suite.T().Fatal(err)
 	}
-	if err := suite.cluster.members[0].Serve([]*pb.Peer{suite.cluster.members[1].Self(),
-		suite.cluster.members[2].Self()}); err != nil {
-		suite.T().Fatal(err)
-	}
+	//suite.cluster.members[0].Serve( /*[]*pb.Peer{suite.cluster.members[1].Self(),
+	//suite.cluster.members[2].Self()}*/)
 }

@@ -22,7 +22,7 @@ var ErrorUnknownMethod = errors.New("unknown method ")
 
 //Server interface for rpc server
 type Server interface {
-	Start() error
+	Start()
 	Stop() error
 	Send(peer *pb.Peer, serviceMethod string, args interface{}) (interface{}, error)
 	GrpcServer() *grpc.Server
@@ -52,26 +52,24 @@ func (rpc *rpcServer) GrpcServer() *grpc.Server {
 	return rpc.grpcServer
 }
 
-func (rpc *rpcServer) Start() error {
+func (rpc *rpcServer) Start() {
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", rpc.address, rpc.port))
 	if err != nil {
-		return ErrorPortNotOpen
+		panic(err)
 	}
 
 	go func() {
 		err := rpc.grpcServer.Serve(lis)
 		if err != nil {
-			rpc.logger.Errorf("failed to start the grpc server, Error = %v", err)
-			return
+			panic(err)
 		}
 	}()
-	return nil
 }
 
 func (rpc *rpcServer) Stop() error {
-	rpc.logger.Debug("Stopping RPC server")
+	rpc.logger.Debugf("[%s] Stopping RPC server", rpc.srvName)
 	rpc.grpcServer.Stop()
-	rpc.logger.Debug("Stopped RPC server")
+	rpc.logger.Debugf("[%s] Stopped RPC server", rpc.srvName)
 	return nil
 }
 
@@ -101,8 +99,8 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 	switch serviceMethod {
 	case "RPC.RequestVote":
 		request := args.(*pb.VoteRequest)
-		rpc.logger.Debugf("[%s] Type = RequestVotes %s -----> %s  "+
-			"Request : {Term = %v Candidate Name = %v }", request.Id, rpc.srvName, peer.Name,
+		rpc.logger.Debugf("[%s] [%s] Sending RequestVotes to [%s]  "+
+			"Request : {Term = %v Candidate Name = %v }", rpc.srvName, request.Id, peer.Name,
 			request.Term, request.CandidateName)
 
 		reply, err := rpcClient.RequestVotes(context.Background(), request)
@@ -110,23 +108,17 @@ func (rpc *rpcServer) Send(peer *pb.Peer, serviceMethod string, args interface{}
 			return nil, err
 		}
 		return reply, nil
-	case "server.AddNewMember":
-		request := args.(*pb.NewPeerRequest)
-		rpc.logger.Debugf("[%s] Type = AddNewMember %s -----> %s  ",
-			request.Id, rpc.srvName, peer.Name)
-
-		reply, err := rpcClient.AddMember(context.Background(), request)
-		if err != nil {
-			return nil, err
-		}
-		return reply, nil
 	case "RPC.AppendEntries":
 		request := args.(*pb.AppendEntryRequest)
 
-		rpc.logger.Debugf("[%s] AppendEntries ( -> %s ) : nextIndex = %d Term = %v; LeaderName = "+
-			"%v; PrevLogTerm = %v; PrevLogIndex = %v; LeaderCommit = %v ", request.Id,
+		rpc.logger.Debugf("[%s] [%s] DDDDD Sending AppendEntries to [%s] : nextIndex= %d; Term= %v; LeaderName= "+
+			"%v; PrevLogTerm= %v; PrevLogIndex= %v; LeaderCommit= %v ", rpc.srvName, request.Id,
 			peer.Name, request.NextIndex, request.Term, request.Leader.Name, request.PrevLogTerm,
 			request.PrevLogIndex, request.LeaderCommit)
+
+		for _, e := range request.Entries {
+			rpc.logger.Debugf("[%s] [%s] rpcClient.AppendEntries", rpc.srvName, e.Id)
+		}
 
 		reply, err := rpcClient.AppendEntries(context.Background(), request)
 		if err != nil {

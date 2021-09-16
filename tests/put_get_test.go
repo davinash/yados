@@ -7,9 +7,8 @@ import (
 )
 
 func (suite *YadosTestSuite) TestPutGet() {
-	WaitForLeaderElection(suite.cluster)
 
-	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: "TestPut",
 	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
@@ -38,9 +37,8 @@ func (suite *YadosTestSuite) TestPutGet() {
 }
 
 func (suite *YadosTestSuite) TestPutGetMultiple() {
-	WaitForLeaderElection(suite.cluster)
 
-	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: "TestPut",
 	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {

@@ -21,7 +21,7 @@ const _ = grpc.SupportPackageIsVersion7
 type YadosServiceClient interface {
 	RequestVotes(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*VoteReply, error)
 	AppendEntries(ctx context.Context, in *AppendEntryRequest, opts ...grpc.CallOption) (*AppendEntryReply, error)
-	AddMember(ctx context.Context, in *NewPeerRequest, opts ...grpc.CallOption) (*NewPeerReply, error)
+	AddPeers(ctx context.Context, in *AddPeersRequest, opts ...grpc.CallOption) (*AddPeersReply, error)
 	RemovePeer(ctx context.Context, in *RemovePeerRequest, opts ...grpc.CallOption) (*RemovePeerReply, error)
 	PeerStatus(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusReply, error)
 	ClusterStatus(ctx context.Context, in *ClusterStatusRequest, opts ...grpc.CallOption) (*ClusterStatusReply, error)
@@ -32,6 +32,7 @@ type YadosServiceClient interface {
 	DeleteStore(ctx context.Context, in *StoreDeleteRequest, opts ...grpc.CallOption) (*StoreDeleteReply, error)
 	ExecuteQuery(ctx context.Context, in *ExecuteQueryRequest, opts ...grpc.CallOption) (*ExecuteQueryReply, error)
 	Query(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*QueryReply, error)
+	GetLeader(ctx context.Context, in *GetLeaderRequest, opts ...grpc.CallOption) (*GetLeaderReply, error)
 }
 
 type yadosServiceClient struct {
@@ -60,9 +61,9 @@ func (c *yadosServiceClient) AppendEntries(ctx context.Context, in *AppendEntryR
 	return out, nil
 }
 
-func (c *yadosServiceClient) AddMember(ctx context.Context, in *NewPeerRequest, opts ...grpc.CallOption) (*NewPeerReply, error) {
-	out := new(NewPeerReply)
-	err := c.cc.Invoke(ctx, "/YadosService/AddMember", in, out, opts...)
+func (c *yadosServiceClient) AddPeers(ctx context.Context, in *AddPeersRequest, opts ...grpc.CallOption) (*AddPeersReply, error) {
+	out := new(AddPeersReply)
+	err := c.cc.Invoke(ctx, "/YadosService/AddPeers", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -159,13 +160,22 @@ func (c *yadosServiceClient) Query(ctx context.Context, in *QueryRequest, opts .
 	return out, nil
 }
 
+func (c *yadosServiceClient) GetLeader(ctx context.Context, in *GetLeaderRequest, opts ...grpc.CallOption) (*GetLeaderReply, error) {
+	out := new(GetLeaderReply)
+	err := c.cc.Invoke(ctx, "/YadosService/GetLeader", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YadosServiceServer is the server API for YadosService service.
 // All implementations must embed UnimplementedYadosServiceServer
 // for forward compatibility
 type YadosServiceServer interface {
 	RequestVotes(context.Context, *VoteRequest) (*VoteReply, error)
 	AppendEntries(context.Context, *AppendEntryRequest) (*AppendEntryReply, error)
-	AddMember(context.Context, *NewPeerRequest) (*NewPeerReply, error)
+	AddPeers(context.Context, *AddPeersRequest) (*AddPeersReply, error)
 	RemovePeer(context.Context, *RemovePeerRequest) (*RemovePeerReply, error)
 	PeerStatus(context.Context, *StatusRequest) (*StatusReply, error)
 	ClusterStatus(context.Context, *ClusterStatusRequest) (*ClusterStatusReply, error)
@@ -176,6 +186,7 @@ type YadosServiceServer interface {
 	DeleteStore(context.Context, *StoreDeleteRequest) (*StoreDeleteReply, error)
 	ExecuteQuery(context.Context, *ExecuteQueryRequest) (*ExecuteQueryReply, error)
 	Query(context.Context, *QueryRequest) (*QueryReply, error)
+	GetLeader(context.Context, *GetLeaderRequest) (*GetLeaderReply, error)
 	mustEmbedUnimplementedYadosServiceServer()
 }
 
@@ -189,8 +200,8 @@ func (UnimplementedYadosServiceServer) RequestVotes(context.Context, *VoteReques
 func (UnimplementedYadosServiceServer) AppendEntries(context.Context, *AppendEntryRequest) (*AppendEntryReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppendEntries not implemented")
 }
-func (UnimplementedYadosServiceServer) AddMember(context.Context, *NewPeerRequest) (*NewPeerReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddMember not implemented")
+func (UnimplementedYadosServiceServer) AddPeers(context.Context, *AddPeersRequest) (*AddPeersReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddPeers not implemented")
 }
 func (UnimplementedYadosServiceServer) RemovePeer(context.Context, *RemovePeerRequest) (*RemovePeerReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemovePeer not implemented")
@@ -221,6 +232,9 @@ func (UnimplementedYadosServiceServer) ExecuteQuery(context.Context, *ExecuteQue
 }
 func (UnimplementedYadosServiceServer) Query(context.Context, *QueryRequest) (*QueryReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Query not implemented")
+}
+func (UnimplementedYadosServiceServer) GetLeader(context.Context, *GetLeaderRequest) (*GetLeaderReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLeader not implemented")
 }
 func (UnimplementedYadosServiceServer) mustEmbedUnimplementedYadosServiceServer() {}
 
@@ -271,20 +285,20 @@ func _YadosService_AppendEntries_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _YadosService_AddMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NewPeerRequest)
+func _YadosService_AddPeers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddPeersRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(YadosServiceServer).AddMember(ctx, in)
+		return srv.(YadosServiceServer).AddPeers(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/YadosService/AddMember",
+		FullMethod: "/YadosService/AddPeers",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YadosServiceServer).AddMember(ctx, req.(*NewPeerRequest))
+		return srv.(YadosServiceServer).AddPeers(ctx, req.(*AddPeersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -469,6 +483,24 @@ func _YadosService_Query_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _YadosService_GetLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLeaderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YadosServiceServer).GetLeader(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/YadosService/GetLeader",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YadosServiceServer).GetLeader(ctx, req.(*GetLeaderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // YadosService_ServiceDesc is the grpc.ServiceDesc for YadosService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -485,8 +517,8 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _YadosService_AppendEntries_Handler,
 		},
 		{
-			MethodName: "AddMember",
-			Handler:    _YadosService_AddMember_Handler,
+			MethodName: "AddPeers",
+			Handler:    _YadosService_AddPeers_Handler,
 		},
 		{
 			MethodName: "RemovePeer",
@@ -527,6 +559,10 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Query",
 			Handler:    _YadosService_Query_Handler,
+		},
+		{
+			MethodName: "GetLeader",
+			Handler:    _YadosService_GetLeader_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

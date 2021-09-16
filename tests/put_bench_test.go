@@ -51,21 +51,20 @@ func BenchmarkPut(b *testing.B) {
 	cluster := &TestCluster{}
 	walDir := SetupDataDirectory()
 
-	err := CreateNewClusterEx(3, cluster, walDir, "debug")
+	err := CreateNewClusterEx(3, cluster, walDir, "debug", nil)
 	if err != nil {
 		b.Fail()
 	}
-	WaitForLeaderElection(cluster)
 
 	defer func() {
-		StopCluster(cluster)
+		StopCluster(cluster, nil)
 		Cleanup(walDir)
 	}()
 
 	b.Run("ABC", func(b *testing.B) {
 		storeName := "BenchmarkPut"
 		b.Log("Creating a store")
-		err = server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+		_, err = server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 			Name: storeName,
 		}, cluster.members[0].Address(), cluster.members[0].Port())
 		if err != nil {

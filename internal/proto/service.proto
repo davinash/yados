@@ -2,6 +2,7 @@ syntax = "proto3";
 option go_package = "/gen";
 
 import "google/protobuf/any.proto";
+import "common.proto";
 
 enum CommandType {
   CreateStore = 0;
@@ -60,18 +61,13 @@ message AppendEntryReply {
   int64 ConflictTerm = 5;
 }
 
-message Peer {
-  string name = 1;
-  string address = 2;
-  int32  port = 3;
-}
 
-message NewPeerRequest {
+message AddPeersRequest {
   string Id = 1;
-  Peer NewPeer = 2;
+  repeated Peer peers = 2;
 }
 
-message NewPeerReply {
+message AddPeersReply {
   string Id = 1;
 }
 
@@ -120,7 +116,7 @@ message StoreCreateRequest {
 
 message StoreCreateReply {
   string Id = 1;
-  string error = 2;
+  string msg = 2;
 }
 
 message CommandRequest {
@@ -211,7 +207,7 @@ message QueryReply {
 service YadosService {
   rpc RequestVotes(VoteRequest) returns (VoteReply) {}
   rpc AppendEntries(AppendEntryRequest) returns (AppendEntryReply) {}
-  rpc AddMember(NewPeerRequest) returns (NewPeerReply) {}
+  rpc AddPeers(AddPeersRequest) returns (AddPeersReply) {}
   rpc RemovePeer(RemovePeerRequest) returns(RemovePeerReply) {}
   rpc PeerStatus(StatusRequest) returns (StatusReply) {}
   rpc ClusterStatus(ClusterStatusRequest) returns (ClusterStatusReply) {}
@@ -222,4 +218,5 @@ service YadosService {
   rpc DeleteStore(StoreDeleteRequest) returns (StoreDeleteReply) {}
   rpc ExecuteQuery(ExecuteQueryRequest) returns (ExecuteQueryReply) {}
   rpc Query(QueryRequest) returns (QueryReply) {}
+  rpc GetLeader(GetLeaderRequest) returns ( GetLeaderReply) {}
 }

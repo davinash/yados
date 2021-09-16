@@ -1,0 +1,24 @@
+syntax = "proto3";
+option go_package = "/gen";
+
+import "common.proto";
+
+message RegisterRequest {
+  Peer server = 1;
+}
+
+message RegisterReply {
+}
+
+message UnRegisterRequest {
+  Peer server = 1;
+}
+
+message UnRegisterReply {
+}
+
+service ControllerService {
+  rpc Register(RegisterRequest) returns (RegisterReply);
+  rpc UnRegister(UnRegisterRequest) returns (UnRegisterReply);
+  rpc GetLeader(GetLeaderRequest) returns (GetLeaderReply);
+}

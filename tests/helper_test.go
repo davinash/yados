@@ -7,13 +7,10 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
-	"sync"
 	"testing"
 
-	"github.com/davinash/yados/internal/raft"
+	"github.com/davinash/yados/internal/controller"
 
-	pb "github.com/davinash/yados/internal/proto/gen"
 	"github.com/davinash/yados/internal/server"
 	"github.com/stretchr/testify/suite"
 )
@@ -26,47 +23,42 @@ type TestCluster struct {
 
 type YadosTestSuite struct {
 	suite.Suite
-	cluster *TestCluster
-	walDir  string
+	cluster    *TestCluster
+	controller *controller.Controller
+	walDir     string
 }
 
 //GetFreePort Get the next free port ( Only for test purpose )
-func GetFreePort() (int, *net.TCPListener, error) {
+func GetFreePort() (int, *net.TCPListener) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
-		return 0, nil, err
+		panic(err)
 	}
 
 	l, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		return 0, nil, err
+		panic(err)
 	}
-	return l.Addr().(*net.TCPAddr).Port, l, nil
+	return l.Addr().(*net.TCPAddr).Port, l
 }
 
 // GetFreePorts allocates a batch of n TCP ports in one go to avoid collisions. ( Only for test purpose )
-func GetFreePorts(n int) ([]int, error) {
+func GetFreePorts(n int) []int {
 	ports := make([]int, 0)
 	for i := 0; i < n; i++ {
-		port, listener, err := GetFreePort()
+		port, listener := GetFreePort()
+		err := listener.Close()
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
-		listener.Close()
 		ports = append(ports, port)
 	}
-	return ports, nil
+	return ports
 }
 
-func AddNewServer(suffix int, members []server.Server, walDir string, logLevel string, isWithHTTP bool) (server.Server, int, error) {
-	freePorts, err := GetFreePorts(1)
-	if err != nil {
-		return nil, -1, err
-	}
-	peers := make([]*pb.Peer, 0)
-	for _, p := range members {
-		peers = append(peers, p.Self())
-	}
+func AddNewServer(suffix int, members []server.Server, walDir string, logLevel string, isWithHTTP bool,
+	controller *controller.Controller) (server.Server, int, error) {
+	freePorts := GetFreePorts(1)
 	srvArgs := &server.NewServerArgs{
 		Name:       fmt.Sprintf("Server-%d", suffix),
 		Address:    "127.0.0.1",
@@ -78,33 +70,28 @@ func AddNewServer(suffix int, members []server.Server, walDir string, logLevel s
 	}
 
 	if isWithHTTP {
-		ports, err := GetFreePorts(1)
-		if err != nil {
-			return nil, -1, err
-		}
+		ports := GetFreePorts(1)
 		srvArgs.HTTPPort = ports[0]
 	}
+	srvArgs.Controllers = make([]string, 0)
+	srvArgs.Controllers = append(srvArgs.Controllers, fmt.Sprintf("%s:%d", controller.Address(), controller.Port()))
 	srv, err := server.NewServer(srvArgs)
 	if err != nil {
 		return nil, -1, err
 	}
-
-	err = srv.Serve(peers)
-	if err != nil {
-		return nil, -1, err
-	}
-	return srv, srvArgs.HTTPPort, nil
+	return srv, srvArgs.HTTPPort, srv.Serve()
 }
 
-func CreateNewClusterEx(numOfServers int, cluster *TestCluster, walDir string, logLevel string) error {
-	srv, _, err := AddNewServer(0, cluster.members, walDir, logLevel, false)
+func CreateNewClusterEx(numOfServers int, cluster *TestCluster, walDir string, logLevel string,
+	controller *controller.Controller) error {
+	srv, _, err := AddNewServer(0, cluster.members, walDir, logLevel, false, controller)
 	if err != nil {
 		panic(err)
 	}
 	cluster.members = append(cluster.members, srv)
 
 	for i := 1; i < numOfServers; i++ {
-		srv, _, err := AddNewServer(i, cluster.members, walDir, logLevel, false)
+		srv, _, err := AddNewServer(i, cluster.members, walDir, logLevel, false, controller)
 		if err != nil {
 			panic(err)
 		}
@@ -119,29 +106,27 @@ func (suite *YadosTestSuite) CreateNewCluster(numOfServers int) error {
 		members:      make([]server.Server, 0),
 		numOfServers: numOfServers,
 	}
-	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.walDir, "debug")
+	ports := GetFreePorts(1)
+	suite.controller = controller.NewController("127.0.0.1", int32(ports[0]), "debug")
+	suite.controller.Start()
+
+	err := CreateNewClusterEx(numOfServers, suite.cluster, suite.walDir, "debug", suite.controller)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 //StopCluster To stop the cluster ( Only for Test Purpose )
-func StopCluster(cluster *TestCluster) {
-	var wg sync.WaitGroup
+func StopCluster(cluster *TestCluster, controller *controller.Controller) {
 	for _, srv := range cluster.members {
-		wg.Add(1)
-		go func(wg *sync.WaitGroup, srv server.Server) {
-			defer wg.Done()
-			if srv.State() != raft.Dead {
-				err := srv.Stop()
-				if err != nil {
-					log.Printf("StopCluster -> %v", err)
-				}
-			}
-		}(&wg, srv)
+		err := srv.Stop()
+		if err != nil {
+			log.Printf("StopCluster -> %v", err)
+		}
 	}
-	wg.Wait()
+	controller.Stop()
 }
 
 func SetupDataDirectory() string {
@@ -168,36 +153,13 @@ func (suite *YadosTestSuite) SetupTest() {
 
 }
 
-func WaitForLeaderElection(cluster *TestCluster) *pb.Peer {
-	for _, s := range cluster.members {
-		s.EventHandler().LeaderChangeChan = make(chan interface{})
-	}
-	defer func() {
-		for _, s := range cluster.members {
-			close(s.EventHandler().LeaderChangeChan)
-			s.EventHandler().LeaderChangeChan = nil
-		}
-	}()
-
-	var set []reflect.SelectCase
-	for _, s := range cluster.members {
-		set = append(set, reflect.SelectCase{
-			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(s.EventHandler().LeaderChangeChan),
-		})
-	}
-	_, valValue, _ := reflect.Select(set)
-	peer := valValue.Interface().(*pb.Peer)
-	return peer
-}
-
 func Cleanup(walDir string) {
 	_ = os.RemoveAll(walDir)
 }
 
 func (suite *YadosTestSuite) TearDownTest() {
 	suite.T().Log("Running TearDownTest")
-	StopCluster(suite.cluster)
+	StopCluster(suite.cluster, suite.controller)
 	Cleanup(suite.walDir)
 }
 

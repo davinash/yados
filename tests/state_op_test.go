@@ -1,7 +1,6 @@
 package tests
 
 func (suite *YadosTestSuite) TestStateFileOp() {
-	WaitForLeaderElection(suite.cluster)
 
 	err := suite.cluster.members[0].WAL().WriteState(1, "abc")
 	if err != nil {

@@ -52,10 +52,11 @@ type Manager interface {
 }
 
 type manager struct {
-	mutex  sync.Mutex
+	mutex  sync.RWMutex
 	stores map[string]Store
 	logger *logrus.Logger
 	walDir string
+	wg     sync.WaitGroup
 }
 
 //NewStoreManger new instance of storage manager
@@ -72,6 +73,9 @@ func (sm *manager) Create(request *pb.StoreCreateRequest) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
+	sm.wg.Add(1)
+	defer sm.wg.Done()
+
 	if request.Type == pb.StoreType_Sqlite {
 		s, err := NewSqliteStore(&Args{
 			Name:   request.Name,
@@ -84,9 +88,20 @@ func (sm *manager) Create(request *pb.StoreCreateRequest) error {
 		sm.Stores()[request.Name] = s
 	} else if request.Type == pb.StoreType_Memory {
 		s := NewStore(request.Name)
-		sm.Stores()[request.Name] = s
+		sm.stores[request.Name] = s
 	} else {
 		return fmt.Errorf("type not supported by store")
+	}
+	return nil
+}
+
+func (sm *manager) Close() error {
+	sm.wg.Wait()
+	for _, store := range sm.Stores() {
+		err := store.Close()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -95,6 +110,9 @@ func (sm *manager) Delete(request *pb.StoreDeleteRequest) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
+	sm.wg.Add(1)
+	defer sm.wg.Done()
+
 	delete(sm.Stores(), request.StoreName)
 
 	return nil
@@ -102,16 +120,6 @@ func (sm *manager) Delete(request *pb.StoreDeleteRequest) error {
 
 func (sm *manager) Stores() map[string]Store {
 	return sm.stores
-}
-
-func (sm *manager) Close() error {
-	for _, store := range sm.Stores() {
-		err := store.Close()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (sm *manager) Apply(entry *pb.WalEntry) error {

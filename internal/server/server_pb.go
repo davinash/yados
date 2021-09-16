@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sync"
+	"fmt"
 
 	"github.com/davinash/yados/internal/store"
+	"google.golang.org/grpc"
 
 	"github.com/davinash/yados/internal/raft"
 
@@ -28,33 +29,9 @@ func (srv *server) AppendEntries(ctx context.Context, request *pb.AppendEntryReq
 	return srv.Raft().AppendEntries(ctx, request)
 }
 
-func (srv *server) AddMember(ctx context.Context, newPeer *pb.NewPeerRequest) (*pb.NewPeerReply, error) {
-	EmptyNewMemberReply := &pb.NewPeerReply{Id: newPeer.Id}
-	srv.logger.Debugf("[%s] Received AddMember", newPeer.Id)
-	srv.mutex.Lock()
-	defer srv.mutex.Unlock()
-	// 1. check if the member with this name already exists
-	for _, peer := range srv.Peers() {
-		if peer.Name == newPeer.NewPeer.Name {
-			return EmptyNewMemberReply, ErrorPeerAlreadyExists
-		}
-	}
-	// Add new member
-	err := srv.Raft().AddPeer(&pb.Peer{
-		Name:    newPeer.NewPeer.Name,
-		Address: newPeer.NewPeer.Address,
-		Port:    newPeer.NewPeer.Port,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return EmptyNewMemberReply, nil
-}
-
 func (srv *server) RemovePeer(ctx context.Context, request *pb.RemovePeerRequest) (*pb.RemovePeerReply, error) {
 	EmptyRemovePeerReply := &pb.RemovePeerReply{Id: request.Id}
-	srv.logger.Debugf("[%s] Received RemovePeer", request.Id)
+	srv.logger.Debugf("[%s] [%s] Received RemovePeer", srv.Name(), request.Id)
 
 	err := srv.Raft().RemovePeer(request)
 	if err != nil {
@@ -68,9 +45,10 @@ func (srv *server) PeerStatus(ctx context.Context, request *pb.StatusRequest) (*
 		Id:       request.Id,
 		IsLeader: false,
 	}
+
 	reply.Server = srv.Self()
-	reply.Status = srv.State().String()
-	if srv.State() == raft.Leader {
+	reply.Status = srv.Raft().State().String()
+	if srv.Raft().State() == raft.Leader {
 		reply.IsLeader = true
 	}
 	return reply, nil
@@ -95,49 +73,23 @@ func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusR
 	return reply, nil
 }
 
-func (srv *server) SubmitToRaft(request interface{}, ID string, cmdType pb.CommandType) error {
-	err := srv.Raft().AddCommandListener(ID)
-	if err != nil {
-		return err
-	}
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		srv.Raft().WaitForCommandCompletion(ID)
-	}()
-
-	err = srv.Raft().Submit(request, ID, cmdType)
-	if err != nil {
-		return err
-	}
-	wg.Wait()
-	return nil
-}
-
 //ErrorStoreAlreadyExists error if store with this name already exists
 var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
 
 func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
+	srv.logger.Debugf("[%s] [%s] XXXXX Received request CreateStore id=%v Name=%v, Type=%v",
+		srv.Name(), srv.State(), request.Id, request.Name, request.Type)
 	reply := &pb.StoreCreateReply{}
 	// Check if store with name already exists
 	if _, ok := srv.StoreManager().Stores()[request.Name]; ok {
-		reply.Error = ErrorStoreAlreadyExists.Error()
 		return reply, ErrorStoreAlreadyExists
 	}
 
-	if srv.logger.IsLevelEnabled(logrus.DebugLevel) {
-		marshal, err := json.Marshal(request)
-		if err != nil {
-			return nil, err
-		}
-		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
-	}
-
-	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_CreateStore)
+	err := srv.Raft().SubmitAndWait(request, request.Id, pb.CommandType_CreateStore)
 	if err != nil {
 		return reply, err
 	}
+	reply.Msg = fmt.Sprintf("Store = %s, Type = %s created", request.Name, request.Type.String())
 	return reply, nil
 }
 
@@ -157,7 +109,7 @@ func (srv *server) DeleteStore(ctx context.Context, request *pb.StoreDeleteReque
 		}
 		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
 	}
-	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_DeleteStore)
+	err := srv.Raft().SubmitAndWait(request, request.Id, pb.CommandType_DeleteStore)
 	if err != nil {
 		return reply, err
 	}
@@ -180,7 +132,7 @@ func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRepl
 		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
 	}
 
-	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_Put)
+	err := srv.Raft().SubmitAndWait(request, request.Id, pb.CommandType_Put)
 	if err != nil {
 		return reply, err
 	}
@@ -211,18 +163,14 @@ func (srv *server) ListStores(ctx context.Context, request *pb.ListStoreRequest)
 }
 
 func (srv *server) ExecuteQuery(ctx context.Context, request *pb.ExecuteQueryRequest) (*pb.ExecuteQueryReply, error) {
-	reply := &pb.ExecuteQueryReply{}
+	reply := &pb.ExecuteQueryReply{Id: request.Id}
 
 	// Check if store with name exists
 	if _, ok := srv.StoreManager().Stores()[request.StoreName]; !ok {
 		return reply, ErrorStoreDoesExists
 	}
 
-	err := srv.SubmitToRaft(request, request.Id, pb.CommandType_SqlDDL)
-	if err != nil {
-		return reply, err
-	}
-
+	err := srv.Raft().SubmitAndWait(request, request.Id, pb.CommandType_SqlDDL)
 	return reply, err
 }
 
@@ -233,9 +181,39 @@ func (srv *server) Query(ctx context.Context, request *pb.QueryRequest) (*pb.Que
 	}
 
 	resp, err := (srv.StoreManager().Stores()[request.StoreName].(store.SQLStore)).Query(request)
-	if err != nil {
-		return reply, err
-	}
+	return resp, err
+}
 
-	return resp, nil
+func (srv *server) AddPeers(ctx context.Context, peers *pb.AddPeersRequest) (*pb.AddPeersReply, error) {
+	srv.mutex.Lock()
+	defer srv.mutex.Unlock()
+
+	for _, p := range peers.GetPeers() {
+		if p.Name != srv.Name() {
+			srv.Raft().AddPeer(p)
+		}
+	}
+	return &pb.AddPeersReply{}, nil
+}
+
+func (srv *server) GetLeader(ctx context.Context, request *pb.GetLeaderRequest) (*pb.GetLeaderReply, error) {
+	controllers := srv.Controller()
+
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", controllers[0].address, controllers[0].port), grpc.WithInsecure())
+	if err != nil {
+		return &pb.GetLeaderReply{}, fmt.Errorf("failed to connect with controller[%s:%d], "+
+			"error = %w", controllers[0].address, controllers[0].port, err)
+	}
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			srv.logger.Warnf("failed to close the connection with controller, Error = %v", err)
+		}
+	}(conn)
+	controller := pb.NewControllerServiceClient(conn)
+	leader, err := controller.GetLeader(ctx, request)
+	if err != nil {
+		return &pb.GetLeaderReply{}, err
+	}
+	return leader, nil
 }

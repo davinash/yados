@@ -8,7 +8,6 @@ import (
 )
 
 func (suite *YadosTestSuite) TestStoreCreate() {
-	WaitForLeaderElection(suite.cluster)
 
 	wg := sync.WaitGroup{}
 	WaitForEvents(suite.cluster.members, &wg, 1)
@@ -16,7 +15,7 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 		StopWaitForEvents(suite.cluster.members)
 	}()
 
-	err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: "TestStoreCreate",
 	}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 	if err != nil {
@@ -26,7 +25,6 @@ func (suite *YadosTestSuite) TestStoreCreate() {
 }
 
 func (suite *YadosTestSuite) TestStoreList() {
-	WaitForLeaderElection(suite.cluster)
 
 	wg := sync.WaitGroup{}
 	WaitForEvents(suite.cluster.members, &wg, 5)
@@ -35,7 +33,7 @@ func (suite *YadosTestSuite) TestStoreList() {
 	}()
 
 	for i := 0; i < 5; i++ {
-		err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
+		_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 			Name: fmt.Sprintf("TestStoreList-%d", i),
 		}, suite.cluster.members[0].Address(), suite.cluster.members[0].Port())
 		if err != nil {
