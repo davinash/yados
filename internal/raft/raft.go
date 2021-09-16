@@ -76,10 +76,11 @@ type Raft interface {
 }
 
 type raft struct {
-	mutex    sync.Mutex
-	stateMtx sync.RWMutex
-	peerMtx  sync.RWMutex
-	peers    map[string]*pb.Peer
+	mutex          sync.Mutex
+	stateMtx       sync.RWMutex
+	peerMtx        sync.RWMutex
+	cmdListenerMtx sync.RWMutex
+	peers          map[string]*pb.Peer
 
 	// Persistent Raft state on all servers
 	currentTerm int64
@@ -299,19 +300,31 @@ func (r *raft) IsRunning() bool {
 }
 
 func (r *raft) AddCommandListener(id string) error {
+	r.cmdListenerMtx.Lock()
+	defer r.cmdListenerMtx.Unlock()
+
 	r.commandErrChan[id] = make(chan error)
 	return nil
+}
+
+func (r *raft) DeleteCommandListener(id string) {
+	r.cmdListenerMtx.Lock()
+	delete(r.commandErrChan, id)
+	r.cmdListenerMtx.Unlock()
 }
 
 func (r *raft) WaitForCommandCompletion(id string) error {
 	r.logger.Debugf("[%s] WaitForCommandCompletion for %s", r.Server().Name, id)
 	var err error
-	if v, ok := r.commandErrChan[id]; ok {
+
+	r.cmdListenerMtx.Lock()
+	v, ok := r.commandErrChan[id]
+	r.cmdListenerMtx.Unlock()
+
+	if ok {
 		err = <-v
 	}
-	r.mutex.Lock()
-	delete(r.commandErrChan, id)
-	r.mutex.Unlock()
+
 	r.logger.Debugf("[%s] COMPLETED WaitForCommandCompletion for %s", r.Server().Name, id)
 	return err
 }
@@ -770,7 +783,9 @@ func (r *raft) submit(command interface{}, commandID string, cmdType pb.CommandT
 		Id:      commandID,
 		CmdType: cmdType,
 	}
+	r.mutex.Lock()
 	r.log = append(r.log, entry)
+	r.mutex.Unlock()
 
 	err = r.persistToStorage([]*pb.WalEntry{entry})
 	if err != nil {
@@ -800,6 +815,7 @@ func (r *raft) SubmitAndWait(request interface{}, ID string, cmdType pb.CommandT
 	}
 	r.wg.Add(1)
 	err = <-errChan
+	r.DeleteCommandListener(ID)
 	r.logger.Debugf("[%s] [%s] XXXXX SubmitAndWait DONE ", r.Server().Name, ID)
 	return err
 }
@@ -819,7 +835,10 @@ func (r *raft) becomeFollower(term int64) {
 }
 
 func (r *raft) reportCommandListener(id string, err error) {
-	if c, ok := r.commandErrChan[id]; ok {
+	r.cmdListenerMtx.Lock()
+	c, ok := r.commandErrChan[id]
+	r.cmdListenerMtx.Unlock()
+	if ok {
 		c <- err
 	}
 }
