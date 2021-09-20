@@ -151,7 +151,7 @@ func NewRaft(args *Args) (Raft, error) {
 	r.lastApplied = -1
 	r.nextIndex = make(map[string]int64)
 	r.matchIndex = make(map[string]int64)
-	r.newCommitReadyChan = make(chan struct{}, 16)
+	r.newCommitReadyChan = make(chan struct{})
 	r.commandErrChan = make(map[string]chan error)
 
 	err := r.InitializeFromStorage()
@@ -202,6 +202,7 @@ func (r *raft) InitializeFromStorage() error {
 }
 
 func (r *raft) Start() {
+	r.wg.Add(1)
 	go func() {
 		<-r.ready
 		r.mutex.Lock()
@@ -209,6 +210,7 @@ func (r *raft) Start() {
 		r.mutex.Unlock()
 		r.runElectionTimer()
 	}()
+	r.wg.Add(1)
 	go r.commitChanSender()
 
 }
@@ -347,6 +349,7 @@ func (r *raft) electionTimeout() time.Duration {
 }
 
 func (r *raft) runElectionTimer() {
+	defer r.wg.Done()
 	timeoutDuration := r.electionTimeout()
 	r.mutex.Lock()
 	termStarted := r.currentTerm
@@ -450,7 +453,6 @@ func (r *raft) startElection() {
 	// Run another election timer, in case this election is not successful.
 	r.wg.Add(1)
 	go func() {
-		defer r.wg.Done()
 		r.runElectionTimer()
 	}()
 
@@ -829,7 +831,6 @@ func (r *raft) becomeFollower(term int64) {
 
 	r.wg.Add(1)
 	go func() {
-		defer r.wg.Done()
 		r.runElectionTimer()
 	}()
 }
@@ -849,24 +850,29 @@ func (r *raft) applyCommittedEntry(entry *pb.WalEntry) {
 }
 
 func (r *raft) commitChanSender() {
-	for range r.newCommitReadyChan {
-		// Find which entries we have to Apply.
-		r.mutex.Lock()
-		savedLastApplied := r.lastApplied
-		var entries []*pb.WalEntry
-		if r.commitIndex > r.lastApplied {
-			entries = r.log[r.lastApplied+1 : r.commitIndex+1]
-			r.lastApplied = r.commitIndex
-		}
-		r.mutex.Unlock()
+	defer r.wg.Done()
+	for {
+		select {
+		case <-r.quit:
+			return
+		case <-r.newCommitReadyChan:
+			// Find which entries we have to Apply.
+			r.mutex.Lock()
+			savedLastApplied := r.lastApplied
+			var entries []*pb.WalEntry
+			if r.commitIndex > r.lastApplied {
+				entries = r.log[r.lastApplied+1 : r.commitIndex+1]
+				r.lastApplied = r.commitIndex
+			}
+			r.mutex.Unlock()
 
-		r.logger.Debugf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
+			r.logger.Debugf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
 
-		for _, entry := range entries {
-			r.applyCommittedEntry(entry)
+			for _, entry := range entries {
+				r.applyCommittedEntry(entry)
+			}
 		}
 	}
-	r.logger.Debug("commitChanSender done")
 }
 
 func (r *raft) lastLogIndexAndTerm() (int64, int64) {

@@ -56,7 +56,6 @@ type manager struct {
 	stores map[string]Store
 	logger *logrus.Logger
 	walDir string
-	wg     sync.WaitGroup
 }
 
 //NewStoreManger new instance of storage manager
@@ -72,9 +71,6 @@ func NewStoreManger(logger *logrus.Logger, walDir string) Manager {
 func (sm *manager) Create(request *pb.StoreCreateRequest) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-
-	sm.wg.Add(1)
-	defer sm.wg.Done()
 
 	if request.Type == pb.StoreType_Sqlite {
 		s, err := NewSqliteStore(&Args{
@@ -96,7 +92,6 @@ func (sm *manager) Create(request *pb.StoreCreateRequest) error {
 }
 
 func (sm *manager) Close() error {
-	sm.wg.Wait()
 	for _, store := range sm.Stores() {
 		err := store.Close()
 		if err != nil {
@@ -109,9 +104,6 @@ func (sm *manager) Close() error {
 func (sm *manager) Delete(request *pb.StoreDeleteRequest) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-
-	sm.wg.Add(1)
-	defer sm.wg.Done()
 
 	delete(sm.Stores(), request.StoreName)
 
