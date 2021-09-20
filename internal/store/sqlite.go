@@ -49,6 +49,7 @@ func (ss *storeSqlite) Type() pb.StoreType {
 }
 
 func (ss *storeSqlite) Execute(request *pb.ExecuteQueryRequest) (*pb.ExecuteQueryReply, error) {
+
 	reply := &pb.ExecuteQueryReply{}
 
 	result, err := ss.db.Exec(request.SqlQuery)
