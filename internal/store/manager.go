@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"sync"
 
 	pb "github.com/davinash/yados/internal/proto/gen"
@@ -14,17 +13,8 @@ import (
 type Store interface {
 	Name() string
 	Close() error
-	Type() pb.StoreType
 	Create(*pb.StoreCreateRequest)
 	Delete(*pb.StoreDeleteRequest)
-}
-
-//KVStore interface for Key Value store
-type KVStore interface {
-	Store
-	Put(*pb.PutRequest) error
-	Get(*pb.GetRequest) string
-	InternalMap() map[string]string
 }
 
 //SQLStore interface for Sql store
@@ -36,10 +26,9 @@ type SQLStore interface {
 
 //Args arguments for creating new store
 type Args struct {
-	Name      string
-	WALDir    string
-	Logger    *logrus.Logger
-	StoreType pb.StoreType
+	Name   string
+	WALDir string
+	Logger *logrus.Logger
 }
 
 //Manager interface for Storage management
@@ -72,22 +61,15 @@ func (sm *manager) Create(request *pb.StoreCreateRequest) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	if request.Type == pb.StoreType_Sqlite {
-		s, err := NewSqliteStore(&Args{
-			Name:   request.Name,
-			WALDir: sm.walDir,
-			Logger: sm.logger,
-		})
-		if err != nil {
-			return err
-		}
-		sm.Stores()[request.Name] = s
-	} else if request.Type == pb.StoreType_Memory {
-		s := NewStore(request.Name)
-		sm.stores[request.Name] = s
-	} else {
-		return fmt.Errorf("type not supported by store")
+	s, err := NewSqliteStore(&Args{
+		Name:   request.Name,
+		WALDir: sm.walDir,
+		Logger: sm.logger,
+	})
+	if err != nil {
+		return err
 	}
+	sm.Stores()[request.Name] = s
 	return nil
 }
 
@@ -127,14 +109,6 @@ func (sm *manager) Apply(entry *pb.WalEntry) error {
 		if err != nil {
 			return err
 		}
-
-	case pb.CommandType_Put:
-		var req pb.PutRequest
-		err := anypb.UnmarshalTo(entry.Command, &req, proto.UnmarshalOptions{})
-		if err != nil {
-			return err
-		}
-		return (sm.Stores()[req.StoreName].(KVStore)).Put(&req)
 
 	case pb.CommandType_DeleteStore:
 		var req pb.StoreDeleteRequest

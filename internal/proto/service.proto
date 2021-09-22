@@ -6,16 +6,9 @@ import "common.proto";
 
 enum CommandType {
   CreateStore = 0;
-  Put = 1;
-  Get = 2;
-  DeleteStore = 3;
-  SqlDML = 4;
-  SqlDDL = 5;
-}
-
-enum StoreType {
-  Memory = 0;
-  Sqlite = 1;
+  DeleteStore = 1;
+  SqlDML = 2;
+  SqlDDL = 3;
 }
 
 message VoteRequest {
@@ -71,14 +64,6 @@ message AddPeersReply {
   string Id = 1;
 }
 
-message BootStrapRequest {
-  string Id = 1;
-}
-
-message BootStrapReply {
-  string Id = 1;
-}
-
 message RemovePeerRequest {
   string Id = 1;
   Peer peer = 2;
@@ -111,7 +96,6 @@ message ClusterStatusReply {
 message StoreCreateRequest {
   string Id = 1;
   string name = 2;
-  StoreType type = 3;
 }
 
 message StoreCreateReply {
@@ -135,29 +119,6 @@ message ListStoreRequest {
 
 message ListStoreReply {
   repeated string name = 1;
-}
-
-message PutRequest {
-  string Id = 1;
-  string StoreName = 2;
-  string Key = 3;
-  string Value = 4;
-}
-
-message PutReply {
-  string Id = 1;
-  string error = 2;
-}
-
-message GetRequest {
-  string Id = 1;
-  string StoreName = 2;
-  string Key = 3;
-}
-
-message GetReply {
-  string Id = 1;
-  string value = 2;
 }
 
 message StoreDeleteRequest {
@@ -213,8 +174,6 @@ service YadosService {
   rpc ClusterStatus(ClusterStatusRequest) returns (ClusterStatusReply) {}
   rpc CreateStore(StoreCreateRequest) returns (StoreCreateReply) {}
   rpc ListStores(ListStoreRequest) returns (ListStoreReply) {}
-  rpc Put(PutRequest) returns (PutReply) {}
-  rpc Get(GetRequest) returns(GetReply) {}
   rpc DeleteStore(StoreDeleteRequest) returns (StoreDeleteReply) {}
   rpc ExecuteQuery(ExecuteQueryRequest) returns (ExecuteQueryReply) {}
   rpc Query(QueryRequest) returns (QueryReply) {}

@@ -77,8 +77,8 @@ func (srv *server) ClusterStatus(ctx context.Context, request *pb.ClusterStatusR
 var ErrorStoreAlreadyExists = errors.New("store with this name already exists")
 
 func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateRequest) (*pb.StoreCreateReply, error) {
-	srv.logger.Debugf("[%s] [%s] XXXXX Received request CreateStore id=%v Name=%v, Type=%v",
-		srv.Name(), srv.State(), request.Id, request.Name, request.Type)
+	srv.logger.Debugf("[%s] [%s] XXXXX Received request CreateStore id=%v Name=%v",
+		srv.Name(), srv.State(), request.Id, request.Name)
 	reply := &pb.StoreCreateReply{}
 	// Check if store with name already exists
 	if _, ok := srv.StoreManager().Stores()[request.Name]; ok {
@@ -89,7 +89,7 @@ func (srv *server) CreateStore(ctx context.Context, request *pb.StoreCreateReque
 	if err != nil {
 		return reply, err
 	}
-	reply.Msg = fmt.Sprintf("Store = %s, Type = %s created", request.Name, request.Type.String())
+	reply.Msg = fmt.Sprintf("Store = %s created", request.Name)
 	return reply, nil
 }
 
@@ -113,44 +113,6 @@ func (srv *server) DeleteStore(ctx context.Context, request *pb.StoreDeleteReque
 	if err != nil {
 		return reply, err
 	}
-	return reply, nil
-}
-
-func (srv *server) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutReply, error) {
-	reply := &pb.PutReply{}
-	// Check if store with name exists
-	if _, ok := srv.StoreManager().Stores()[request.StoreName]; !ok {
-		reply.Error = ErrorStoreDoesExists.Error()
-		return reply, ErrorStoreDoesExists
-	}
-
-	if srv.logger.IsLevelEnabled(logrus.DebugLevel) {
-		marshal, err := json.Marshal(request)
-		if err != nil {
-			return nil, err
-		}
-		srv.logger.Debugf("[%s] Submitting request to raft engine %s", request.Id, string(marshal))
-	}
-
-	err := srv.Raft().SubmitAndWait(request, request.Id, pb.CommandType_Put)
-	if err != nil {
-		return reply, err
-	}
-
-	return reply, nil
-}
-
-func (srv *server) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetReply, error) {
-	reply := &pb.GetReply{}
-	// Check if store with name exists
-	if _, ok := srv.StoreManager().Stores()[request.StoreName]; !ok {
-		reply.Value = ErrorStoreDoesExists.Error()
-		return reply, ErrorStoreDoesExists
-	}
-
-	value := (srv.StoreManager().Stores()[request.StoreName].(store.KVStore)).Get(request)
-	reply.Value = value
-
 	return reply, nil
 }
 

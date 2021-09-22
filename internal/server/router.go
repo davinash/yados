@@ -38,8 +38,6 @@ func (h *HTTPHandler) Router() *gin.Engine {
 	router.GET("/api/v1/status", h.getStatus)
 	router.POST("/api/v1/store", h.createStore)
 	router.GET("/api/v1/stores", h.getStores)
-	router.POST("/api/v1/kv/put", h.put)
-	router.GET("/api/v1/kv/get/:storeName/:key", h.get)
 	router.POST("/api/v1/sqlite/execute", h.execute)
 	router.POST("/api/v1/sqlite/query", h.query)
 
@@ -104,59 +102,6 @@ func (h *HTTPHandler) getStores(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, status)
-}
-
-//
-// @Summary Perform put operation in KV type of store
-// @Description Perform put operation in KV type of store
-// @Success 200 {string} string	"ok"
-// @Accept  json
-// @Produce  json
-// @Param   PutArgs     body PutArgs     true        "PutArgs"
-// @Router /kv/put [post]
-func (h *HTTPHandler) put(c *gin.Context) {
-	request := PutArgs{}
-	if err := c.ShouldBindWith(&request, binding.JSON); err != nil {
-		h.srv.Logger().Error(err)
-		c.JSON(http.StatusBadRequest, err.Error())
-		return
-	}
-	err := ExecuteCmdPut(&request, h.srv.Self().Address, h.srv.Self().Port)
-	if err != nil {
-		h.srv.Logger().Error(err)
-		c.JSON(http.StatusInternalServerError, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "success",
-	})
-}
-
-//
-// @Summary Gets value of a key
-// @Description Gets value of a key
-// @Success 200 {string} string	"ok"
-// @Accept  json
-// @Produce  json
-// @Param   storeName     path    string     true        "storeName"
-// @Param   key     path    string     true        "key"
-// @Router /kv/get [get]
-func (h *HTTPHandler) get(c *gin.Context) {
-	request := GetArgs{}
-	storeName := c.Params.ByName("storeName")
-	key := c.Params.ByName("key")
-
-	request.StoreName = storeName
-	request.Key = key
-
-	reply, err := ExecuteCmdGet(&request, h.srv.Self().Address, h.srv.Self().Port)
-	if err != nil {
-		h.srv.Logger().Error(err)
-		c.JSON(http.StatusInternalServerError, err)
-		return
-	}
-	c.JSON(http.StatusOK, reply)
 }
 
 //

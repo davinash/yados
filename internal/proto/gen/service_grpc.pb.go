@@ -27,8 +27,6 @@ type YadosServiceClient interface {
 	ClusterStatus(ctx context.Context, in *ClusterStatusRequest, opts ...grpc.CallOption) (*ClusterStatusReply, error)
 	CreateStore(ctx context.Context, in *StoreCreateRequest, opts ...grpc.CallOption) (*StoreCreateReply, error)
 	ListStores(ctx context.Context, in *ListStoreRequest, opts ...grpc.CallOption) (*ListStoreReply, error)
-	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutReply, error)
-	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetReply, error)
 	DeleteStore(ctx context.Context, in *StoreDeleteRequest, opts ...grpc.CallOption) (*StoreDeleteReply, error)
 	ExecuteQuery(ctx context.Context, in *ExecuteQueryRequest, opts ...grpc.CallOption) (*ExecuteQueryReply, error)
 	Query(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*QueryReply, error)
@@ -115,24 +113,6 @@ func (c *yadosServiceClient) ListStores(ctx context.Context, in *ListStoreReques
 	return out, nil
 }
 
-func (c *yadosServiceClient) Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutReply, error) {
-	out := new(PutReply)
-	err := c.cc.Invoke(ctx, "/YadosService/Put", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *yadosServiceClient) Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetReply, error) {
-	out := new(GetReply)
-	err := c.cc.Invoke(ctx, "/YadosService/Get", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *yadosServiceClient) DeleteStore(ctx context.Context, in *StoreDeleteRequest, opts ...grpc.CallOption) (*StoreDeleteReply, error) {
 	out := new(StoreDeleteReply)
 	err := c.cc.Invoke(ctx, "/YadosService/DeleteStore", in, out, opts...)
@@ -181,8 +161,6 @@ type YadosServiceServer interface {
 	ClusterStatus(context.Context, *ClusterStatusRequest) (*ClusterStatusReply, error)
 	CreateStore(context.Context, *StoreCreateRequest) (*StoreCreateReply, error)
 	ListStores(context.Context, *ListStoreRequest) (*ListStoreReply, error)
-	Put(context.Context, *PutRequest) (*PutReply, error)
-	Get(context.Context, *GetRequest) (*GetReply, error)
 	DeleteStore(context.Context, *StoreDeleteRequest) (*StoreDeleteReply, error)
 	ExecuteQuery(context.Context, *ExecuteQueryRequest) (*ExecuteQueryReply, error)
 	Query(context.Context, *QueryRequest) (*QueryReply, error)
@@ -217,12 +195,6 @@ func (UnimplementedYadosServiceServer) CreateStore(context.Context, *StoreCreate
 }
 func (UnimplementedYadosServiceServer) ListStores(context.Context, *ListStoreRequest) (*ListStoreReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListStores not implemented")
-}
-func (UnimplementedYadosServiceServer) Put(context.Context, *PutRequest) (*PutReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Put not implemented")
-}
-func (UnimplementedYadosServiceServer) Get(context.Context, *GetRequest) (*GetReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
 func (UnimplementedYadosServiceServer) DeleteStore(context.Context, *StoreDeleteRequest) (*StoreDeleteReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteStore not implemented")
@@ -393,42 +365,6 @@ func _YadosService_ListStores_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _YadosService_Put_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PutRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(YadosServiceServer).Put(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/YadosService/Put",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YadosServiceServer).Put(ctx, req.(*PutRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _YadosService_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(YadosServiceServer).Get(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/YadosService/Get",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YadosServiceServer).Get(ctx, req.(*GetRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _YadosService_DeleteStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StoreDeleteRequest)
 	if err := dec(in); err != nil {
@@ -539,14 +475,6 @@ var YadosService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListStores",
 			Handler:    _YadosService_ListStores_Handler,
-		},
-		{
-			MethodName: "Put",
-			Handler:    _YadosService_Put_Handler,
-		},
-		{
-			MethodName: "Get",
-			Handler:    _YadosService_Get_Handler,
 		},
 		{
 			MethodName: "DeleteStore",

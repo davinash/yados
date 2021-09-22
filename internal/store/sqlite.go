@@ -14,18 +14,16 @@ import (
 )
 
 type storeSqlite struct {
-	db        *sql.DB
-	logger    *logrus.Logger
-	storeType pb.StoreType
-	name      string
+	db     *sql.DB
+	logger *logrus.Logger
+	name   string
 }
 
 //NewSqliteStore creates a new store for sqlite database
 func NewSqliteStore(args *Args) (SQLStore, error) {
 	s := &storeSqlite{
-		logger:    args.Logger,
-		storeType: args.StoreType,
-		name:      args.Name,
+		logger: args.Logger,
+		name:   args.Name,
 	}
 	dbPath := filepath.Join(args.WALDir, fmt.Sprintf("%s.db", args.Name))
 	db, err := sql.Open("sqlite3", dbPath)
@@ -42,10 +40,6 @@ func (ss *storeSqlite) Name() string {
 
 func (ss *storeSqlite) Close() error {
 	return ss.db.Close()
-}
-
-func (ss *storeSqlite) Type() pb.StoreType {
-	return ss.storeType
 }
 
 func (ss *storeSqlite) Execute(request *pb.ExecuteQueryRequest) (*pb.ExecuteQueryReply, error) {

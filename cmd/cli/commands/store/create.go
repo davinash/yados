@@ -41,7 +41,5 @@ yadosctl store create --store-name store-kv
 		panic(err)
 	}
 
-	cmd.Flags().StringVar(&arg.Type, "store-type", "memory", "type of the store to create [ memory | sqlite ]")
-
 	rootCmd.AddCommand(cmd)
 }

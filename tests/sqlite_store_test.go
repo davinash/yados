@@ -14,7 +14,6 @@ func CreateSQLStoreAndWait(cluster *TestCluster, storeName string) error {
 	}()
 	_, err := server.ExecuteCmdCreateStore(&server.CreateCommandArgs{
 		Name: storeName,
-		Type: "sqlite",
 	}, cluster.members[0].Address(), cluster.members[0].Port())
 	if err != nil {
 		return err
@@ -64,8 +63,8 @@ func InsertRowsAndWait(cluster *TestCluster, storeName string) error {
 			return err
 		}
 	}
-
 	wg.Wait()
+
 	return nil
 }
 

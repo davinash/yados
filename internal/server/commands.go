@@ -46,7 +46,6 @@ func ExecuteCmdStatus(address string, port int32) (*pb.ClusterStatusReply, error
 //CreateCommandArgs argument structure for this command
 type CreateCommandArgs struct {
 	Name string `json:"name"`
-	Type string `json:"type"`
 }
 
 //ExecuteCmdCreateStore helper function to executed create store command
@@ -72,10 +71,6 @@ func ExecuteCmdCreateStore(args *CreateCommandArgs, address string, port int32) 
 	req := &pb.StoreCreateRequest{
 		Name: args.Name,
 		Id:   uuid.New().String(),
-		Type: pb.StoreType_Memory,
-	}
-	if args.Type == "sqlite" {
-		req.Type = pb.StoreType_Sqlite
 	}
 
 	resp, err := rpcClient.CreateStore(context.Background(), req)
@@ -86,42 +81,6 @@ func ExecuteCmdCreateStore(args *CreateCommandArgs, address string, port int32) 
 	}
 
 	return resp, nil
-}
-
-//GetArgs argument structure for this command
-type GetArgs struct {
-	Key       string `json:"key"`
-	StoreName string `json:"storeName"`
-}
-
-//ExecuteCmdGet helper function to perform put command
-func ExecuteCmdGet(args *GetArgs, address string, port int32) (*pb.GetReply, error) {
-	leader, err := GetLeader(address, port)
-	if err != nil {
-		return nil, err
-	}
-	peerConn, rpcClient, err := rpc.GetPeerConn(leader.Address, leader.Port)
-	if err != nil {
-		return nil, err
-	}
-	defer func(peerConn *grpc.ClientConn) {
-		err := peerConn.Close()
-		if err != nil {
-			log.Printf("failed to close the connection, error = %v\n", err)
-		}
-	}(peerConn)
-
-	req := &pb.GetRequest{
-		StoreName: args.StoreName,
-		Key:       args.Key,
-	}
-	reply, err := rpcClient.Get(context.Background(), req)
-	if err != nil {
-		e, _ := status.FromError(err)
-		e.Message()
-		return &pb.GetReply{}, fmt.Errorf("get failed, Error= %s", e.Message())
-	}
-	return reply, nil
 }
 
 //ExecuteCmdListStore executes the list command for a store
@@ -149,47 +108,6 @@ func ExecuteCmdListStore(address string, port int32) (*pb.ListStoreReply, error)
 		return &pb.ListStoreReply{}, fmt.Errorf("ListStores failed, Error= %s", e.Message())
 	}
 	return storeList, err
-}
-
-//PutArgs argument structure for this command
-type PutArgs struct {
-	Key       string `json:"key"`
-	Value     string `json:"value"`
-	StoreName string `json:"storeName"`
-}
-
-//ExecuteCmdPut helper function to perform put command
-func ExecuteCmdPut(args *PutArgs, address string, port int32) error {
-	leader, err := GetLeader(address, port)
-	if err != nil {
-		return err
-	}
-
-	peerConn, rpcClient, err1 := rpc.GetPeerConn(leader.Address, leader.Port)
-	if err1 != nil {
-		return err1
-	}
-	defer func(peerConn *grpc.ClientConn) {
-		err := peerConn.Close()
-		if err != nil {
-			log.Printf("failed to close the connection, error = %v\n", err)
-		}
-	}(peerConn)
-
-	req := &pb.PutRequest{
-		StoreName: args.StoreName,
-		Key:       args.Key,
-		Value:     args.Value,
-		Id:        uuid.New().String(),
-	}
-
-	_, err = rpcClient.Put(context.Background(), req)
-	if err != nil {
-		e, _ := status.FromError(err)
-		e.Message()
-		return fmt.Errorf("put failed, Error= %s", e.Message())
-	}
-	return nil
 }
 
 //QueryArgs arguments for the query command
