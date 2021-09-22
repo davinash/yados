@@ -4,7 +4,7 @@ services:
   yados-controller:
     container_name: yados-controller
     image: davinash/yados:1.0.0
-    command: "yadosctl server start --name yados-1 --listen-address 192.28.0.2 --wal-dir /data --port 9191 --http-port 8181"
+    command: "yadosctl controller start --listen-address 192.28.0.2 --port 9090"
     volumes:
       - ./data:/data
     ports:
@@ -16,13 +16,13 @@ services:
   yados-1:
     container_name: yados-1
     image: davinash/yados:1.0.0
-    command: "yadosctl server start --name yados-1 --listen-address 192.28.0.2 --wal-dir /data --port 9191 --http-port 8181"
+    command: "yadosctl server start --name yados-1 --listen-address 192.28.0.3 --wal-dir /data --port 9191 --http-port 8989 --controller 192.28.0.2:9090"
     volumes:
       - ./data:/data
     depends_on:
       - yados-controller
     ports:
-      - "8181:8181"
+      - "8989:8989"
     networks:
       yados_network:
         ipv4_address: 192.28.0.3
@@ -30,7 +30,7 @@ services:
   yados-2:
     container_name: yados-2
     image: davinash/yados:1.0.0
-    command: "yadosctl server start --name yados-2 --listen-address 192.28.0.3 --wal-dir /data --port 9192  --peer yados-1:192.28.0.2:9191"
+    command: "yadosctl server start --name yados-2 --listen-address 192.28.0.4 --wal-dir /data --port 9192  --controller 192.28.0.2:9090"
     volumes:
       - ./data:/data
     depends_on:
@@ -42,7 +42,7 @@ services:
   yados-3:
     container_name: yados-3
     image: davinash/yados:1.0.0
-    command: "yadosctl server start --name yados-3 --listen-address 192.28.0.4 --wal-dir /data --port 9193 --peer yados-1:192.28.0.2:9191 --peer yados-2:192.28.0.3:9192"
+    command: "yadosctl server start --name yados-3 --listen-address 192.28.0.5 --wal-dir /data --port 9193 --controller 192.28.0.2:9090"
     volumes:
       - ./data:/data
     depends_on:

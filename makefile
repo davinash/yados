@@ -83,6 +83,11 @@ build-docker-image: build
 	@echo "Building YADOS container"
 	@docker build --no-cache -t $(TAG) . -f Dockerfile
 
+
+build-docker-image-dev: build
+	@echo "Building YADOS container"
+	@docker build --no-cache -t $(TAG) . -f Dockerfile.dev
+
 clean:
 	rm -rf out/*
 
