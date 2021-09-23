@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
+
+	"github.com/davinash/yados/internal/raft"
 
 	"google.golang.org/grpc/status"
 
@@ -50,8 +53,9 @@ type CreateCommandArgs struct {
 
 //ExecuteCmdCreateStore helper function to executed create store command
 func ExecuteCmdCreateStore(args *CreateCommandArgs, address string, port int32) (*pb.StoreCreateReply, error) {
+	retry := 0
 	reply := &pb.StoreCreateReply{}
-
+TryWithNewLeader:
 	leader, err := GetLeader(address, port)
 	if err != nil {
 		return reply, err
@@ -75,11 +79,19 @@ func ExecuteCmdCreateStore(args *CreateCommandArgs, address string, port int32) 
 
 	resp, err := rpcClient.CreateStore(context.Background(), req)
 	if err != nil {
+		if err == raft.ErrorNotALeader && retry < 5 {
+			err := peerConn.Close()
+			if err != nil {
+				log.Printf("failed to close the connection, error = %v\n", err)
+			}
+			retry++
+			time.Sleep(20 * time.Millisecond)
+			goto TryWithNewLeader
+		}
 		e, _ := status.FromError(err)
 		e.Message()
 		return reply, fmt.Errorf("CreateStore failed, Error= %s", e.Message())
 	}
-
 	return resp, nil
 }
 
@@ -118,6 +130,8 @@ type QueryArgs struct {
 
 //ExecuteCmdQuery executes the query on the store
 func ExecuteCmdQuery(args *QueryArgs, address string, port int32) (*pb.ExecuteQueryReply, error) {
+	retry := 0
+TryWithNewLeader:
 	leader, err := GetLeader(address, port)
 	if err != nil {
 		return nil, err
@@ -142,6 +156,15 @@ func ExecuteCmdQuery(args *QueryArgs, address string, port int32) (*pb.ExecuteQu
 
 	resp, err := rpcClient.ExecuteQuery(context.Background(), &req)
 	if err != nil {
+		if err == raft.ErrorNotALeader && retry < 5 {
+			err := peerConn.Close()
+			if err != nil {
+				log.Printf("failed to close the connection, error = %v\n", err)
+			}
+			retry++
+			time.Sleep(20 * time.Millisecond)
+			goto TryWithNewLeader
+		}
 		e, _ := status.FromError(err)
 		e.Message()
 		return &pb.ExecuteQueryReply{}, fmt.Errorf("ExecuteQuery failed, Error= %s", e.Message())
@@ -151,6 +174,8 @@ func ExecuteCmdQuery(args *QueryArgs, address string, port int32) (*pb.ExecuteQu
 
 //ExecuteCmdSQLQuery executes the query on the store
 func ExecuteCmdSQLQuery(args *QueryArgs, address string, port int32) (*pb.QueryReply, error) {
+	retry := 0
+TryWithNewLeader:
 	leader, err := GetLeader(address, port)
 	if err != nil {
 		return nil, err
@@ -175,6 +200,15 @@ func ExecuteCmdSQLQuery(args *QueryArgs, address string, port int32) (*pb.QueryR
 
 	resp, err := rpcClient.Query(context.Background(), &req)
 	if err != nil {
+		if err == raft.ErrorNotALeader && retry < 5 {
+			err := peerConn.Close()
+			if err != nil {
+				log.Printf("failed to close the connection, error = %v\n", err)
+			}
+			retry++
+			time.Sleep(20 * time.Millisecond)
+			goto TryWithNewLeader
+		}
 		e, _ := status.FromError(err)
 		e.Message()
 		return &pb.QueryReply{}, fmt.Errorf("query failed, Error= %s", e.Message())
