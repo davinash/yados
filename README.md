@@ -1,7 +1,7 @@
 # yados
 <img src="https://github.com/davinash/yados/blob/main/logo.jpg" align="center"/>
 
-Yet Another Distributed Object Store
+Yet Another Distributed Object Store Using RAFT consensus algorithm.
 
 [![Go Actions Status](https://github.com/davinash/yados/workflows/Go/badge.svg)](https://github.com/davinash/yados/actions)
 
